@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TocItem, Bookmark, Citation, ReaderSettings, BookRecord } from '../types';
-import { CloseIcon, ChevronRightIcon, TrashIcon } from './icons';
+import { CloseIcon, ChevronRightIcon, TrashIcon, ExportIcon } from './icons';
 
 interface NavigationPanelProps {
   isOpen: boolean;
@@ -17,40 +17,114 @@ interface NavigationPanelProps {
   bookData: BookRecord | null;
 }
 
-const formatAuthorName = (author: string, format: 'apa' | 'mla' | 'chicago') => {
-    const parts = author.split(' ').filter(p => p);
-    if (parts.length < 2) return author;
-    const lastName = parts.pop()!;
-    const firstName = parts.join(' ');
-
-    switch (format) {
-        case 'apa':
-            const initials = firstName.split(' ').map(n => n[0] + '.').join(' ');
-            return `${lastName}, ${initials}`;
-        case 'mla':
-        case 'chicago':
-            return `${lastName}, ${firstName}`;
-        default:
-            return author;
+const getPublicationYear = (pubDate: string | undefined): string => {
+    if (!pubDate) return 'n.d.';
+    // Try parsing as a date first to handle various formats
+    const parsedYear = new Date(pubDate).getFullYear();
+    if (!isNaN(parsedYear)) {
+        return parsedYear.toString();
     }
-}
+    // Fallback for "YYYY-MM-DD" or just "YYYY" strings
+    const yearMatch = pubDate.match(/^\d{4}/);
+    if (yearMatch) {
+        return yearMatch[0];
+    }
+    return 'n.d.';
+};
 
-const generateCitationParts = (
+const formatAuthorName = (authorName: string, format: 'apa' | 'mla' | 'chicago' | 'ris'): string => {
+    const words = authorName.split(' ').filter(p => p.trim());
+    if (words.length < 2) return authorName;
+
+    const lastName = words.pop()!;
+    const firstNameParts = words;
+
+    if (format === 'apa') {
+        const initials = firstNameParts.map(name => name[0] ? `${name[0]}.` : '').join(' ');
+        return `${lastName}, ${initials}`;
+    }
+    // MLA, Chicago, RIS use "Last, First Middle"
+    return `${lastName}, ${firstNameParts.join(' ')}`;
+};
+
+
+const generateCitation = (
     book: BookRecord,
     format: 'apa' | 'mla' | 'chicago'
-): { preTitle: string; title: string; postTitle: string } => {
-    const author = formatAuthorName(book.author || 'Unknown Author', format);
+): { pre: string; title: string; post: string; isItalic: boolean } => {
+    const author = book.author || 'Unknown Author';
     const title = book.title || 'Untitled Book';
+    const publisher = book.publisher || '[Publisher not available]';
+    const year = getPublicationYear(book.publicationDate);
+    
+    const formattedAuthor = formatAuthorName(author, format);
 
     switch (format) {
         case 'apa':
-            return { preTitle: `${author}. (n.d.). `, title: title, postTitle: `.` };
+            // Author, A. A. (Year). *Title of work*. Publisher.
+            return {
+                pre: `${formattedAuthor} (${year}). `,
+                title: title,
+                post: `. ${publisher}.`,
+                isItalic: true,
+            };
         case 'mla':
+            // Lastname, Firstname. *Title*. Publisher, Year.
+            return {
+                pre: `${formattedAuthor}. `,
+                title: title,
+                post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
+                isItalic: true,
+            };
         case 'chicago':
-            return { preTitle: `${author}. `, title: title, postTitle: `.` };
+            // Lastname, Firstname. Title. Publisher, Year.
+            return {
+                pre: `${formattedAuthor}. `,
+                title: title,
+                post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
+                isItalic: false,
+            };
         default:
-            return { preTitle: `${book.author}. `, title: title, postTitle: `.` };
+             return { pre: `${author}. `, title: title, post: `.`, isItalic: false };
     }
+};
+
+const generateRisContent = (book: BookRecord, citations: Citation[]): string => {
+    const allRecords: string[] = [];
+    const year = getPublicationYear(book.publicationDate);
+
+    // Create a "Book Chapter" (CHAP) record for each citation.
+    citations.forEach(citation => {
+        const risRecord: string[] = [];
+        risRecord.push('TY  - CHAP');
+        
+        // Book-level information
+        if (book.author) risRecord.push(`AU  - ${formatAuthorName(book.author, 'ris')}`);
+        if (book.title) risRecord.push(`T2  - ${book.title}`); // T2 (Secondary Title) is the Book Title
+        if (book.publisher) risRecord.push(`PB  - ${book.publisher}`);
+        if (year !== 'n.d.') risRecord.push(`PY  - ${year}`);
+        if (book.isbn) risRecord.push(`SN  - ${book.isbn}`);
+
+        // Citation-specific information
+        if (citation.chapter) {
+            risRecord.push(`TI  - ${citation.chapter}`); // TI (Primary Title) is the Chapter Title
+        }
+        if (citation.pageNumber) {
+            risRecord.push(`SP  - ${citation.pageNumber}`); // SP = Start Page
+        }
+        
+        // The note is specific to this one citation.
+        const noteContent = citation.note.replace(/(\r\n|\n|\r)/gm, " ");
+        if (noteContent) {
+            risRecord.push(`N1  - ${noteContent}`); // N1 = Notes
+        }
+        
+        risRecord.push('ER  - ');
+        allRecords.push(risRecord.join('\r\n'));
+    });
+
+    // Separate records with a blank line for compatibility
+    return allRecords.join('\r\n\r\n') + '\r\n';
 };
 
 
@@ -119,6 +193,24 @@ const TocPanel: React.FC<NavigationPanelProps> = ({
     bookData,
 }) => {
   const [activeTab, setActiveTab] = useState<'toc' | 'bookmarks' | 'citations'>('toc');
+
+  const handleExportCitations = () => {
+    if (!bookData || citations.length === 0) return;
+
+    const risContent = generateRisContent(bookData, citations);
+    const blob = new Blob([risContent], { type: 'application/x-research-info-systems;charset=utf-8' });
+    
+    const safeTitle = bookData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const filename = `${safeTitle}_citations.ris`;
+
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
     
   if (!isOpen) return null;
 
@@ -227,24 +319,43 @@ const TocPanel: React.FC<NavigationPanelProps> = ({
             )}
             {activeTab === 'citations' && (
                 <div>
+                    {bookData && citations.length > 0 && (
+                        <div className="p-4 border-b border-slate-700">
+                            <button
+                                onClick={handleExportCitations}
+                                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-md bg-sky-500 hover:bg-sky-600 transition-colors font-semibold text-white text-sm"
+                            >
+                                <ExportIcon className="w-5 h-5" />
+                                <span>Export Citations (.ris)</span>
+                            </button>
+                        </div>
+                    )}
                     {citations.length > 0 && bookData ? (
                         <ul className="divide-y divide-slate-700">
                             {citations.sort((a, b) => a.createdAt - b.createdAt).map((citation) => {
-                                const citationParts = generateCitationParts(bookData, settings.citationFormat);
+                                const citationParts = generateCitation(bookData, settings.citationFormat);
                                 return (
                                     <li key={citation.id} className="p-4 flex items-center justify-between group">
                                         <button onClick={() => onCitationNavigate(citation.cfi)} className="flex-grow text-left pr-4">
-                                            <p className="text-sm font-semibold text-slate-200 group-hover:text-sky-300 transition-colors">
-                                                {citationParts.preTitle}
-                                                <em className="font-normal not-italic text-slate-300 group-hover:text-sky-400">{citationParts.title}</em>
-                                                {citationParts.postTitle}
+                                            {citation.chapter && (
+                                                <span className="block text-xs font-semibold text-sky-400 uppercase tracking-wider mb-1">{citation.chapter}</span>
+                                            )}
+                                            <p className="text-sm text-slate-200 group-hover:text-sky-300 transition-colors">
+                                                {citationParts.pre}
+                                                <span className={`${citationParts.isItalic ? 'italic' : 'not-italic'} text-slate-300 group-hover:text-sky-400`}>{citationParts.title}</span>
+                                                {citationParts.post}
                                             </p>
                                             {citation.note && (
                                                 <blockquote className="mt-2 pl-3 border-l-2 border-slate-600">
                                                     <p className="text-sm text-slate-300 italic">"{citation.note}"</p>
                                                 </blockquote>
                                             )}
-                                            <span className="block text-xs text-slate-400 mt-2">{new Date(citation.createdAt).toLocaleString()}</span>
+                                            <div className="flex justify-between items-center text-xs text-slate-400 mt-2">
+                                                <span>{new Date(citation.createdAt).toLocaleString()}</span>
+                                                {citation.pageNumber && (
+                                                    <span className="font-semibold bg-slate-700 px-1.5 py-0.5 rounded">p. {citation.pageNumber}</span>
+                                                )}
+                                            </div>
                                         </button>
                                         <button onClick={() => onDeleteCitation(citation.id)} className="p-2 rounded-full hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors flex-shrink-0" aria-label={`Delete citation`}>
                                             <TrashIcon className="w-5 h-5" />

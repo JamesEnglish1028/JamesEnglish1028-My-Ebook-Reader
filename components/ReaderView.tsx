@@ -7,6 +7,7 @@ import TocPanel from './TocPanel';
 import SearchPanel from './SearchPanel';
 import Spinner from './Spinner';
 import CitationModal from './CitationModal';
+import BookmarkModal from './BookmarkModal';
 
 interface ReaderViewProps {
   bookId: number;
@@ -49,6 +50,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const [showNavPanel, setShowNavPanel] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showCitationModal, setShowCitationModal] = useState(false);
+  const [showBookmarkModal, setShowBookmarkModal] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
@@ -336,21 +338,40 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const handleBookmarkNavigate = (cfi: string) => { rendition?.display(cfi); setShowNavPanel(false); };
   const handleCitationNavigate = (cfi: string) => { rendition?.display(cfi); setShowNavPanel(false); };
 
-  const addBookmark = useCallback(() => {
+  const handleSaveBookmark = useCallback(async (description: string) => {
     if (!latestCfiRef.current) return;
-    const description = window.prompt("Add a note for this bookmark (optional):");
+
+    const cfi = latestCfiRef.current;
+    let chapter = currentChapterLabel;
+
+    if (navigationRef.current) {
+      try {
+        const tocItemPromise = navigationRef.current.get(cfi);
+        if (tocItemPromise && typeof tocItemPromise.then === 'function') {
+            const tocItem = await tocItemPromise;
+            if (tocItem?.label) {
+              chapter = tocItem.label.trim();
+            }
+        }
+      } catch (e) {
+        console.warn("Could not fetch chapter for bookmark, using last known chapter.", e);
+      }
+    }
+    
     const newBookmark: Bookmark = {
         id: new Date().toISOString(),
-        cfi: latestCfiRef.current,
+        cfi: cfi,
         label: `Page ${locationInfo.currentPage} (${locationInfo.progress}%)`,
-        chapter: currentChapterLabel,
+        chapter: chapter,
         description: description || undefined,
         createdAt: Date.now(),
     };
     const updatedBookmarks = [...bookmarks, newBookmark];
     setBookmarks(updatedBookmarks);
     saveBookmarksForBook(bookId, updatedBookmarks);
+    setShowBookmarkModal(false);
   }, [bookId, bookmarks, locationInfo.currentPage, locationInfo.progress, currentChapterLabel]);
+
 
   const deleteBookmark = useCallback((bookmarkId: string) => {
       const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
@@ -358,19 +379,39 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       saveBookmarksForBook(bookId, updatedBookmarks);
   }, [bookId, bookmarks]);
 
-  const handleSaveCitation = useCallback((note: string) => {
+  const handleSaveCitation = useCallback(async (note: string) => {
     if (!latestCfiRef.current) return;
+    
+    const cfi = latestCfiRef.current;
+    let chapter = currentChapterLabel;
+
+    if (navigationRef.current) {
+      try {
+        const tocItemPromise = navigationRef.current.get(cfi);
+        if (tocItemPromise && typeof tocItemPromise.then === 'function') {
+            const tocItem = await tocItemPromise;
+            if (tocItem?.label) {
+              chapter = tocItem.label.trim();
+            }
+        }
+      } catch (e) {
+        console.warn("Could not fetch chapter for citation, using last known chapter.", e);
+      }
+    }
+
     const newCitation: Citation = {
         id: new Date().toISOString(),
-        cfi: latestCfiRef.current,
+        cfi: cfi,
         note: note,
         createdAt: Date.now(),
+        pageNumber: locationInfo.currentPage > 0 ? locationInfo.currentPage : undefined,
+        chapter: chapter,
     };
     const updatedCitations = [...citations, newCitation];
     setCitations(updatedCitations);
     saveCitationsForBook(bookId, updatedCitations);
     setShowCitationModal(false);
-  }, [bookId, citations]);
+  }, [bookId, citations, locationInfo.currentPage, currentChapterLabel]);
 
   const deleteCitation = useCallback((citationId: string) => {
       const updatedCitations = citations.filter(c => c.id !== citationId);
@@ -381,13 +422,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const isCurrentPageBookmarked = useMemo(() => bookmarks.some(b => b.cfi === currentCfi), [bookmarks, currentCfi]);
 
   const toggleBookmark = useCallback(() => {
-      if (isCurrentPageBookmarked) {
-          const bookmarkToRemove = bookmarks.find(b => b.cfi === currentCfi);
-          if (bookmarkToRemove) deleteBookmark(bookmarkToRemove.id);
-      } else {
-          addBookmark();
-      }
-  }, [isCurrentPageBookmarked, addBookmark, deleteBookmark, bookmarks, currentCfi]);
+    if (isCurrentPageBookmarked) {
+        const bookmarkToRemove = bookmarks.find(b => b.cfi === currentCfi);
+        if (bookmarkToRemove) deleteBookmark(bookmarkToRemove.id);
+    } else {
+        setShowBookmarkModal(true);
+    }
+  }, [isCurrentPageBookmarked, deleteBookmark, bookmarks, currentCfi]);
 
   const performSearch = useCallback(async (query: string) => {
     if (!query || !bookRef.current) {
@@ -663,6 +704,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           isOpen={showCitationModal}
           onClose={() => setShowCitationModal(false)}
           onSave={handleSaveCitation}
+        />
+        <BookmarkModal
+          isOpen={showBookmarkModal}
+          onClose={() => setShowBookmarkModal(false)}
+          onSave={handleSaveBookmark}
         />
       </div>
     </>

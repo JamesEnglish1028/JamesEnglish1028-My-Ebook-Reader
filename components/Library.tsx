@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../services/db';
 import { BookMetadata, BookRecord, CoverAnimationData } from '../types';
@@ -80,6 +79,9 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
           author: metadata.creator || 'Unknown Author',
           coverImage,
           epubData,
+          publisher: metadata.publisher,
+          publicationDate: metadata.pubdate,
+          isbn: metadata.identifier,
         };
 
         setImportStatus(prev => ({ ...prev, message: 'Saving book to library...' }));

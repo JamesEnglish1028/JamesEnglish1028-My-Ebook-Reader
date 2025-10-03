@@ -67,3 +67,9 @@ export const AcademicCapIcon: React.FC<{ className?: string }> = ({ className })
     <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0l-.07.07m15.482 0l.07.07m0 0l-1.018.51a51.011 51.011 0 01-4.456 2.054A51.011 51.011 0 0112 15.342a51.011 51.011 0 01-4.456-2.054l-1.018-.51m0 0l-1.018.51a51.011 51.011 0 01-4.456 2.054A51.011 51.011 0 0112 15.342a51.011 51.011 0 01-4.456-2.054l-1.018-.51" />
   </svg>
 );
+
+export const ExportIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+    </svg>
+);

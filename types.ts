@@ -1,10 +1,12 @@
-
 export interface BookRecord {
   id?: number;
   title: string;
   author: string;
   coverImage: string | null; // Base64 encoded image
   epubData: ArrayBuffer;
+  publisher?: string;
+  publicationDate?: string;
+  isbn?: string;
 }
 
 export interface BookMetadata {
@@ -12,6 +14,9 @@ export interface BookMetadata {
   title: string;
   author: string;
   coverImage: string | null;
+  publisher?: string;
+  publicationDate?: string;
+  isbn?: string;
 }
 
 export interface ReaderSettings {
@@ -43,6 +48,8 @@ export interface Citation {
   cfi: string;
   note: string;
   createdAt: number;
+  pageNumber?: number;
+  chapter?: string;
 }
 
 export interface SearchResult {

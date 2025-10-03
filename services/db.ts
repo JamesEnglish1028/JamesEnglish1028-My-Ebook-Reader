@@ -1,4 +1,3 @@
-
 import { BookRecord, BookMetadata } from '../types';
 
 const DB_NAME = 'EbookReaderDB';
@@ -65,8 +64,8 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
       if (cursor) {
-        const { id, title, author, coverImage } = cursor.value;
-        books.push({ id, title, author, coverImage });
+        const { id, title, author, coverImage, publisher, publicationDate, isbn } = cursor.value;
+        books.push({ id, title, author, coverImage, publisher, publicationDate, isbn });
         cursor.continue();
       } else {
         resolve(books);
