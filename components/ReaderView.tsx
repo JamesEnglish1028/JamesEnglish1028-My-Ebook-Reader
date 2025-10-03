@@ -23,24 +23,66 @@ const defaultSettings: ReaderSettings = {
   citationFormat: 'apa',
 };
 
-// Helper functions for localStorage
+// --- LocalStorage & Data Persistence Helpers ---
+const STORAGE_PREFIX = 'ebook-reader';
+const getStorageKey = (type: string, bookId: number | string) => `${STORAGE_PREFIX}-${type}-${bookId}`;
+
 const getBookmarksForBook = (bookId: number): Bookmark[] => {
-    const saved = localStorage.getItem(`ebook-reader-bookmarks-${bookId}`);
+    const saved = localStorage.getItem(getStorageKey('bookmarks', bookId));
     return saved ? JSON.parse(saved) : [];
 };
 
 const saveBookmarksForBook = (bookId: number, bookmarks: Bookmark[]) => {
-    localStorage.setItem(`ebook-reader-bookmarks-${bookId}`, JSON.stringify(bookmarks));
+    localStorage.setItem(getStorageKey('bookmarks', bookId), JSON.stringify(bookmarks));
 };
 
 const getCitationsForBook = (bookId: number): Citation[] => {
-    const saved = localStorage.getItem(`ebook-reader-citations-${bookId}`);
+    const saved = localStorage.getItem(getStorageKey('citations', bookId));
     return saved ? JSON.parse(saved) : [];
 };
 
 const saveCitationsForBook = (bookId: number, citations: Citation[]) => {
-    localStorage.setItem(`ebook-reader-citations-${bookId}`, JSON.stringify(citations));
+    localStorage.setItem(getStorageKey('citations', bookId), JSON.stringify(citations));
 };
+
+const getLastPositionForBook = (bookId: number): string | null => {
+    return localStorage.getItem(getStorageKey('pos', bookId));
+};
+
+const saveLastPositionForBook = (bookId: number, cfi: string) => {
+    localStorage.setItem(getStorageKey('pos', bookId), cfi);
+};
+
+const getReaderSettings = (): ReaderSettings => {
+    const savedSettings = localStorage.getItem(getStorageKey('settings', 'global'));
+    const parsedSettings = savedSettings ? JSON.parse(savedSettings) : {};
+    return { ...defaultSettings, ...parsedSettings };
+};
+
+const saveReaderSettings = (settings: ReaderSettings) => {
+    localStorage.setItem(getStorageKey('settings', 'global'), JSON.stringify(settings));
+};
+
+
+// --- EPUB Interaction Helpers ---
+
+const performBookSearch = async (book: any, query: string): Promise<SearchResult[]> => {
+    if (!query || !book) return [];
+    
+    const searchPromises = book.spine.spineItems.map((item: any) => 
+        item.load(book.load.bind(book)).then(() => {
+            const results = item.find(query.trim());
+            item.unload();
+            return Promise.resolve(results);
+        }).catch(() => {
+            item.unload();
+            return Promise.resolve([]);
+        })
+    );
+    const nestedResults = await Promise.all(searchPromises);
+    return [].concat(...nestedResults);
+};
+
 
 const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData }) => {
   const [bookData, setBookData] = useState<BookRecord | null>(null);
@@ -67,11 +109,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   );
   const [isNavReady, setIsNavReady] = useState(false);
   
-  const [settings, setSettings] = useState<ReaderSettings>(() => {
-    const savedSettings = localStorage.getItem('readerSettings');
-    const parsedSettings = savedSettings ? JSON.parse(savedSettings) : {};
-    return { ...defaultSettings, ...parsedSettings };
-  });
+  const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings);
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<any>(null);
@@ -164,7 +202,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         latestCfiRef.current = cfi;
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = window.setTimeout(() => {
-          localStorage.setItem(`ebook-reader-pos-${bookId}`, cfi);
+          saveLastPositionForBook(bookId, cfi);
         }, 1000);
       }
 
@@ -186,24 +224,20 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         setBookmarks(getBookmarksForBook(bookId));
         setCitations(getCitationsForBook(bookId));
         
-        // Determine starting location before displaying anything
-        let startLocation = localStorage.getItem(`ebook-reader-pos-${bookId}`);
+        let startLocation = getLastPositionForBook(bookId);
 
         if (!startLocation) {
           const findFirstChapter = async () => {
-            // Method 1: Check EPUB 3 landmarks for 'bodymatter'.
             if (book.navigation?.landmarks?.length > 0) {
               const bodyMatter = book.navigation.landmarks.find((l: any) => l.type?.includes('bodymatter'));
               if (bodyMatter?.href) return bodyMatter.href;
             }
     
-            // Method 2: Check EPUB 2 <guide> element for 'text'.
             if (book.packaging?.guide?.length > 0) {
               const textReference = book.packaging.guide.find((ref: any) => ref.type?.toLowerCase().includes('text'));
               if (textReference?.href) return textReference.href;
             }
             
-            // Method 3: Fallback - Scan the spine.
             for (const item of book.spine.items) {
               try {
                 const section = await book.spine.get(item.href);
@@ -228,7 +262,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               }
             }
             
-            // Final Fallback
             return book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
           };
           
@@ -239,7 +272,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         
         setIsLoading(false);
         
-        // Fade in the viewer content now that it's rendered
         if (viewerRef.current) {
             viewerRef.current.style.transition = 'opacity 0.3s ease-in';
             viewerRef.current.style.opacity = '1';
@@ -249,7 +281,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     return () => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         if (latestCfiRef.current) {
-            localStorage.setItem(`ebook-reader-pos-${bookId}`, latestCfiRef.current);
+            saveLastPositionForBook(bookId, latestCfiRef.current);
         }
         setIsNavReady(false);
         navigationRef.current = null;
@@ -273,7 +305,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             rendition.themes.font('"Helvetica Neue", Helvetica, Arial, sans-serif');
         }
     }
-    localStorage.setItem('readerSettings', JSON.stringify(settings));
+    saveReaderSettings(settings);
   }, [rendition, settings]);
 
   useEffect(() => {
@@ -441,16 +473,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         setCurrentHighlightCfi(null);
     }
     try {
-        const book = bookRef.current;
-        const searchPromises = book.spine.spineItems.map((item: any) => 
-            item.load(book.load.bind(book)).then(() => {
-                const results = item.find(query.trim());
-                item.unload();
-                return Promise.resolve(results);
-            }).catch(() => { item.unload(); return Promise.resolve([]); })
-        );
-        const nestedResults = await Promise.all(searchPromises);
-        setSearchResults([].concat(...nestedResults));
+        setIsSearching(true);
+        const results = await performBookSearch(bookRef.current, query);
+        setSearchResults(results);
     } catch (err) {
         console.error("Search failed:", err);
         setSearchResults([]);
@@ -469,9 +494,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       return;
     }
     
-    // Set a timeout to perform the search after a delay
     debounceTimeoutRef.current = window.setTimeout(() => {
-      setIsSearching(true); // Show spinner right before search starts
       performSearch(query);
     }, 500);
   }, [performSearch]);
@@ -479,15 +502,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const handleNavigateToResult = useCallback((cfi: string) => {
     if (!rendition) return;
   
-    // Remove the previous highlight first
     if (currentHighlightCfi) {
       rendition.annotations.remove(currentHighlightCfi, 'highlight');
     }
   
-    // Close the panel to reveal the content
     setShowSearch(false);
   
-    // Navigate to the new CFI and highlight it
     rendition.display(cfi).then(() => {
       rendition.annotations.add('highlight', cfi, {}, undefined, 'hl', { 'fill': 'yellow', 'fill-opacity': '0.3' });
       setCurrentHighlightCfi(cfi);
