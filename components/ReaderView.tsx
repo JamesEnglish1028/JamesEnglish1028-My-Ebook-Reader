@@ -936,11 +936,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         }}
       >
         <header
-          className={`grid grid-cols-3 items-center p-2 bg-slate-800 shadow-md z-20 text-white flex-shrink-0 transition-transform duration-300 ease-in-out ${controlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
+          className={`flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-start sm:gap-4 p-2 bg-slate-800 shadow-md z-20 text-white flex-shrink-0 transition-transform duration-300 ease-in-out ${controlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
           onMouseEnter={clearControlsTimeout}
           onMouseLeave={resetControlsTimeout}
         >
-          <div className="flex items-center gap-2">
+          {/* Left controls */}
+          <div className="flex items-center gap-2 sm:order-1">
               <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close Reader">
                   <CloseIcon className="w-6 h-6" />
               </button>
@@ -951,11 +952,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                   )}
               </button>
           </div>
-          <div className="text-center truncate px-2">
-              <h2 className="text-lg font-bold">{bookData?.title || 'Loading...'}</h2>
-              <p className="text-sm text-slate-400">{bookData?.author}</p>
-          </div>
-          <div className="flex justify-end items-center gap-2">
+          
+          {/* Right controls */}
+          <div className="flex justify-end items-center gap-2 sm:order-3">
               <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label={speechState === 'playing' ? "Pause Read Aloud" : "Start Read Aloud"}>
                 {speechState === 'playing' ? <PauseIcon className="w-6 h-6 text-sky-400" /> : <PlayIcon className="w-6 h-6" />}
               </button>
@@ -971,6 +970,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Settings">
                   <SettingsIcon className="w-6 h-6" />
               </button>
+          </div>
+
+          {/* Title/Author - Placed last in DOM for flexbox ordering */}
+          <div className="text-center truncate px-2 w-full pt-2 sm:order-2 sm:w-auto sm:flex-grow sm:min-w-0 sm:pt-0">
+              <h2 className="text-lg font-bold">{bookData?.title || 'Loading...'}</h2>
+              <p className="text-sm text-slate-400">{bookData?.author}</p>
           </div>
         </header>
 
