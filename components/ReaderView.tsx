@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { db } from '../services/db';
 import { BookRecord, ReaderSettings, TocItem, Bookmark, SearchResult, CoverAnimationData, Citation } from '../types';
-import { LeftArrowIcon, RightArrowIcon, SettingsIcon, CloseIcon, ListIcon, BookmarkIcon, SearchIcon, AcademicCapIcon } from './icons';
+import { LeftArrowIcon, RightArrowIcon, SettingsIcon, CloseIcon, ListIcon, BookmarkIcon, SearchIcon, AcademicCapIcon, PlayIcon, PauseIcon } from './icons';
 import SettingsPanel from './SettingsPanel';
 import TocPanel from './TocPanel';
 import SearchPanel from './SearchPanel';
@@ -21,6 +22,12 @@ const defaultSettings: ReaderSettings = {
   flow: 'paginated',
   fontFamily: 'Original',
   citationFormat: 'apa',
+  readAloud: {
+    voiceURI: null,
+    rate: 0.9,
+    pitch: 1,
+    volume: 1,
+  },
 };
 
 // --- LocalStorage & Data Persistence Helpers ---
@@ -56,7 +63,14 @@ const saveLastPositionForBook = (bookId: number, cfi: string) => {
 const getReaderSettings = (): ReaderSettings => {
     const savedSettings = localStorage.getItem(getStorageKey('settings', 'global'));
     const parsedSettings = savedSettings ? JSON.parse(savedSettings) : {};
-    return { ...defaultSettings, ...parsedSettings };
+    return {
+      ...defaultSettings,
+      ...parsedSettings,
+      readAloud: {
+        ...defaultSettings.readAloud,
+        ...(parsedSettings.readAloud || {}),
+      },
+    };
 };
 
 const saveReaderSettings = (settings: ReaderSettings) => {
@@ -81,6 +95,144 @@ const performBookSearch = async (book: any, query: string): Promise<SearchResult
     );
     const nestedResults = await Promise.all(searchPromises);
     return [].concat(...nestedResults);
+};
+
+const findFirstChapter = async (book: any): Promise<string | undefined> => {
+  if (book.navigation?.landmarks?.length > 0) {
+    const bodyMatter = book.navigation.landmarks.find((l: any) => l.type?.includes('bodymatter'));
+    if (bodyMatter?.href) return bodyMatter.href;
+  }
+
+  if (book.packaging?.guide?.length > 0) {
+    const textReference = book.packaging.guide.find((ref: any) => ref.type?.toLowerCase().includes('text'));
+    if (textReference?.href) return textReference.href;
+  }
+
+  for (const item of book.spine.items) {
+    try {
+      const section = await book.spine.get(item.href);
+      if (!section) continue;
+
+      const doc = await section.load();
+      const body = doc?.body;
+
+      let isLikelyContentPage = false;
+      if (body) {
+        const textContent = body.textContent || '';
+        if (textContent.trim().length > 300) {
+          isLikelyContentPage = true;
+        }
+      }
+
+      section.unload();
+
+      if (isLikelyContentPage) return item.href;
+    } catch (error) {
+       console.warn(`Could not parse section ${item.href} when searching for first chapter. Skipping.`, error);
+    }
+  }
+
+  return book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
+};
+
+// --- Read Aloud Helpers ---
+
+// A list of common English abbreviations that might be mistaken for sentence endings.
+// This list can be expanded for better accuracy.
+const ABBREVIATIONS = [
+  'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sr', 'Jr', 'Sen', 'Rep', 'Gov', 'Gen', 'Hon', // Titles
+  'Sgt', 'Capt', 'Col', 'Lt', // Military
+  'St', 'Ave', 'Blvd', // Locations
+  'etc', 'i.e', 'e.g', 'vs', 'al', 'op', 'cit' // Latin & Common
+];
+
+// This regex improves sentence detection by handling common abbreviations and multiple punctuation marks (like ellipses).
+// It works in two parts joined by an OR (|):
+// 1. For sentences ending with a period: It matches non-greedily and uses a negative lookbehind
+//    to ensure the period is not part of a known abbreviation from the list above.
+// 2. For sentences ending with '?' or '!': It matches non-greedily, as these are less ambiguous.
+// It handles multiple punctuation marks (e.g., "...", "?!") by matching `[.!?]+`.
+const SENTENCE_REGEX = new RegExp(
+    `(?:.+?)` + // Non-greedy match for sentence content.
+    `(?<!\\b(?:${ABBREVIATIONS.join('|')}))` + // Negative lookbehind: ensure what comes before the period is NOT a known abbreviation.
+    `\\.` + // Match the period.
+    `[.!?]*` + // Match any subsequent punctuation (for ellipses, etc.).
+    `\\s*` + // Include trailing whitespace.
+    `|` + // OR
+    `(?:.+?)` + // Non-greedy match for sentence content.
+    `[?!]+` + // Match '?' or '!', which are unambiguous sentence endings.
+    `[.!?]*` + // Match any subsequent punctuation (for "?!").
+    `\\s*`, // Include trailing whitespace.
+    'g'
+);
+
+
+const findSentenceRange = (text: string, index: number): { start: number; end: number; sentence: string } | null => {
+    // Use the new, more accurate regex to split the text into sentences.
+    const sentences = text.match(SENTENCE_REGEX) || [];
+    let charCount = 0;
+    for (const sentence of sentences) {
+        const sentenceStart = charCount;
+        const sentenceEnd = charCount + sentence.length;
+        if (index >= sentenceStart && index < sentenceEnd) {
+            const trimmedSentence = sentence.trim();
+            // Find the start of the trimmed sentence within the original text, searching from the start of the current sentence block
+            const startOffset = text.indexOf(trimmedSentence, sentenceStart);
+            if (startOffset !== -1) {
+                const endOffset = startOffset + trimmedSentence.length;
+                return { start: startOffset, end: endOffset, sentence: trimmedSentence };
+            }
+        }
+        charCount = sentenceEnd;
+    }
+    return null;
+};
+
+const findDomRangeFromCharacterOffsets = (root: Node, startOffset: number, endOffset: number): Range | null => {
+    const doc = root.ownerDocument;
+    if (!doc) return null;
+
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let charCount = 0;
+    let startNode: Node | null = null;
+    let startNodeOffset = 0;
+    let endNode: Node | null = null;
+    let endNodeOffset = 0;
+    let currentNode: Node | null;
+
+    while (currentNode = walker.nextNode()) {
+        const nodeText = currentNode.textContent || '';
+        const nodeLength = nodeText.length;
+        const nextCharCount = charCount + nodeLength;
+
+        if (startNode === null && startOffset >= charCount && startOffset < nextCharCount) {
+            startNode = currentNode;
+            startNodeOffset = startOffset - charCount;
+        }
+
+        if (endNode === null && endOffset > charCount && endOffset <= nextCharCount) {
+            endNode = currentNode;
+            endNodeOffset = endOffset - charCount;
+        }
+        
+        if (startNode && endNode) {
+            break; // Found both, exit loop
+        }
+        charCount = nextCharCount;
+    }
+    
+    if (startNode && endNode) {
+        const range = doc.createRange();
+        try {
+            range.setStart(startNode, startNodeOffset);
+            range.setEnd(endNode, endNodeOffset);
+            return range;
+        } catch (e) {
+            console.error("Error creating DOM range:", e);
+            return null;
+        }
+    }
+    return null;
 };
 
 
@@ -108,11 +260,17 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     animationData ? 'start' : 'finished'
   );
   const [isNavReady, setIsNavReady] = useState(false);
+  const [speechState, setSpeechState] = useState<'stopped' | 'playing' | 'paused'>('stopped');
   
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings);
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<any>(null);
+  const renditionRef = useRef<any>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const speechStateRef = useRef(speechState);
+  speechStateRef.current = speechState;
   const navigationRef = useRef<any>(null);
   const sliderTimeoutRef = useRef<number | null>(null);
   const latestCfiRef = useRef<string | null>(null);
@@ -120,6 +278,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const touchStartXRef = useRef<number | null>(null);
   const debounceTimeoutRef = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
+  const locationsReadyRef = useRef(false);
+  const highlightedCfiRef = useRef<string | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const isAnyPanelOpen = useMemo(
     () => showSettings || showNavPanel || showSearch,
@@ -161,140 +322,282 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     };
     fetchBook();
   }, [bookId, onClose]);
+
+  // Smart default voice selection effect
+  useEffect(() => {
+    const setDefaultVoice = () => {
+      const currentSettings = getReaderSettings();
+      if (currentSettings.readAloud.voiceURI) {
+        return; 
+      }
   
+      const availableVoices = window.speechSynthesis.getVoices();
+      if (availableVoices.length === 0) {
+        return;
+      }
+  
+      let bestVoice = availableVoices.find(v => v.default) ||
+                      availableVoices.find(v => v.lang === 'en-US' && /google/i.test(v.name)) ||
+                      availableVoices.find(v => v.lang === 'en-US' && /microsoft/i.test(v.name)) ||
+                      availableVoices.find(v => v.lang === 'en-US' && v.localService) ||
+                      availableVoices.find(v => v.lang === 'en-US') ||
+                      null;
+  
+      if (bestVoice) {
+        setSettings(prevSettings => {
+          const newReadAloudSettings = { ...prevSettings.readAloud, voiceURI: bestVoice!.voiceURI };
+          const newSettings = { ...prevSettings, readAloud: newReadAloudSettings };
+          saveReaderSettings(newSettings); 
+          return newSettings;
+        });
+      }
+    };
+  
+    if (window.speechSynthesis.getVoices().length > 0) {
+      setDefaultVoice();
+    } else {
+      window.speechSynthesis.onvoiceschanged = setDefaultVoice;
+    }
+    
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  const removeHighlight = useCallback(() => {
+    if (highlightedCfiRef.current && renditionRef.current) {
+        renditionRef.current.annotations.remove(highlightedCfiRef.current, 'highlight');
+        highlightedCfiRef.current = null;
+    }
+  }, []);
+
+  const stopSpeech = useCallback(() => {
+      window.speechSynthesis.cancel();
+      removeHighlight();
+      utteranceRef.current = null;
+      setSpeechState('stopped');
+  }, [removeHighlight]);
+  
+  const startSpeech = useCallback(() => {
+    const currentRendition = renditionRef.current;
+    if (!currentRendition) return;
+
+    stopSpeech();
+
+    const contents = currentRendition.getContents();
+    let textToRead = '';
+    let body: HTMLElement | null = null;
+    if (contents && contents.length > 0) {
+        body = contents[0].document?.body;
+        if (body) {
+            textToRead = body.textContent?.replace(/\s+/g, ' ').trim() || '';
+        }
+    }
+
+    if (!textToRead) {
+        console.warn("No text on page to read.");
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utteranceRef.current = utterance;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const currentSettings = settingsRef.current;
+    const selectedVoice = voices.find(v => v.voiceURI === currentSettings.readAloud.voiceURI);
+    
+    utterance.voice = selectedVoice || null;
+    utterance.rate = currentSettings.readAloud.rate;
+    utterance.pitch = currentSettings.readAloud.pitch;
+    utterance.volume = currentSettings.readAloud.volume;
+
+    let currentSentence = '';
+    
+    utterance.onboundary = (event) => {
+        if (event.name !== 'word' || !renditionRef.current || !body) return;
+        
+        const sentenceInfo = findSentenceRange(textToRead, event.charIndex);
+        if (!sentenceInfo || sentenceInfo.sentence === currentSentence) {
+            return;
+        }
+        currentSentence = sentenceInfo.sentence;
+        
+        try {
+            const contents = renditionRef.current.getContents()[0];
+            const domRange = findDomRangeFromCharacterOffsets(body, sentenceInfo.start, sentenceInfo.end);
+            
+            if (domRange) {
+              const cfi = contents.cfiFromRange(domRange);
+              if (cfi) {
+                  removeHighlight();
+                  renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
+                      'fill': 'rgba(0, 191, 255, 0.4)',
+                  });
+                  highlightedCfiRef.current = cfi;
+              }
+            }
+        } catch (e) {
+            console.error("Error during sentence highlighting:", e);
+        }
+    };
+    
+    utterance.onend = () => {
+      removeHighlight();
+      if (speechStateRef.current === 'playing' && settingsRef.current.flow === 'paginated') {
+          renditionRef.current?.next();
+      } else {
+          setSpeechState('stopped');
+      }
+    };
+    
+    utterance.onerror = (e) => {
+        console.error("SpeechSynthesisUtterance error", e);
+        stopSpeech();
+    };
+
+    window.speechSynthesis.speak(utterance);
+    setSpeechState('playing');
+  }, [stopSpeech, removeHighlight]);
+
   // Initialize epub.js rendition only after animation is finished
   useEffect(() => {
     if (animationState !== 'finished' || !bookData || !viewerRef.current) {
         return;
     }
 
-    setIsLoading(true);
+    let isMounted = true;
 
-    const ePub = (window as any).ePub;
-    const book = ePub(bookData.epubData);
-    bookRef.current = book;
-    
-    if (viewerRef.current) {
-      viewerRef.current.innerHTML = '';
-      viewerRef.current.style.opacity = '0'; // Keep viewer transparent until content is rendered
-    }
-    
-    const rend = book.renderTo(viewerRef.current, {
-        width: '100%',
-        height: '100%',
-        flow: settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
-        manager: 'default',
-        spread: 'auto',
-    });
-    setRendition(rend);
-      
-    book.loaded.navigation.then((nav: any) => {
-      setToc(nav.toc);
-      navigationRef.current = nav;
-      setIsNavReady(true);
-    });
+    const initializeBook = async () => {
+      try {
+        setIsLoading(true);
 
-    rend.on('relocated', (location: any) => {
-      const cfi = location.start.cfi;
-      setCurrentCfi(cfi);
-
-      if (cfi) {
-        latestCfiRef.current = cfi;
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = window.setTimeout(() => {
-          saveLastPositionForBook(bookId, cfi);
-        }, 1000);
-      }
-
-      if (book.locations?.length() > 0) {
-        const page = book.locations.locationFromCfi(location.start.cfi);
-        const progress = book.locations.percentageFromCfi(location.start.cfi);
-        setLocationInfo({
-          currentPage: page + 1,
-          totalPages: book.locations.length(),
-          progress: Math.round(progress * 100),
+        const ePub = (window as any).ePub;
+        const bookInstance = ePub(bookData.epubData);
+        bookRef.current = bookInstance;
+        
+        if (viewerRef.current) {
+          viewerRef.current.innerHTML = '';
+          viewerRef.current.style.opacity = '0';
+        }
+        
+        const renditionInstance = bookInstance.renderTo(viewerRef.current, {
+            width: '100%',
+            height: '100%',
+            flow: settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
+            manager: 'default',
+            spread: 'auto',
         });
-      }
-    });
+        if (!isMounted) return;
+        setRendition(renditionInstance);
+        renditionRef.current = renditionInstance;
+          
+        const nav = await bookInstance.loaded.navigation;
+        if (!isMounted) return;
+        setToc(nav.toc);
+        navigationRef.current = nav;
+        setIsNavReady(true);
 
-    book.ready.then(async () => {
-        await book.locations.generate(1600);
-        setLocationInfo(prev => ({ ...prev, totalPages: book.locations.length(), currentPage: 1 }));
+        renditionInstance.on('relocated', (location: any) => {
+          if (!isMounted) return;
+
+          const cfi = location.start.cfi;
+          setCurrentCfi(cfi);
+
+          if (cfi) {
+            latestCfiRef.current = cfi;
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = window.setTimeout(() => {
+              saveLastPositionForBook(bookId, cfi);
+            }, 1000);
+          }
+
+          if (locationsReadyRef.current && bookRef.current?.locations) {
+            const bookLocations = bookRef.current.locations;
+            const page = bookLocations.locationFromCfi(location.start.cfi);
+            
+            // FIX: Only update location info if the CFI is valid and found in the locations map.
+            // This prevents the progress bar from resetting on intermediate `relocated` events
+            // that can fire with an unresolvable CFI during automatic page turns.
+            if (page > -1) {
+              const progress = bookLocations.percentageFromCfi(location.start.cfi);
+              setLocationInfo({
+                currentPage: page + 1,
+                totalPages: bookLocations.length(),
+                progress: Math.round((progress || 0) * 100),
+              });
+            }
+          }
+          
+          if (speechStateRef.current === 'playing') {
+            startSpeech();
+          }
+        });
+        
+        await bookInstance.ready;
+        if (!isMounted) return;
+
+        locationsReadyRef.current = false;
+        await bookInstance.locations.generate(1600);
+        if (!isMounted) return;
+        locationsReadyRef.current = true;
+        
+        if (bookInstance.locations) {
+            setLocationInfo(prev => ({ ...prev, totalPages: bookInstance.locations.length(), currentPage: 1 }));
+        }
 
         setBookmarks(getBookmarksForBook(bookId));
         setCitations(getCitationsForBook(bookId));
         
-        let startLocation = getLastPositionForBook(bookId);
-
-        if (!startLocation) {
-          const findFirstChapter = async () => {
-            if (book.navigation?.landmarks?.length > 0) {
-              const bodyMatter = book.navigation.landmarks.find((l: any) => l.type?.includes('bodymatter'));
-              if (bodyMatter?.href) return bodyMatter.href;
-            }
-    
-            if (book.packaging?.guide?.length > 0) {
-              const textReference = book.packaging.guide.find((ref: any) => ref.type?.toLowerCase().includes('text'));
-              if (textReference?.href) return textReference.href;
-            }
-            
-            for (const item of book.spine.items) {
-              try {
-                const section = await book.spine.get(item.href);
-                if (!section) continue;
-    
-                const doc = await section.load();
-                const body = doc?.body;
-                
-                let isLikelyContentPage = false;
-                if (body) {
-                  const textContent = body.textContent || '';
-                  if (textContent.trim().length > 300) {
-                    isLikelyContentPage = true;
-                  }
-                }
-                
-                section.unload();
-    
-                if (isLikelyContentPage) return item.href;
-              } catch (error) {
-                 console.warn(`Could not parse section ${item.href} when searching for first chapter. Skipping.`, error);
-              }
-            }
-            
-            return book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
-          };
-          
-          startLocation = await findFirstChapter();
-        }
+        const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
         
-        await rend.display(startLocation || undefined);
+        if (!isMounted) return;
+        await renditionInstance.display(startLocation || undefined);
         
+        if (!isMounted) return;
         setIsLoading(false);
         
         if (viewerRef.current) {
             viewerRef.current.style.transition = 'opacity 0.3s ease-in';
             viewerRef.current.style.opacity = '1';
         }
-    });
+      } catch (error) {
+        if (isMounted) {
+            console.error("Error initializing EPUB:", error);
+        }
+      }
+    };
+    
+    initializeBook();
 
     return () => {
+        isMounted = false;
+        stopSpeech();
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         if (latestCfiRef.current) {
             saveLastPositionForBook(bookId, latestCfiRef.current);
         }
+        locationsReadyRef.current = false;
         setIsNavReady(false);
         navigationRef.current = null;
-        book.destroy();
+        if (bookRef.current) {
+          bookRef.current.destroy();
+          bookRef.current = null;
+        }
+        renditionRef.current = null;
+        setRendition(null);
     };
-  }, [bookId, bookData, settings.flow, animationState]);
+  }, [bookId, bookData, settings.flow, animationState, startSpeech, stopSpeech]);
 
   useEffect(() => {
     if (rendition) {
-        const lightTheme = { body: { 'color': '#000', 'background': '#fff' } };
-        const darkTheme = { body: { 'color': '#fff', 'background': '#1f2937' } };
-        rendition.themes.register('light', lightTheme);
-        rendition.themes.register('dark', darkTheme);
+        if (!(rendition as any).themesRegistered) {
+            const lightTheme = { body: { 'color': '#000', 'background': '#fff' } };
+            const darkTheme = { body: { 'color': '#fff', 'background': '#1f2937' } };
+            rendition.themes.register('light', lightTheme);
+            rendition.themes.register('dark', darkTheme);
+            (rendition as any).themesRegistered = true;
+        }
+
         rendition.themes.select(settings.theme);
         rendition.themes.fontSize(`${settings.fontSize}%`);
         if (settings.fontFamily === 'Original') {
@@ -307,6 +610,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     }
     saveReaderSettings(settings);
   }, [rendition, settings]);
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     if (rendition) {
@@ -340,8 +649,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     }
   }, [currentCfi, isNavReady]);
 
-  const nextPage = useCallback(() => { rendition?.next(); setControlsVisible(true); }, [rendition]);
-  const prevPage = useCallback(() => { rendition?.prev(); setControlsVisible(true); }, [rendition]);
+  const nextPage = useCallback(() => { rendition?.next(); setControlsVisible(true); stopSpeech(); }, [rendition, stopSpeech]);
+  const prevPage = useCallback(() => { rendition?.prev(); setControlsVisible(true); stopSpeech(); }, [rendition, stopSpeech]);
   
   useEffect(() => {
     if (!rendition) return;
@@ -365,10 +674,18 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     return () => { rendition.off('click', clickHandler); };
   }, [rendition, settings.flow, showSettings, showNavPanel, showSearch, prevPage, nextPage]);
 
-  const handleSettingsChange = (newSettings: Partial<ReaderSettings>) => setSettings(prev => ({ ...prev, ...newSettings }));
-  const handleTocNavigate = (href: string) => { rendition?.display(href); setShowNavPanel(false); };
-  const handleBookmarkNavigate = (cfi: string) => { rendition?.display(cfi); setShowNavPanel(false); };
-  const handleCitationNavigate = (cfi: string) => { rendition?.display(cfi); setShowNavPanel(false); };
+  const handleSettingsChange = (newSettings: Partial<ReaderSettings>) => {
+    setSettings(prev => {
+        const updated = { ...prev, ...newSettings };
+        if(newSettings.readAloud) {
+            updated.readAloud = { ...prev.readAloud, ...newSettings.readAloud };
+        }
+        return updated;
+    });
+  };
+  const handleTocNavigate = (href: string) => { stopSpeech(); rendition?.display(href); setShowNavPanel(false); };
+  const handleBookmarkNavigate = (cfi: string) => { stopSpeech(); rendition?.display(cfi); setShowNavPanel(false); };
+  const handleCitationNavigate = (cfi: string) => { stopSpeech(); rendition?.display(cfi); setShowNavPanel(false); };
 
   const handleSaveBookmark = useCallback(async (description: string) => {
     if (!latestCfiRef.current) return;
@@ -505,14 +822,15 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     if (currentHighlightCfi) {
       rendition.annotations.remove(currentHighlightCfi, 'highlight');
     }
-  
+    
+    stopSpeech();
     setShowSearch(false);
   
     rendition.display(cfi).then(() => {
       rendition.annotations.add('highlight', cfi, {}, undefined, 'hl', { 'fill': 'yellow', 'fill-opacity': '0.3' });
       setCurrentHighlightCfi(cfi);
     });
-  }, [rendition, currentHighlightCfi]);
+  }, [rendition, currentHighlightCfi, stopSpeech]);
 
   const handleCloseSearch = () => {
     setShowSearch(false);
@@ -523,8 +841,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   };
   
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (rendition && bookRef.current?.locations) {
+    if (rendition && bookRef.current?.locations && locationsReadyRef.current) {
       setControlsVisible(true);
+      stopSpeech();
       const newProgress = parseInt(e.target.value, 10);
       setLocationInfo(prev => ({ ...prev, progress: newProgress }));
       if (sliderTimeoutRef.current) clearTimeout(sliderTimeoutRef.current);
@@ -546,6 +865,18 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     if (deltaX > 50) prevPage();
     else if (deltaX < -50) nextPage();
     touchStartXRef.current = null;
+  };
+
+  const toggleSpeech = () => {
+    if (speechState === 'playing') {
+      window.speechSynthesis.pause();
+      setSpeechState('paused');
+    } else if (speechState === 'paused') {
+      window.speechSynthesis.resume();
+      setSpeechState('playing');
+    } else {
+      startSpeech();
+    }
   };
 
 
@@ -625,6 +956,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               <p className="text-sm text-slate-400">{bookData?.author}</p>
           </div>
           <div className="flex justify-end items-center gap-2">
+              <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label={speechState === 'playing' ? "Pause Read Aloud" : "Start Read Aloud"}>
+                {speechState === 'playing' ? <PauseIcon className="w-6 h-6 text-sky-400" /> : <PlayIcon className="w-6 h-6" />}
+              </button>
               <button onClick={() => setShowSearch(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Search in book">
                 <SearchIcon className="w-6 h-6" />
               </button>
@@ -673,10 +1007,10 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                     onChange={handleSliderChange}
                     className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Book progress"
-                    disabled={locationInfo.totalPages === 0}
+                    disabled={!locationsReadyRef.current || locationInfo.totalPages === 0}
                 />
                 <div className="text-center text-sm text-slate-300 mt-2" aria-live="polite">
-                    {locationInfo.totalPages > 0 ? (
+                    {locationInfo.totalPages > 0 && locationsReadyRef.current ? (
                         <span>Page {locationInfo.currentPage} of {locationInfo.totalPages} &bull; {locationInfo.progress}%</span>
                     ) : (
                         <span className="text-slate-400">Calculating progress...</span>

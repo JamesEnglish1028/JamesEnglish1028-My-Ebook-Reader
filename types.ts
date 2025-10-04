@@ -19,12 +19,20 @@ export interface BookMetadata {
   isbn?: string;
 }
 
+export interface ReadAloudSettings {
+  voiceURI: string | null;
+  rate: number;
+  pitch: number;
+  volume: number;
+}
+
 export interface ReaderSettings {
   fontSize: number;
   theme: 'light' | 'dark';
   flow: 'paginated' | 'scrolled';
   fontFamily: string;
   citationFormat: 'apa' | 'mla' | 'chicago';
+  readAloud: ReadAloudSettings;
 }
 
 export interface TocItem {
