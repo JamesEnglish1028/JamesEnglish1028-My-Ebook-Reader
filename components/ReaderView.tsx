@@ -60,6 +60,14 @@ const saveLastPositionForBook = (bookId: number, cfi: string) => {
     localStorage.setItem(getStorageKey('pos', bookId), cfi);
 };
 
+const getLastSpokenPositionForBook = (bookId: number): string | null => {
+    return localStorage.getItem(getStorageKey('speech-pos', bookId));
+};
+
+const saveLastSpokenPositionForBook = (bookId: number, cfi: string) => {
+    localStorage.setItem(getStorageKey('speech-pos', bookId), cfi);
+};
+
 const getReaderSettings = (): ReaderSettings => {
     const savedSettings = localStorage.getItem(getStorageKey('settings', 'global'));
     const parsedSettings = savedSettings ? JSON.parse(savedSettings) : {};
@@ -138,7 +146,6 @@ const findFirstChapter = async (book: any): Promise<string | undefined> => {
 // --- Read Aloud Helpers ---
 
 // A list of common English abbreviations that might be mistaken for sentence endings.
-// This list can be expanded for better accuracy.
 const ABBREVIATIONS = [
   'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sr', 'Jr', 'Sen', 'Rep', 'Gov', 'Gen', 'Hon', // Titles
   'Sgt', 'Capt', 'Col', 'Lt', // Military
@@ -147,11 +154,6 @@ const ABBREVIATIONS = [
 ];
 
 // This regex improves sentence detection by handling common abbreviations and multiple punctuation marks (like ellipses).
-// It works in two parts joined by an OR (|):
-// 1. For sentences ending with a period: It matches non-greedily and uses a negative lookbehind
-//    to ensure the period is not part of a known abbreviation from the list above.
-// 2. For sentences ending with '?' or '!': It matches non-greedily, as these are less ambiguous.
-// It handles multiple punctuation marks (e.g., "...", "?!") by matching `[.!?]+`.
 const SENTENCE_REGEX = new RegExp(
     `(?:.+?)` + // Non-greedy match for sentence content.
     `(?<!\\b(?:${ABBREVIATIONS.join('|')}))` + // Negative lookbehind: ensure what comes before the period is NOT a known abbreviation.
@@ -168,22 +170,24 @@ const SENTENCE_REGEX = new RegExp(
 
 
 const findSentenceRange = (text: string, index: number): { start: number; end: number; sentence: string } | null => {
-    // Use the new, more accurate regex to split the text into sentences.
-    const sentences = text.match(SENTENCE_REGEX) || [];
-    let charCount = 0;
-    for (const sentence of sentences) {
-        const sentenceStart = charCount;
-        const sentenceEnd = charCount + sentence.length;
-        if (index >= sentenceStart && index < sentenceEnd) {
-            const trimmedSentence = sentence.trim();
-            // Find the start of the trimmed sentence within the original text, searching from the start of the current sentence block
-            const startOffset = text.indexOf(trimmedSentence, sentenceStart);
-            if (startOffset !== -1) {
-                const endOffset = startOffset + trimmedSentence.length;
-                return { start: startOffset, end: endOffset, sentence: trimmedSentence };
+    SENTENCE_REGEX.lastIndex = 0; // Reset regex state for global flag
+    let match;
+    while ((match = SENTENCE_REGEX.exec(text)) !== null) {
+        const fullMatch = match[0];
+        const matchStart = match.index;
+        const matchEnd = matchStart + fullMatch.length;
+
+        if (index >= matchStart && index < matchEnd) {
+            const trimmedSentence = fullMatch.trim();
+            const textStartIndexInMatch = fullMatch.search(/\S/);
+            if (textStartIndexInMatch === -1) { 
+                continue;
             }
+            const startOffset = matchStart + textStartIndexInMatch;
+            const endOffset = startOffset + trimmedSentence.length;
+
+            return { start: startOffset, end: endOffset, sentence: trimmedSentence };
         }
-        charCount = sentenceEnd;
     }
     return null;
 };
@@ -281,6 +285,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const locationsReadyRef = useRef(false);
   const highlightedCfiRef = useRef<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const lastSpokenCfiRef = useRef<string | null>(null);
+  const speechStartCfiRef = useRef<string | null>(null);
+  const currentSentenceRef = useRef<string>('');
+  const speechContextRef = useRef<{ rawText: string, normalizedText: string, startIndexInNormalized: number } | null>(null);
+  const isAutoPagingRef = useRef(false);
+
 
   const isAnyPanelOpen = useMemo(
     () => showSettings || showNavPanel || showSearch,
@@ -364,6 +374,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     };
   }, []);
 
+  const saveLastSpokenPosition = useCallback(() => {
+    if (lastSpokenCfiRef.current) {
+        saveLastSpokenPositionForBook(bookId, lastSpokenCfiRef.current);
+    }
+  }, [bookId]);
+
   const removeHighlight = useCallback(() => {
     if (highlightedCfiRef.current && renditionRef.current) {
         renditionRef.current.annotations.remove(highlightedCfiRef.current, 'highlight');
@@ -372,33 +388,66 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   }, []);
 
   const stopSpeech = useCallback(() => {
+      if (speechStateRef.current !== 'stopped') {
+          saveLastSpokenPosition();
+      }
+      setSpeechState('stopped');
       window.speechSynthesis.cancel();
+      isAutoPagingRef.current = false;
       removeHighlight();
       utteranceRef.current = null;
-      setSpeechState('stopped');
-  }, [removeHighlight]);
+      lastSpokenCfiRef.current = null;
+      currentSentenceRef.current = '';
+  }, [removeHighlight, saveLastSpokenPosition]);
   
   const startSpeech = useCallback(() => {
     const currentRendition = renditionRef.current;
     if (!currentRendition) return;
-
-    stopSpeech();
+    
+    if (speechStateRef.current !== 'stopped') {
+        window.speechSynthesis.cancel();
+        removeHighlight();
+    }
 
     const contents = currentRendition.getContents();
-    let textToRead = '';
-    let body: HTMLElement | null = null;
-    if (contents && contents.length > 0) {
-        body = contents[0].document?.body;
-        if (body) {
-            textToRead = body.textContent?.replace(/\s+/g, ' ').trim() || '';
+    if (!contents || contents.length === 0) return;
+    
+    const body = contents[0].document?.body;
+    if (!body) return;
+
+    const rawText = body.textContent || '';
+    const normalizedText = rawText.replace(/\s+/g, ' ').trim();
+    if (!normalizedText) {
+        if (settingsRef.current.flow === 'paginated' && speechStateRef.current === 'playing') {
+            isAutoPagingRef.current = true;
+            currentRendition.next();
+        }
+        return;
+    }
+    
+    let textToRead = normalizedText;
+    let startIndexInNormalized = 0;
+    const startCfi = speechStartCfiRef.current;
+
+    if (startCfi) {
+        try {
+            const range = contents[0].range(startCfi);
+            if (range) {
+                const textForCfi = range.toString().replace(/\s+/g, ' ').trim();
+                const searchIndex = normalizedText.indexOf(textForCfi);
+                if (searchIndex !== -1) {
+                    startIndexInNormalized = searchIndex;
+                    textToRead = normalizedText.substring(startIndexInNormalized);
+                }
+            }
+        } catch (e) {
+            console.error("Could not find start CFI for speech, starting from beginning.", e);
+        } finally {
+            speechStartCfiRef.current = null;
         }
     }
 
-    if (!textToRead) {
-        console.warn("No text on page to read.");
-        return;
-    }
-
+    speechContextRef.current = { rawText, normalizedText, startIndexInNormalized };
     const utterance = new SpeechSynthesisUtterance(textToRead);
     utteranceRef.current = utterance;
     
@@ -410,31 +459,76 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     utterance.rate = currentSettings.readAloud.rate;
     utterance.pitch = currentSettings.readAloud.pitch;
     utterance.volume = currentSettings.readAloud.volume;
-
-    let currentSentence = '';
     
     utterance.onboundary = (event) => {
-        if (event.name !== 'word' || !renditionRef.current || !body) return;
+        if (event.name !== 'word' || !renditionRef.current || !body || !speechContextRef.current) return;
         
-        const sentenceInfo = findSentenceRange(textToRead, event.charIndex);
-        if (!sentenceInfo || sentenceInfo.sentence === currentSentence) {
+        const { rawText, normalizedText, startIndexInNormalized } = speechContextRef.current;
+        const absoluteCharIndex = event.charIndex + startIndexInNormalized;
+        const sentenceInfo = findSentenceRange(normalizedText, absoluteCharIndex);
+        
+        if (!sentenceInfo || sentenceInfo.sentence === currentSentenceRef.current) {
             return;
         }
-        currentSentence = sentenceInfo.sentence;
+        currentSentenceRef.current = sentenceInfo.sentence;
         
         try {
-            const contents = renditionRef.current.getContents()[0];
-            const domRange = findDomRangeFromCharacterOffsets(body, sentenceInfo.start, sentenceInfo.end);
+            const estimatedRawIndex = (absoluteCharIndex / normalizedText.length) * rawText.length;
             
-            if (domRange) {
-              const cfi = contents.cfiFromRange(domRange);
-              if (cfi) {
-                  removeHighlight();
-                  renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
-                      'fill': 'rgba(0, 191, 255, 0.4)',
-                  });
-                  highlightedCfiRef.current = cfi;
-              }
+            let bestMatchIndex = -1;
+            let minDistance = Infinity;
+            let currentIndex = -1;
+
+            while ((currentIndex = rawText.indexOf(sentenceInfo.sentence, currentIndex + 1)) !== -1) {
+                const distance = Math.abs(currentIndex - estimatedRawIndex);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestMatchIndex = currentIndex;
+                }
+            }
+
+            if (bestMatchIndex !== -1) {
+                const rawStartOffset = bestMatchIndex;
+                const rawEndOffset = bestMatchIndex + sentenceInfo.sentence.length;
+                const domRange = findDomRangeFromCharacterOffsets(body, rawStartOffset, rawEndOffset);
+                
+                if (domRange) {
+                    const contents = renditionRef.current.getContents()[0];
+                    const cfi = contents.cfiFromRange(domRange);
+                    if (cfi) {
+                        lastSpokenCfiRef.current = cfi;
+                        removeHighlight();
+                        renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
+                            'fill': 'rgba(0, 191, 255, 0.4)',
+                        });
+                        highlightedCfiRef.current = cfi;
+                        
+                        if (settingsRef.current.flow === 'scrolled') {
+                            const iframe = viewerRef.current?.querySelector('iframe');
+                            const elementToScroll = domRange.startContainer.parentElement;
+
+                            if (elementToScroll && iframe) {
+                                const elementRect = elementToScroll.getBoundingClientRect();
+                                const iframeRect = iframe.getBoundingClientRect();
+                                
+                                const elementTopInIframe = elementRect.top - iframeRect.top;
+                                const elementBottomInIframe = elementRect.bottom - iframeRect.top;
+                                
+                                const iframeVisibleHeight = iframeRect.height;
+                                const safeZoneTop = iframeVisibleHeight * 0.3;
+                                const safeZoneBottom = iframeVisibleHeight * 0.7;
+
+                                if (elementTopInIframe < safeZoneTop || elementBottomInIframe > safeZoneBottom) {
+                                    elementToScroll.scrollIntoView({
+                                        behavior: 'smooth',
+                                        block: 'center',
+                                        inline: 'nearest'
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } catch (e) {
             console.error("Error during sentence highlighting:", e);
@@ -442,12 +536,26 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     };
     
     utterance.onend = () => {
-      removeHighlight();
-      if (speechStateRef.current === 'playing' && settingsRef.current.flow === 'paginated') {
-          renditionRef.current?.next();
-      } else {
-          setSpeechState('stopped');
-      }
+        removeHighlight();
+        
+        // If the speech state is not 'playing' when onend fires, it means
+        // the event was triggered by a manual pause() or cancel() call.
+        // In this case, we should not proceed to the next page.
+        if (speechStateRef.current !== 'playing') {
+            if (speechStateRef.current === 'paused') {
+                return; // Stay in paused state
+            }
+            setSpeechState('stopped'); // Finalize to stopped state
+            return;
+        }
+
+        // If we get here, speech ended naturally while in the 'playing' state.
+        if (settingsRef.current.flow === 'paginated') {
+            isAutoPagingRef.current = true;
+            renditionRef.current?.next();
+        } else {
+            setSpeechState('stopped');
+        }
     };
     
     utterance.onerror = (e) => {
@@ -515,9 +623,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             const bookLocations = bookRef.current.locations;
             const page = bookLocations.locationFromCfi(location.start.cfi);
             
-            // FIX: Only update location info if the CFI is valid and found in the locations map.
-            // This prevents the progress bar from resetting on intermediate `relocated` events
-            // that can fire with an unresolvable CFI during automatic page turns.
             if (page > -1) {
               const progress = bookLocations.percentageFromCfi(location.start.cfi);
               setLocationInfo({
@@ -528,8 +633,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             }
           }
           
-          if (speechStateRef.current === 'playing') {
-            startSpeech();
+          if (isAutoPagingRef.current) {
+              isAutoPagingRef.current = false;
+              startSpeech();
           }
         });
         
@@ -547,6 +653,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
         setBookmarks(getBookmarksForBook(bookId));
         setCitations(getCitationsForBook(bookId));
+        speechStartCfiRef.current = getLastSpokenPositionForBook(bookId);
         
         const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
         
@@ -868,12 +975,14 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   };
 
   const toggleSpeech = () => {
-    if (speechState === 'playing') {
-      window.speechSynthesis.pause();
+    if (speechStateRef.current === 'playing') {
       setSpeechState('paused');
-    } else if (speechState === 'paused') {
-      window.speechSynthesis.resume();
+      window.speechSynthesis.pause();
+      saveLastSpokenPosition();
+      isAutoPagingRef.current = false;
+    } else if (speechStateRef.current === 'paused') {
       setSpeechState('playing');
+      window.speechSynthesis.resume();
     } else {
       startSpeech();
     }
