@@ -1,17 +1,29 @@
 # Custom Ebook Reader
 
-A custom, browser-based ebook reader inspired by [Readium's Thorium](https://www.edrlab.org/software/thorium-reader/). This application allows users to import and read EPUB books directly in their browser, with all data stored locally. It is built using modern web technologies and focuses on providing a rich, customizable reading experience.
+A custom, browser-based ebook reader inspired by [Readium's Thorium](https://www.edrlab.org/software/thorium-reader/). This application allows users to import EPUB books into a local library and browse online OPDS catalogs. It is built using modern web technologies and focuses on providing a rich, customizable reading experience with robust library management features.
 
 ## Key Features
 
+### Library Management
+-   **Local-First Storage**: Your books and reading data never leave your computer. Book files are stored in IndexedDB, while settings, catalog lists, and annotations are kept in LocalStorage.
+-   **EPUB Import**: Import `.epub` files to build your personal library, displayed with book covers.
+-   **Book Details**: View detailed information for each book, including publication details, subjects, and provider IDs.
+-   **Library Organization**: Sort your library by title, author, publication date, or the date added.
+-   **Delete Books**: Permanently remove books from your local library.
+
+### Online Catalog Support (OPDS)
+-   **Browse Remote Libraries**: Add and manage an unlimited number of public OPDS (Open Publication Distribution System) catalogs.
+-   **OPDS v1 & v2 Support**: Compatible with both XML-based (Atom) and JSON-based OPDS feeds.
+-   **Seamless Navigation**: Navigate catalog hierarchies, categories, and paginated results.
+-   **One-Click Import**: Download books directly from a catalog and add them to your local library.
+
+### Advanced Reader Experience
 -   **Entirely Browser-Based**: No installation needed. The app runs completely in your web browser.
--   **Local-First Storage**: Your books and reading data never leave your computer. Book files are stored in IndexedDB, while settings and annotations are kept in LocalStorage.
--   **EPUB Library**: Import `.epub` files to build your personal library, displayed with book covers.
 -   **Customizable Reader**:
-    -   Adjust font size and family (Serif, Sans-Serif).
+    -   Adjust font size and family (Serif, Sans-Serif, Original).
     -   Switch between Light and Dark themes.
     -   Choose your reading mode: `Paginated` (like a physical book) or `Scrolled` (like a webpage).
--   **Advanced Reading Tools**:
+-   **Rich Reading Tools**:
     -   **Bookmarks**: Save your favorite passages with optional notes.
     -   **Citations**: Create academic citations for specific locations in the book, with support for APA, MLA, and Chicago formats.
     -   **Citation Export**: Export all citations for a book in the standard `.ris` format for use in reference managers like Zotero or EndNote.
@@ -36,43 +48,38 @@ All external dependencies (`React`, `Tailwind`, `epub.js`, `JSZip`) are loaded d
 ## Application Architecture
 
 ### Overall Structure
-The application is managed by the root `App.tsx` component, which switches between two primary views:
-1.  **Library View**: The default view that displays all imported books.
-2.  **Reader View**: The immersive view for reading a single selected book.
+The application is managed by the root `App.tsx` component, which switches between three primary views:
+1.  **Library View**: The main interface for displaying the user's local library or browsing a selected OPDS catalog.
+2.  **Book Detail View**: Shows comprehensive metadata for a selected book from either the library or a catalog.
+3.  **Reader View**: The immersive view for reading a single selected book from the local library.
+
+### State Management
+The app primarily uses React's built-in hooks (`useState`, `useCallback`, etc.). To ensure a seamless user experience, key navigation state (like the active catalog and the user's path within it) is "lifted up" to the `App.tsx` component. This preserves the user's browsing location when they navigate between the library and book detail views.
 
 ### Data Persistence
-Data is stored entirely within the user's browser using two storage mechanisms:
+-   **IndexedDB** (`services/db.ts`): Acts as the database for the local library. It stores the full `BookRecord` for each imported book, including the large `epubData` (an `ArrayBuffer` of the book file).
+-   **LocalStorage**: Used for storing smaller, key-value data:
+    -   The list of saved OPDS catalogs.
+    -   Global reader settings (theme, font size, etc.).
+    -   Per-book reading progress, bookmarks, and citations.
 
--   **IndexedDB** (`services/db.ts`): Used to store the full `BookRecord`, including the large `epubData` (an `ArrayBuffer` of the book file). IndexedDB is ideal for storing large amounts of structured data, including binary blobs. The `db.ts` file provides a simple service to interact with the database.
--   **LocalStorage** (`components/ReaderView.tsx`): Used for storing smaller, key-value data such as user preferences, reading progress, bookmarks, and citations. This data is persisted across browser sessions.
+### OPDS & CORS
+To bypass browser CORS (Cross-Origin Resource Sharing) restrictions when fetching data from external OPDS catalogs, the application routes requests through a public CORS proxy (`corsproxy.io`).
 
 ## File & Component Breakdown
 
-Here is a summary of the major files and their roles in the application:
-
--   **`index.html`**: The main HTML file. It sets up the page structure and loads all necessary scripts and styles from CDNs.
--   **`index.tsx`**: The entry point for the React application, which renders the `App` component into the DOM.
--   **`App.tsx`**: The top-level React component. It manages the current view (library or reader) and handles the transition between them.
--   **`types.ts`**: Contains all TypeScript interface definitions used throughout the application, ensuring type safety.
+-   **`index.html` / `index.tsx`**: The entry point for the application.
+-   **`App.tsx`**: The top-level component. It manages view switching, holds lifted navigation state, and contains the core logic for processing and saving books.
+-   **`types.ts`**: Contains all TypeScript interface definitions used throughout the application.
 
 ### Services
-
--   **`services/db.ts`**: An abstraction layer for all IndexedDB operations. It handles creating the database, adding new books, and retrieving book data and metadata.
+-   **`services/db.ts`**: An abstraction layer for all IndexedDB operations (saving, retrieving, deleting books).
 
 ### Components
-
--   **`components/Library.tsx`**: Renders the user's book library. Its primary responsibilities include:
-    -   Fetching and displaying book metadata from IndexedDB.
-    -   Handling the file input and import process for new EPUBs.
-    -   Using `epub.js` to parse the metadata and cover of an imported file before saving it.
--   **`components/ReaderView.tsx`**: The most complex component, responsible for the entire reading experience.
-    -   Initializes `epub.js` to render the selected book.
-    -   Manages all reader state, including the current location, settings, and panel visibility.
-    -   Implements all major features like navigation, read-aloud (TTS), and event handling (clicks, swipes).
-    -   Orchestrates the settings, navigation, search, and modal components.
--   **`components/SettingsPanel.tsx`**: A slide-out panel for adjusting display settings (font, theme, etc.) and text-to-speech preferences (voice, rate, pitch).
--   **`components/TocPanel.tsx`**: A tabbed slide-out panel for navigation. It displays the book's Table of Contents, user-created Bookmarks, and Citations. It also contains the logic for exporting citations.
--   **`components/SearchPanel.tsx`**: A slide-out panel that provides an interface for full-text search within the book and displays the results.
--   **`components/BookmarkModal.tsx` & `components/CitationModal.tsx`**: Simple modal dialogs for adding notes when creating a new bookmark or citation.
--   **`components/icons.tsx`**: A collection of SVG icons used throughout the UI, exported as React components.
--   **`components/Spinner.tsx`**: A reusable loading spinner component.
+-   **`components/Library.tsx`**: A multi-purpose component that renders either the user's local book library or the OPDS catalog browser. It contains the logic for fetching and parsing OPDS feeds (both XML and JSON formats) and handles user interactions like sorting and initiating file imports.
+-   **`components/ReaderView.tsx`**: The most complex component, responsible for the entire reading experience. It initializes `epub.js`, manages reader state, and orchestrates all reading-related UI panels and modals.
+-   **`components/BookDetailView.tsx`**: A dedicated view to display detailed information about a book. It adapts its presentation and actions based on whether the book is from the local library or a remote catalog.
+-   **`components/ManageCatalogsModal.tsx`**: A modal dialog for users to add, edit, and delete their saved OPDS catalogs.
+-   **Panel Components** (`SettingsPanel`, `TocPanel`, `SearchPanel`): Slide-out panels used within the `ReaderView` to provide access to settings, navigation tools (TOC, bookmarks, citations), and search functionality.
+-   **Modal Components** (`BookmarkModal`, `CitationModal`, `DuplicateBookModal`, `DeleteConfirmationModal`): Dialogs that handle specific user actions like adding notes, managing import conflicts, and confirming deletions.
+-   **Shared Components** (`icons.tsx`, `Spinner.tsx`): Reusable UI elements used across the application.
