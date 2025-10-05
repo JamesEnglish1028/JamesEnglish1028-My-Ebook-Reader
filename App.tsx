@@ -1,16 +1,32 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Library from './components/Library';
 import ReaderView from './components/ReaderView';
 import BookDetailView from './components/BookDetailView';
 import { db } from './services/db';
-import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog } from './types';
+import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog, Bookmark, Citation, ReaderSettings, SyncPayload } from './types';
+import SplashScreen from './components/SplashScreen';
+import SettingsModal from './components/SettingsModal';
+import { useAuth } from './contexts/AuthContext';
+import { uploadLibraryToDrive, downloadLibraryFromDrive } from './services/google';
+import LocalStorageModal from './components/LocalStorageModal';
+import AboutPage from './components/AboutPage';
+import ErrorBoundary from './components/ErrorBoundary';
+
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'library' | 'reader' | 'bookDetail'>('library');
+  const [currentView, setCurrentView] = useState<'library' | 'reader' | 'bookDetail' | 'about'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [coverAnimationData, setCoverAnimationData] = useState<CoverAnimationData | null>(null);
   const [activeCatalog, setActiveCatalog] = useState<Catalog | null>(null);
   const [catalogNavPath, setCatalogNavPath] = useState<{ name: string, url: string }[]>([]);
+  const [showSplash, setShowSplash] = useState(true);
+  const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
+  const [isLocalStorageModalOpen, setIsLocalStorageModalOpen] = useState(false);
+  const { tokenClient } = useAuth();
+  const [syncStatus, setSyncStatus] = useState<{
+    state: 'idle' | 'syncing' | 'success' | 'error';
+    message: string;
+  }>({ state: 'idle', message: '' });
 
   const [detailViewData, setDetailViewData] = useState<{
     book: BookMetadata | CatalogBook;
@@ -28,9 +44,14 @@ const App: React.FC = () => {
     error: null,
   });
 
-  // Initialize DB on app start
-  React.useEffect(() => {
+  // Initialize DB on app start & handle splash screen
+  useEffect(() => {
     db.init();
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500); // Show splash for 2.5 seconds
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const handleOpenBook = useCallback((id: number, animationData: CoverAnimationData) => {
@@ -53,6 +74,10 @@ const App: React.FC = () => {
   const handleReturnToLibrary = useCallback(() => {
     setDetailViewData(null);
     setCurrentView('library');
+  }, []);
+
+  const handleShowAbout = useCallback(() => {
+    setCurrentView('about');
   }, []);
   
   const blobUrlToBase64 = async (blobUrl: string): Promise<string> => {
@@ -172,52 +197,189 @@ const App: React.FC = () => {
       return { success: false };
     }
   }, [processAndSaveBook]);
+  
+  const gatherDataForUpload = async (): Promise<{ payload: SyncPayload; booksWithData: BookRecord[] }> => {
+    const booksWithData = await db.getAllBooks();
+    const library = booksWithData.map(({ epubData, ...meta }) => meta);
+
+    const catalogs: Catalog[] = JSON.parse(localStorage.getItem('ebook-catalogs') || '[]');
+    const settings: ReaderSettings = JSON.parse(localStorage.getItem('ebook-reader-settings-global') || '{}');
+
+    const bookmarks: Record<number, Bookmark[]> = {};
+    const citations: Record<number, Citation[]> = {};
+    const positions: Record<number, string | null> = {};
+
+    booksWithData.forEach(book => {
+        if (book.id) {
+            bookmarks[book.id] = JSON.parse(localStorage.getItem(`ebook-reader-bookmarks-${book.id}`) || '[]');
+            citations[book.id] = JSON.parse(localStorage.getItem(`ebook-reader-citations-${book.id}`) || '[]');
+            positions[book.id] = localStorage.getItem(`ebook-reader-pos-${book.id}`);
+        }
+    });
+
+    return {
+        payload: { library, catalogs, bookmarks, citations, positions, settings },
+        booksWithData
+    };
+  };
+  
+  const handleUploadToDrive = async () => {
+    if (!tokenClient) return;
+    setSyncStatus({ state: 'syncing', message: 'Gathering local data...' });
+    try {
+        const { payload, booksWithData } = await gatherDataForUpload();
+        setSyncStatus({ state: 'syncing', message: 'Uploading to Google Drive... This may take a while.' });
+        await uploadLibraryToDrive(payload, booksWithData, (progressMsg) => {
+            setSyncStatus({ state: 'syncing', message: progressMsg });
+        });
+        localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
+        setSyncStatus({ state: 'success', message: 'Library successfully uploaded!' });
+    } catch (error) {
+        console.error('Upload failed:', error);
+        setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
+    }
+  };
+
+  const handleDownloadFromDrive = async () => {
+    if (!tokenClient) return;
+
+    const confirmed = window.confirm(
+      'DANGER: This will replace your entire local library with the version from Google Drive.\n\n' +
+      'Any local books or changes not uploaded to Drive will be permanently lost.\n\n' +
+      'Are you absolutely sure you want to continue?'
+    );
+
+    if (!confirmed) return;
+
+    setSyncStatus({ state: 'syncing', message: 'Downloading from Google Drive...' });
+    try {
+        const downloadedData = await downloadLibraryFromDrive((progressMsg) => {
+            setSyncStatus({ state: 'syncing', message: progressMsg });
+        });
+
+        if (!downloadedData) {
+          throw new Error("No data found in Google Drive.");
+        }
+
+        setSyncStatus({ state: 'syncing', message: 'Clearing local library...' });
+        await db.clearAllBooks();
+        
+        // Clear all localStorage data managed by the app
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('ebook-reader-'))
+          .forEach(key => localStorage.removeItem(key));
+        
+        setSyncStatus({ state: 'syncing', message: 'Importing downloaded library...' });
+        
+        // Restore metadata
+        localStorage.setItem('ebook-catalogs', JSON.stringify(downloadedData.payload.catalogs || []));
+        localStorage.setItem('ebook-reader-settings-global', JSON.stringify(downloadedData.payload.settings || {}));
+
+        for (const book of downloadedData.booksWithData) {
+            await db.saveBook(book);
+            if (book.id) {
+                const bookId = book.id;
+                if (downloadedData.payload.bookmarks[bookId]) {
+                    localStorage.setItem(`ebook-reader-bookmarks-${bookId}`, JSON.stringify(downloadedData.payload.bookmarks[bookId]));
+                }
+                if (downloadedData.payload.citations[bookId]) {
+                    localStorage.setItem(`ebook-reader-citations-${bookId}`, JSON.stringify(downloadedData.payload.citations[bookId]));
+                }
+                if (downloadedData.payload.positions[bookId]) {
+                    localStorage.setItem(`ebook-reader-pos-${bookId}`, downloadedData.payload.positions[bookId]!);
+                }
+            }
+        }
+        localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
+        setSyncStatus({ state: 'success', message: 'Library successfully downloaded! Reloading app...' });
+
+        // Reload to apply all changes cleanly
+        setTimeout(() => window.location.reload(), 2000);
+
+    } catch (error) {
+        console.error('Download failed:', error);
+        setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
+    }
+  };
 
 
   const renderView = () => {
     switch(currentView) {
       case 'reader':
         return selectedBookId !== null && (
-          <ReaderView
-            bookId={selectedBookId}
-            onClose={handleCloseReader}
-            animationData={coverAnimationData}
-          />
+          <ErrorBoundary 
+            onReset={handleCloseReader}
+            fallbackMessage="There was an error while trying to display this book. Returning to the library."
+          >
+            <ReaderView
+              bookId={selectedBookId}
+              onClose={handleCloseReader}
+              animationData={coverAnimationData}
+            />
+          </ErrorBoundary>
         );
       case 'bookDetail':
         return detailViewData && (
-          <BookDetailView
-            book={detailViewData.book}
-            source={detailViewData.source}
-            catalogName={detailViewData.catalogName}
-            onBack={handleReturnToLibrary}
-            onReadBook={handleOpenBook}
-            onImportFromCatalog={handleImportFromCatalog}
-            importStatus={importStatus}
-            setImportStatus={setImportStatus}
-          />
+          <ErrorBoundary
+            onReset={handleReturnToLibrary}
+            fallbackMessage="There was an error showing the book details. Returning to the library."
+          >
+            <BookDetailView
+              book={detailViewData.book}
+              source={detailViewData.source}
+              catalogName={detailViewData.catalogName}
+              onBack={handleReturnToLibrary}
+              onReadBook={handleOpenBook}
+              onImportFromCatalog={handleImportFromCatalog}
+              importStatus={importStatus}
+              setImportStatus={setImportStatus}
+            />
+          </ErrorBoundary>
         );
+      case 'about':
+        return <AboutPage onBack={handleReturnToLibrary} />;
       case 'library':
       default:
         return (
-          <Library
-            onOpenBook={handleOpenBook}
-            onShowBookDetail={handleShowBookDetail}
-            processAndSaveBook={processAndSaveBook}
-            importStatus={importStatus}
-            setImportStatus={setImportStatus}
-            activeCatalog={activeCatalog}
-            setActiveCatalog={setActiveCatalog}
-            catalogNavPath={catalogNavPath}
-            setCatalogNavPath={setCatalogNavPath}
-          />
+          <ErrorBoundary
+            onReset={() => window.location.reload()}
+            fallbackMessage="There was a critical error in the library. Please try reloading the application."
+          >
+            <Library
+              onOpenBook={handleOpenBook}
+              onShowBookDetail={handleShowBookDetail}
+              processAndSaveBook={processAndSaveBook}
+              importStatus={importStatus}
+              setImportStatus={setImportStatus}
+              activeCatalog={activeCatalog}
+              setActiveCatalog={setActiveCatalog}
+              catalogNavPath={catalogNavPath}
+              setCatalogNavPath={setCatalogNavPath}
+              onOpenCloudSyncModal={() => setIsCloudSyncModalOpen(true)}
+              onOpenLocalStorageModal={() => setIsLocalStorageModalOpen(true)}
+              onShowAbout={handleShowAbout}
+            />
+          </ErrorBoundary>
         );
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 font-sans">
-      {renderView()}
+      <SplashScreen isVisible={showSplash} />
+      {!showSplash && renderView()}
+      <SettingsModal 
+        isOpen={isCloudSyncModalOpen}
+        onClose={() => setIsCloudSyncModalOpen(false)}
+        onUploadToDrive={handleUploadToDrive}
+        onDownloadFromDrive={handleDownloadFromDrive}
+        syncStatus={syncStatus}
+        setSyncStatus={setSyncStatus}
+      />
+      <LocalStorageModal
+        isOpen={isLocalStorageModalOpen}
+        onClose={() => setIsLocalStorageModalOpen(false)}
+      />
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import { BookRecord, BookMetadata } from '../types';
 
 const DB_NAME = 'EbookReaderDB';
@@ -96,6 +95,24 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
     request.onerror = () => {
       console.error('Error getting books:', request.error);
       reject('Error getting books');
+    };
+  });
+};
+
+const getAllBooks = async (): Promise<BookRecord[]> => {
+  const db = await init();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      resolve(request.result as BookRecord[]);
+    };
+
+    request.onerror = () => {
+      console.error('Error getting all books:', request.error);
+      reject('Error getting all books');
     };
   });
 };
@@ -201,12 +218,32 @@ const deleteBook = async (id: number): Promise<void> => {
   });
 };
 
+const clearAllBooks = async (): Promise<void> => {
+  const db = await init();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.clear();
+
+    request.onsuccess = () => {
+      resolve();
+    };
+
+    request.onerror = () => {
+      console.error('Error clearing books:', request.error);
+      reject('Error clearing books');
+    };
+  });
+};
+
 export const db = {
   init,
   saveBook,
   getBooksMetadata,
+  getAllBooks,
   getBook,
   getBookMetadata,
   findBookByIdentifier,
   deleteBook,
+  clearAllBooks,
 };

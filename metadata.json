@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Custom Ebook Reader",
+  "name": "MeBooks",
   "description": "A custom ebook reader inspired by Readium's Thorium, allowing users to import and read EPUB books directly in their browser. This application uses epub.js for rendering and IndexedDB for local storage.",
   "requestFramePermissions": []
 }

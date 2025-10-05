@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../services/db';
 import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
-import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon } from './icons';
+import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon, SettingsIcon } from './icons';
 import Spinner from './Spinner';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import DuplicateBookModal from './DuplicateBookModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+import { Logo } from './Logo';
 
 interface LibraryProps {
   onOpenBook: (id: number, animationData: CoverAnimationData) => void;
@@ -24,6 +25,9 @@ interface LibraryProps {
   setActiveCatalog: React.Dispatch<React.SetStateAction<Catalog | null>>;
   catalogNavPath: { name: string, url: string }[];
   setCatalogNavPath: React.Dispatch<React.SetStateAction<{ name: string, url: string }[]>>;
+  onOpenCloudSyncModal: () => void;
+  onOpenLocalStorageModal: () => void;
+  onShowAbout: () => void;
 }
 
 const getFormatFromMimeType = (mimeType: string): string | undefined => {
@@ -280,7 +284,7 @@ const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ book
 };
 
 
-const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, processAndSaveBook, importStatus, setImportStatus, activeCatalog, setActiveCatalog, catalogNavPath, setCatalogNavPath }) => {
+const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, processAndSaveBook, importStatus, setImportStatus, activeCatalog, setActiveCatalog, catalogNavPath, setCatalogNavPath, onOpenCloudSyncModal, onOpenLocalStorageModal, onShowAbout }) => {
   const [books, setBooks] = useState<BookMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -300,10 +304,12 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
   const [bookToDelete, setBookToDelete] = useState<BookMetadata | null>(null);
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('ebook-sort-order') || 'added-desc');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
 
 
   const fetchBooks = useCallback(async () => {
@@ -450,6 +456,9 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
       }
       if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
         setIsSortDropdownOpen(false);
+      }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setIsSettingsMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -679,44 +688,48 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-start mb-4 gap-4">
-        <div ref={dropdownRef} className="relative">
-          <button
-            onClick={() => setIsCatalogDropdownOpen(prev => !prev)}
-            className="flex items-center gap-2 text-white text-left"
-          >
-            <h1 className="text-4xl font-bold tracking-tight">
-              {activeCatalog ? activeCatalog.name : 'My Library'}
-            </h1>
-            <ChevronDownIcon className={`w-6 h-6 transition-transform flex-shrink-0 mt-2 ${isCatalogDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {isCatalogDropdownOpen && (
-            <div className="absolute top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
-              <ul className="p-1 text-white">
-                <li>
-                  <button onClick={() => handleSelectCatalog(null)} className={`w-full text-left px-3 py-2 text-sm rounded-md ${!activeCatalog ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
-                    My Library
-                  </button>
-                </li>
-                {catalogs.length > 0 && <li className="my-1 border-t border-slate-700"></li>}
-                {catalogs.map(catalog => (
-                  <li key={catalog.id}>
-                    <button onClick={() => handleSelectCatalog(catalog)} className={`w-full text-left px-3 py-2 text-sm rounded-md truncate ${activeCatalog?.id === catalog.id ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
-                      {catalog.name}
+      <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+        <div className="flex items-center gap-4">
+          <Logo className="w-10 h-10 text-sky-400 flex-shrink-0" />
+          <div ref={dropdownRef} className="relative">
+            <button
+              onClick={() => setIsCatalogDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2 text-white text-left"
+            >
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                {activeCatalog ? activeCatalog.name : 'My Library'}
+              </h1>
+              <ChevronDownIcon className={`w-6 h-6 transition-transform flex-shrink-0 mt-1 md:mt-2 ${isCatalogDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isCatalogDropdownOpen && (
+              <div className="absolute top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
+                <ul className="p-1 text-white">
+                  <li>
+                    <button onClick={() => handleSelectCatalog(null)} className={`w-full text-left px-3 py-2 text-sm rounded-md ${!activeCatalog ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
+                      My Library
                     </button>
                   </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                  {catalogs.length > 0 && <li className="my-1 border-t border-slate-700"></li>}
+                  {catalogs.map(catalog => (
+                    <li key={catalog.id}>
+                      <button onClick={() => handleSelectCatalog(catalog)} className={`w-full text-left px-3 py-2 text-sm rounded-md truncate ${activeCatalog?.id === catalog.id ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
+                        {catalog.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+
+        <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-auto">
             {!activeCatalog && (
                 <div ref={sortDropdownRef} className="relative">
-                    <button onClick={() => setIsSortDropdownOpen(prev => !prev)} className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200">
-                        <AdjustmentsVerticalIcon className="w-5 h-5 mr-2" />
-                        <span>Sort</span>
+                    <button onClick={() => setIsSortDropdownOpen(prev => !prev)} className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg inline-flex items-center transition-colors duration-200">
+                        <AdjustmentsVerticalIcon className="w-5 h-5 sm:mr-2" />
+                        <span className="hidden sm:inline">Sort</span>
                     </button>
                     {isSortDropdownOpen && (
                          <div className="absolute top-full right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
@@ -733,15 +746,83 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
                     )}
                 </div>
             )}
-            <button onClick={() => setIsManageCatalogsOpen(true)} className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200">
-                <GlobeIcon className="w-5 h-5 mr-2" />
-                <span>Catalogs</span>
-            </button>
-            <label htmlFor="epub-upload" className={`cursor-pointer bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 ${importStatus.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <UploadIcon className="w-5 h-5 mr-2" />
-              <span>Import Book</span>
+            <label htmlFor="epub-upload" className={`cursor-pointer bg-sky-500 hover:bg-sky-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg inline-flex items-center transition-colors duration-200 ${importStatus.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <UploadIcon className="w-5 h-5 sm:mr-2" />
+              <span className="hidden sm:inline">Import Book</span>
             </label>
             <input id="epub-upload" type="file" accept=".epub" className="hidden" onChange={handleFileChange} disabled={importStatus.isLoading} />
+
+            <div ref={settingsMenuRef} className="relative">
+                <button
+                onClick={() => setIsSettingsMenuOpen(prev => !prev)}
+                className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold p-2 rounded-lg inline-flex items-center transition-colors duration-200 h-[40px] w-[40px] justify-center"
+                aria-label="Open settings menu"
+                aria-haspopup="true"
+                aria-expanded={isSettingsMenuOpen}
+                >
+                <SettingsIcon className="w-5 h-5" />
+                </button>
+                {isSettingsMenuOpen && (
+                <div 
+                    className="absolute top-full right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20"
+                    role="menu"
+                    aria-orientation="vertical"
+                >
+                    <ul className="p-1 text-white" role="none">
+                      <li role="none">
+                          <button
+                          onClick={() => {
+                              setIsManageCatalogsOpen(true);
+                              setIsSettingsMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
+                          role="menuitem"
+                          >
+                          Manage Catalogs
+                          </button>
+                      </li>
+                      <li className="my-1 border-t border-slate-700/50" role="separator"></li>
+                      <li role="none">
+                          <button
+                          onClick={() => {
+                              onOpenLocalStorageModal();
+                              setIsSettingsMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
+                          role="menuitem"
+                          >
+                          Local Storage
+                          </button>
+                      </li>
+                      <li role="none">
+                          <button
+                          onClick={() => {
+                              onOpenCloudSyncModal();
+                              setIsSettingsMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
+                          role="menuitem"
+                          >
+                          Cloud Storage (Google Drive)
+                          </button>
+                      </li>
+                      <li className="my-1 border-t border-slate-700/50" role="separator"></li>
+                      <li role="none">
+                        <button
+                          onClick={() => {
+                              onShowAbout();
+                              setIsSettingsMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
+                          role="menuitem"
+                          >
+                          About
+                          </button>
+                      </li>
+                    </ul>
+                </div>
+                )}
+            </div>
         </div>
       </header>
 

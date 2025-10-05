@@ -117,3 +117,19 @@ export interface CatalogPagination {
   first?: string;
   last?: string;
 }
+
+export interface GoogleUser {
+  name: string;
+  email: string;
+  picture: string;
+}
+
+// Structure for the library.json file stored in Google Drive
+export interface SyncPayload {
+  library: Omit<BookRecord, 'epubData'>[];
+  catalogs: Catalog[];
+  bookmarks: Record<number, Bookmark[]>;
+  citations: Record<number, Citation[]>;
+  positions: Record<number, string | null>;
+  settings: ReaderSettings;
+}

@@ -1,4 +1,4 @@
-# Custom Ebook Reader
+# MeBooks
 
 A custom, browser-based ebook reader inspired by [Readium's Thorium](https://www.edrlab.org/software/thorium-reader/). This application allows users to import EPUB books into a local library and browse online OPDS catalogs. It is built using modern web technologies and focuses on providing a rich, customizable reading experience with robust library management features.
 
