@@ -69,3 +69,23 @@ export interface CoverAnimationData {
   rect: DOMRect;
   coverImage: string | null;
 }
+
+export interface Catalog {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export interface CatalogBook {
+  title: string;
+  author: string;
+  coverImage: string | null;
+  downloadUrl: string;
+  summary: string | null;
+}
+
+export interface CatalogNavigationLink {
+  title: string;
+  url: string;
+  rel: string;
+}
