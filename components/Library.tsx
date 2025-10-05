@@ -10,8 +10,14 @@ import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface LibraryProps {
   onOpenBook: (id: number, animationData: CoverAnimationData) => void;
-  onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog') => void;
-  processAndSaveBook: (epubData: ArrayBuffer, fileName?: string, source?: 'file' | 'catalog') => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
+  onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => void;
+  processAndSaveBook: (
+    epubData: ArrayBuffer, 
+    fileName?: string, 
+    source?: 'file' | 'catalog', 
+    providerName?: string,
+    providerId?: string
+  ) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
 }
@@ -58,9 +64,29 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
           const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
           
           const downloadUrlHref = acquisitionLink?.getAttribute('href');
+          
+          const publisher = entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent;
+          const publicationDate = entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent;
+          const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
+          const providerId = identifiers[0]?.textContent?.trim() || undefined;
+
+          const subjects = Array.from(entry.querySelectorAll('category'))
+              .map(cat => cat.getAttribute('term'))
+              .filter((term): term is string => term !== null);
+
           if(downloadUrlHref) {
               const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
-              books.push({ title, author, coverImage, downloadUrl, summary });
+              books.push({ 
+                  title, 
+                  author, 
+                  coverImage, 
+                  downloadUrl, 
+                  summary, 
+                  publisher: publisher || undefined, 
+                  publicationDate: publicationDate || undefined, 
+                  providerId, 
+                  subjects: subjects.length > 0 ? subjects : undefined 
+              });
           }
       } else if (subsectionLink) {
           const navUrl = subsectionLink?.getAttribute('href');
@@ -103,7 +129,46 @@ const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[],
             if (acquisitionLink?.href) {
                 const downloadUrl = new URL(acquisitionLink.href, baseUrl).href;
                 const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
-                books.push({ title, author, coverImage, downloadUrl, summary });
+
+                let publisher: string | undefined = undefined;
+                if (typeof metadata.publisher === 'string') {
+                    publisher = metadata.publisher;
+                } else if (metadata.publisher?.name) {
+                    publisher = metadata.publisher.name;
+                }
+
+                const publicationDate = metadata.published;
+
+                let providerId: string | undefined = undefined;
+                if (typeof metadata.identifier === 'string') {
+                    providerId = metadata.identifier.trim();
+                } else if (Array.isArray(metadata.identifier) && metadata.identifier.length > 0) {
+                    const firstIdentifier = metadata.identifier.find((id: any) => typeof id === 'string');
+                    if (firstIdentifier) {
+                        providerId = firstIdentifier.trim();
+                    }
+                }
+
+                let subjects: string[] = [];
+                if (Array.isArray(metadata.subject)) {
+                    subjects = metadata.subject.map((s: any) => {
+                        if (typeof s === 'string') return s;
+                        if (s?.name) return s.name;
+                        return null;
+                    }).filter((s): s is string => s !== null);
+                }
+
+                books.push({ 
+                    title, 
+                    author, 
+                    coverImage, 
+                    downloadUrl, 
+                    summary, 
+                    publisher, 
+                    publicationDate, 
+                    providerId, 
+                    subjects: subjects.length > 0 ? subjects : undefined
+                });
             }
         });
     }
@@ -254,6 +319,24 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     saveCatalogs(updatedCatalogs);
     if (activeCatalog?.id === id) {
       handleSelectCatalog(null);
+    }
+  }, [catalogs, saveCatalogs, activeCatalog]);
+
+  const handleUpdateCatalog = useCallback((id: string, newName: string) => {
+    const updatedCatalogs = catalogs.map(c => 
+        c.id === id ? { ...c, name: newName } : c
+    );
+    saveCatalogs(updatedCatalogs);
+    if (activeCatalog?.id === id) {
+        setActiveCatalog(prev => prev ? { ...prev, name: newName } : null);
+        setCatalogNavPath(prev => {
+            if (prev.length > 0) {
+                const newPath = [...prev];
+                newPath[0] = { ...newPath[0], name: newName };
+                return newPath;
+            }
+            return prev;
+        });
     }
   }, [catalogs, saveCatalogs, activeCatalog]);
 
@@ -414,7 +497,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
   };
 
   const handleCatalogBookClick = (book: CatalogBook) => {
-      onShowBookDetail(book, 'catalog');
+      onShowBookDetail(book, 'catalog', activeCatalog?.name);
   };
 
   const handleToggleNode = useCallback(async (nodeUrl: string) => {
@@ -751,6 +834,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
         catalogs={catalogs}
         onAddCatalog={handleAddCatalog}
         onDeleteCatalog={handleDeleteCatalog}
+        onUpdateCatalog={handleUpdateCatalog}
       />
 
       <DuplicateBookModal

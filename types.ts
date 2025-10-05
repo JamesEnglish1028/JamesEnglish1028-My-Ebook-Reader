@@ -1,3 +1,4 @@
+
 export interface BookRecord {
   id?: number;
   title: string;
@@ -6,7 +7,9 @@ export interface BookRecord {
   epubData: ArrayBuffer;
   publisher?: string;
   publicationDate?: string;
-  isbn?: string;
+  isbn?: string; // Kept for backwards compatibility with existing library books
+  providerId?: string;
+  providerName?: string;
   description?: string;
   subjects?: string[];
 }
@@ -18,7 +21,9 @@ export interface BookMetadata {
   coverImage: string | null;
   publisher?: string;
   publicationDate?: string;
-  isbn?: string;
+  isbn?: string; // Kept for backwards compatibility with existing library books
+  providerId?: string;
+  providerName?: string;
   description?: string;
   subjects?: string[];
 }
@@ -75,7 +80,7 @@ export interface CoverAnimationData {
 }
 
 export interface Catalog {
-  id: string;
+  id:string;
   name: string;
   url: string;
 }
@@ -86,6 +91,10 @@ export interface CatalogBook {
   coverImage: string | null;
   downloadUrl: string;
   summary: string | null;
+  publisher?: string;
+  publicationDate?: string;
+  providerId?: string;
+  subjects?: string[];
 }
 
 export interface CatalogNavigationLink {

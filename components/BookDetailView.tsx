@@ -9,9 +9,10 @@ import { db } from '../services/db';
 interface BookDetailViewProps {
   book: BookMetadata | CatalogBook;
   source: 'library' | 'catalog';
+  catalogName?: string;
   onBack: () => void;
   onReadBook: (id: number, animationData: CoverAnimationData) => void;
-  onImportFromCatalog: (book: CatalogBook) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
+  onImportFromCatalog: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
 }
@@ -20,7 +21,43 @@ const isLibraryBook = (b: BookMetadata | CatalogBook): b is BookMetadata => {
     return 'id' in b && typeof b.id === 'number';
 };
 
-const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, onBack, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  
+  // Check if the created date is invalid
+  if (isNaN(date.getTime())) {
+    // If parsing fails, it might be a simple year or year-month string
+    // that the constructor couldn't handle perfectly. Return as-is.
+    return dateString;
+  }
+
+  const trimmedDateString = dateString.trim();
+
+  // Handles "YYYY"
+  if (/^\d{4}$/.test(trimmedDateString)) {
+    return date.getUTCFullYear().toString();
+  }
+
+  // Handles "YYYY-MM"
+  if (/^\d{4}-\d{2}$/.test(trimmedDateString)) {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      timeZone: 'UTC', // Use UTC to avoid timezone shifting the month
+    });
+  }
+  
+  // Handles full dates like "YYYY-MM-DD" or ISO strings
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC', // Use UTC to avoid timezone shifting the day
+  });
+};
+
+
+const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogName, onBack, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
   const coverRef = React.useRef<HTMLImageElement>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [duplicateBook, setDuplicateBook] = useState<BookRecord | null>(null);
@@ -29,9 +66,12 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, onBack, o
   const libraryBook = isLibraryBook(book) ? book : null;
   const catalogBook = !isLibraryBook(book) ? book : null;
 
-  const description = libraryBook ? libraryBook.description : catalogBook?.summary;
+  const description = 'description' in book ? book.description : catalogBook?.summary;
   const isLongDescription = description && description.length > 400;
-  const coverImage = libraryBook ? libraryBook.coverImage : (catalogBook?.coverImage ? `https://corsproxy.io/?${encodeURIComponent(catalogBook.coverImage)}` : null);
+  const coverImage = book.coverImage ? ('id' in book ? book.coverImage : `https://corsproxy.io/?${encodeURIComponent(book.coverImage)}`) : null;
+  const providerId = (book as any).providerId || (book as any).isbn;
+  const providerName = (book as BookMetadata).providerName;
+
 
   const handleReadClick = () => {
     if (libraryBook?.id && coverRef.current) {
@@ -50,7 +90,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, onBack, o
 
   const handleAddToBookshelf = async () => {
     if (catalogBook) {
-        const result = await onImportFromCatalog(catalogBook);
+        const result = await onImportFromCatalog(catalogBook, catalogName);
         if (!result.success && result.bookRecord && result.existingBook) {
             setDuplicateBook(result.bookRecord);
             setExistingBook(result.existingBook);
@@ -173,27 +213,32 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, onBack, o
                     </section>
                 )}
 
-                {libraryBook && (libraryBook.publisher || libraryBook.publicationDate || libraryBook.isbn) && (
+                {(book.publisher || book.publicationDate || providerId) && (
                     <section>
                         <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
                         <div className="bg-slate-800/50 rounded-lg border border-slate-700">
                             <dl className="divide-y divide-slate-700">
-                                {libraryBook.publisher && (
+                                {book.publisher && (
                                     <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                                         <dt className="text-sm font-medium text-slate-400">Publisher</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{libraryBook.publisher}</dd>
+                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.publisher}</dd>
                                     </div>
                                 )}
-                                {libraryBook.publicationDate && (
+                                {book.publicationDate && (
                                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                                         <dt className="text-sm font-medium text-slate-400">Published</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{libraryBook.publicationDate}</dd>
+                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{formatDate(book.publicationDate)}</dd>
                                     </div>
                                 )}
-                                {libraryBook.isbn && (
+                                {providerId && (
                                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">ISBN</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{libraryBook.isbn}</dd>
+                                        <dt className="text-sm font-medium text-slate-400">Provider ID</dt>
+                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
+                                            {providerId}
+                                            {providerName && (
+                                                <span className="block text-xs text-slate-400">from {providerName}</span>
+                                            )}
+                                        </dd>
                                     </div>
                                 )}
                             </dl>
@@ -201,11 +246,11 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, onBack, o
                     </section>
                 )}
                 
-                {libraryBook?.subjects && libraryBook.subjects.length > 0 && (
+                {book.subjects && book.subjects.length > 0 && (
                     <section>
                         <h3 className="text-lg font-semibold text-slate-200 mb-3">Subjects</h3>
                         <div className="flex flex-wrap gap-2">
-                            {libraryBook.subjects.map((subject, index) => (
+                            {book.subjects.map((subject, index) => (
                                 <span key={index} className="bg-slate-700 text-slate-300 text-sm font-medium px-3 py-1.5 rounded-full">
                                     {subject}
                                 </span>

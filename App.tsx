@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [detailViewData, setDetailViewData] = useState<{
     book: BookMetadata | CatalogBook;
     source: 'library' | 'catalog';
+    catalogName?: string;
   } | null>(null);
   
   const [importStatus, setImportStatus] = useState<{
@@ -43,8 +44,8 @@ const App: React.FC = () => {
     setCoverAnimationData(null);
   }, []);
 
-  const handleShowBookDetail = useCallback((book: BookMetadata | CatalogBook, source: 'library' | 'catalog') => {
-    setDetailViewData({ book, source });
+  const handleShowBookDetail = useCallback((book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => {
+    setDetailViewData({ book, source, catalogName });
     setCurrentView('bookDetail');
   }, []);
   
@@ -67,7 +68,9 @@ const App: React.FC = () => {
   const processAndSaveBook = useCallback(async (
     epubData: ArrayBuffer, 
     fileName: string = 'Untitled Book',
-    source: 'file' | 'catalog' = 'file'
+    source: 'file' | 'catalog' = 'file',
+    providerName?: string,
+    providerId?: string
   ): Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }> => {
     setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
     try {
@@ -75,8 +78,6 @@ const App: React.FC = () => {
         const book = ePub(epubData);
         const metadata = await book.loaded.metadata;
 
-        const identifier = metadata.identifier;
-        
         setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
         let coverImage: string | null = null;
         const coverUrl = await book.coverUrl();
@@ -86,6 +87,9 @@ const App: React.FC = () => {
 
         const subjectsRaw = metadata.subject || metadata.subjects;
         const subjects = subjectsRaw ? (Array.isArray(subjectsRaw) ? subjectsRaw.map(s => typeof s === 'object' ? s.name : s) : [subjectsRaw]) : [];
+        
+        // Prioritize the provider ID from the catalog feed, fall back to the one in the EPUB file.
+        const finalProviderId = providerId || metadata.identifier;
 
         const newBook: BookRecord = {
           title: metadata.title || fileName,
@@ -94,13 +98,14 @@ const App: React.FC = () => {
           epubData,
           publisher: metadata.publisher,
           publicationDate: metadata.pubdate,
-          isbn: identifier,
+          providerId: finalProviderId,
+          providerName: providerName,
           description: metadata.description,
           subjects: subjects,
         };
 
-        if (identifier) {
-            const existing = await db.findBookByIsbn(identifier);
+        if (finalProviderId) {
+            const existing = await db.findBookByIdentifier(finalProviderId);
             if (existing) {
                 setImportStatus({ isLoading: false, message: '', error: null });
                 return { success: false, bookRecord: newBook, existingBook: existing };
@@ -130,7 +135,7 @@ const App: React.FC = () => {
     }
   }, [handleReturnToLibrary]);
 
-  const handleImportFromCatalog = useCallback(async (book: CatalogBook) => {
+  const handleImportFromCatalog = useCallback(async (book: CatalogBook, catalogName?: string) => {
     setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
     try {
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(book.downloadUrl)}`;
@@ -144,8 +149,8 @@ const App: React.FC = () => {
         throw new Error(errorMessage);
       }
       const epubData = await response.arrayBuffer();
-      // The processAndSaveBook function now returns info about duplicates
-      return await processAndSaveBook(epubData, book.title, 'catalog');
+      // Pass the providerId from the catalog book object to ensure it's saved correctly.
+      return await processAndSaveBook(epubData, book.title, 'catalog', catalogName, book.providerId);
     } catch (error) {
       console.error("Error importing from catalog:", error);
       let message = "Download failed. The file may no longer be available or there was a network issue.";
@@ -175,6 +180,7 @@ const App: React.FC = () => {
           <BookDetailView
             book={detailViewData.book}
             source={detailViewData.source}
+            catalogName={detailViewData.catalogName}
             onBack={handleReturnToLibrary}
             onReadBook={handleOpenBook}
             onImportFromCatalog={handleImportFromCatalog}

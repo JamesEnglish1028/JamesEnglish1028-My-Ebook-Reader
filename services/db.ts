@@ -1,8 +1,9 @@
+
 import { BookRecord, BookMetadata } from '../types';
 
 const DB_NAME = 'EbookReaderDB';
 const STORE_NAME = 'books';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance: IDBDatabase | null = null;
 
@@ -46,6 +47,11 @@ const init = (): Promise<IDBDatabase> => {
             store.createIndex('isbn', 'isbn', { unique: false });
         }
       }
+      if (event.oldVersion < 3) {
+        if (!store.indexNames.contains('providerId')) {
+            store.createIndex('providerId', 'providerId', { unique: false });
+        }
+      }
     };
   });
 };
@@ -79,8 +85,8 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
       if (cursor) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, description, subjects } = cursor.value;
-        books.push({ id, title, author, coverImage, publisher, publicationDate, isbn, description, subjects });
+        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects } = cursor.value;
+        books.push({ id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects });
         cursor.continue();
       } else {
         resolve(books);
@@ -122,8 +128,8 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
     request.onsuccess = () => {
       const bookRecord = request.result as BookRecord | undefined;
       if (bookRecord) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, description, subjects } = bookRecord;
-        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, description, subjects });
+        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects } = bookRecord;
+        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects });
       } else {
         resolve(null);
       }
@@ -137,24 +143,44 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
 };
 
 
-const findBookByIsbn = async (isbn: string): Promise<BookRecord | null> => {
-  if (!isbn) return null;
-  const db = await init();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const index = store.index('isbn');
-    const request = index.get(isbn);
+const findBookByIdentifier = async (identifier: string): Promise<BookRecord | null> => {
+    if (!identifier) return null;
+    const db = await init();
 
-    request.onsuccess = () => {
-      resolve((request.result as BookRecord) || null);
-    };
+    const search = (indexName: 'providerId' | 'isbn'): Promise<BookRecord | null> => {
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction(STORE_NAME, 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                if (!store.indexNames.contains(indexName)) {
+                    resolve(null);
+                    return;
+                }
+                const index = store.index(indexName);
+                const request = index.get(identifier);
 
-    request.onerror = () => {
-      console.error('Error finding book by ISBN:', request.error);
-      reject('Error finding book');
+                request.onsuccess = () => {
+                    resolve((request.result as BookRecord) || null);
+                };
+                request.onerror = () => {
+                    console.error(`Error finding book by ${indexName}:`, request.error);
+                    reject(`Error finding book by ${indexName}`);
+                };
+            } catch (e) {
+                console.error(`Error initiating search on index ${indexName}:`, e);
+                resolve(null);
+            }
+        });
     };
-  });
+    
+    // First, try searching by the new `providerId` field.
+    const byProviderId = await search('providerId');
+    if (byProviderId) {
+        return byProviderId;
+    }
+
+    // If not found, fall back to searching by the old `isbn` field for backward compatibility.
+    return search('isbn');
 };
 
 const deleteBook = async (id: number): Promise<void> => {
@@ -181,6 +207,6 @@ export const db = {
   getBooksMetadata,
   getBook,
   getBookMetadata,
-  findBookByIsbn,
+  findBookByIdentifier,
   deleteBook,
 };
