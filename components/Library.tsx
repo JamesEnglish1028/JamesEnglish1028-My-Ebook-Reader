@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../services/db';
 import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
@@ -20,6 +19,10 @@ interface LibraryProps {
   ) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
+  activeCatalog: Catalog | null;
+  setActiveCatalog: React.Dispatch<React.SetStateAction<Catalog | null>>;
+  catalogNavPath: { name: string, url: string }[];
+  setCatalogNavPath: React.Dispatch<React.SetStateAction<{ name: string, url: string }[]>>;
 }
 
 const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
@@ -223,15 +226,13 @@ const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ book
 };
 
 
-const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, processAndSaveBook, importStatus, setImportStatus }) => {
+const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, processAndSaveBook, importStatus, setImportStatus, activeCatalog, setActiveCatalog, catalogNavPath, setCatalogNavPath }) => {
   const [books, setBooks] = useState<BookMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
-  const [activeCatalog, setActiveCatalog] = useState<Catalog | null>(null);
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
   const [catalogNavLinks, setCatalogNavLinks] = useState<CatalogNavigationLink[]>([]);
-  const [catalogNavPath, setCatalogNavPath] = useState<{ name: string, url: string }[]>([]);
   const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>(null);
 
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
@@ -252,10 +253,11 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
 
 
   const fetchBooks = useCallback(async () => {
+    setIsCatalogLoading(false); // Turn off catalog spinner if active
     setIsLoading(true);
     try {
       const booksData = await db.getBooksMetadata();
-      setBooks(booksData); // Default sort is by ID desc (recently added)
+      setBooks(booksData);
     } catch (error) {
       console.error("Failed to fetch books:", error);
     } finally {
@@ -314,13 +316,46 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     saveCatalogs([...catalogs, newCatalog]);
   }, [catalogs, saveCatalogs]);
 
+  const fetchAndParseCatalog = useCallback(async (url: string, baseUrl?: string) => {
+    setIsLoading(false); // Turn off library spinner if active
+    setIsCatalogLoading(true);
+    setCatalogError(null);
+    setCatalogBooks([]);
+    setCatalogNavLinks([]);
+    setCatalogPagination(null);
+    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url);
+    if (error) {
+        setCatalogError(error);
+    } else {
+        setCatalogBooks(books);
+        setCatalogNavLinks(navLinks);
+        setCatalogPagination(pagination);
+    }
+    setIsCatalogLoading(false);
+  }, []);
+
+  const handleSelectCatalog = useCallback((catalog: Catalog | null) => {
+    setIsCatalogDropdownOpen(false);
+    if (catalog) {
+      // Only reset the path if switching to a new catalog
+      if (activeCatalog?.id !== catalog.id) {
+        setActiveCatalog(catalog);
+        setCatalogNavPath([{ name: catalog.name, url: catalog.url }]);
+      }
+    } else {
+      // Switching to My Library
+      setActiveCatalog(null);
+      setCatalogNavPath([]);
+    }
+  }, [activeCatalog, setActiveCatalog, setCatalogNavPath]);
+
   const handleDeleteCatalog = useCallback((id: string) => {
     const updatedCatalogs = catalogs.filter(c => c.id !== id);
     saveCatalogs(updatedCatalogs);
     if (activeCatalog?.id === id) {
       handleSelectCatalog(null);
     }
-  }, [catalogs, saveCatalogs, activeCatalog]);
+  }, [catalogs, saveCatalogs, activeCatalog, handleSelectCatalog]);
 
   const handleUpdateCatalog = useCallback((id: string, newName: string) => {
     const updatedCatalogs = catalogs.map(c => 
@@ -338,29 +373,21 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
             return prev;
         });
     }
-  }, [catalogs, saveCatalogs, activeCatalog]);
-
-  const fetchAndParseCatalog = useCallback(async (url: string, baseUrl?: string) => {
-    setIsCatalogLoading(true);
-    setCatalogError(null);
-    setCatalogBooks([]);
-    setCatalogNavLinks([]);
-    setCatalogPagination(null);
-    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url);
-    if (error) {
-        setCatalogError(error);
-    } else {
-        setCatalogBooks(books);
-        setCatalogNavLinks(navLinks);
-        setCatalogPagination(pagination);
-    }
-    setIsCatalogLoading(false);
-  }, []);
+  }, [catalogs, saveCatalogs, activeCatalog, setActiveCatalog, setCatalogNavPath]);
 
   useEffect(() => {
     setCatalogs(getCatalogs());
-    fetchBooks();
-  }, [fetchBooks, getCatalogs]);
+  }, [getCatalogs]);
+  
+  // This effect is the single source of truth for what data to fetch and display.
+  useEffect(() => {
+    if (activeCatalog && catalogNavPath.length > 0) {
+        const currentUrl = catalogNavPath[catalogNavPath.length - 1].url;
+        fetchAndParseCatalog(currentUrl, activeCatalog.url);
+    } else {
+        fetchBooks();
+    }
+  }, [activeCatalog, catalogNavPath, fetchAndParseCatalog, fetchBooks]);
   
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -375,37 +402,23 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelectCatalog = (catalog: Catalog | null) => {
-    setActiveCatalog(catalog);
-    setIsCatalogDropdownOpen(false);
-    if (catalog) {
-      const newPath = [{ name: catalog.name, url: catalog.url }];
-      setCatalogNavPath(newPath);
-      fetchAndParseCatalog(catalog.url, catalog.url);
-    } else {
-      setCatalogBooks([]);
-      setCatalogNavLinks([]);
-      setCatalogError(null);
-      setCatalogNavPath([]);
-      setCatalogPagination(null);
-      fetchBooks();
-    }
-  };
-
   const handleNavLinkClick = (link: {title: string, url: string}) => {
-    const newPath = [...catalogNavPath, { name: link.title, url: link.url }];
-    setCatalogNavPath(newPath);
-    fetchAndParseCatalog(link.url, activeCatalog?.url);
+    setCatalogNavPath(prev => [...prev, { name: link.title, url: link.url }]);
   };
 
   const handleBreadcrumbClick = (index: number) => {
-    const newPath = catalogNavPath.slice(0, index + 1);
-    setCatalogNavPath(newPath);
-    fetchAndParseCatalog(newPath[index].url, activeCatalog?.url);
+    setCatalogNavPath(prev => prev.slice(0, index + 1));
   };
 
   const handlePaginationClick = (url: string) => {
-    fetchAndParseCatalog(url, activeCatalog?.url);
+    // Update the URL of the current navigation level to reflect the new page
+    setCatalogNavPath(prev => {
+        if (prev.length === 0) return prev;
+        const newPath = [...prev];
+        const lastItem = { ...newPath[newPath.length - 1], url };
+        newPath[newPath.length - 1] = lastItem;
+        return newPath;
+    });
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {

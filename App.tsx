@@ -1,15 +1,16 @@
-
 import React, { useState, useCallback } from 'react';
 import Library from './components/Library';
 import ReaderView from './components/ReaderView';
 import BookDetailView from './components/BookDetailView';
 import { db } from './services/db';
-import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook } from './types';
+import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'library' | 'reader' | 'bookDetail'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [coverAnimationData, setCoverAnimationData] = useState<CoverAnimationData | null>(null);
+  const [activeCatalog, setActiveCatalog] = useState<Catalog | null>(null);
+  const [catalogNavPath, setCatalogNavPath] = useState<{ name: string, url: string }[]>([]);
 
   const [detailViewData, setDetailViewData] = useState<{
     book: BookMetadata | CatalogBook;
@@ -197,6 +198,10 @@ const App: React.FC = () => {
             processAndSaveBook={processAndSaveBook}
             importStatus={importStatus}
             setImportStatus={setImportStatus}
+            activeCatalog={activeCatalog}
+            setActiveCatalog={setActiveCatalog}
+            catalogNavPath={catalogNavPath}
+            setCatalogNavPath={setCatalogNavPath}
           />
         );
     }
