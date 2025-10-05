@@ -15,7 +15,8 @@ interface LibraryProps {
     fileName?: string, 
     source?: 'file' | 'catalog', 
     providerName?: string,
-    providerId?: string
+    providerId?: string,
+    format?: string
   ) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
@@ -24,6 +25,13 @@ interface LibraryProps {
   catalogNavPath: { name: string, url: string }[];
   setCatalogNavPath: React.Dispatch<React.SetStateAction<{ name: string, url: string }[]>>;
 }
+
+const getFormatFromMimeType = (mimeType: string): string | undefined => {
+    if (!mimeType) return 'EPUB'; // Default to EPUB if type is missing for an acquisition link
+    if (mimeType.includes('epub+zip')) return 'EPUB';
+    if (mimeType.includes('pdf')) return 'PDF';
+    return mimeType.split('/')[1]?.toUpperCase() || undefined;
+};
 
 const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
     const parser = new DOMParser();
@@ -60,7 +68,7 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
       const acquisitionLink = allLinks.find(link => {
           const rel = link.getAttribute('rel') || '';
           const type = link.getAttribute('type') || '';
-          return rel.includes('opds-spec.org/acquisition') && type.includes('epub+zip');
+          return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
       }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
 
       const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
@@ -74,6 +82,8 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
           const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
           
           const downloadUrlHref = acquisitionLink?.getAttribute('href');
+          const mimeType = acquisitionLink?.getAttribute('type') || '';
+          const format = getFormatFromMimeType(mimeType);
           
           const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
           const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
@@ -95,7 +105,8 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
                   publisher: publisher || undefined, 
                   publicationDate: publicationDate || undefined, 
                   providerId, 
-                  subjects: subjects.length > 0 ? subjects : undefined 
+                  subjects: subjects.length > 0 ? subjects : undefined,
+                  format
               });
           }
       } else if (subsectionLink) {
@@ -158,6 +169,8 @@ const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[],
             if (acquisitionLink?.href) {
                 const downloadUrl = new URL(acquisitionLink.href, baseUrl).href;
                 const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
+                const mimeType = acquisitionLink?.type || '';
+                const format = getFormatFromMimeType(mimeType);
 
                 let publisher: string | undefined = undefined;
                 if (metadata.publisher) {
@@ -198,7 +211,8 @@ const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[],
                     publisher, 
                     publicationDate, 
                     providerId, 
-                    subjects: subjects.length > 0 ? subjects : undefined
+                    subjects: subjects.length > 0 ? subjects : undefined,
+                    format
                 });
             }
         });
@@ -793,7 +807,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
           ) : catalogBooks.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
               {catalogBooks.map((book, index) => (
-                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group">
+                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group relative">
                   <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
                     {book.coverImage ? (
                       <img src={`https://corsproxy.io/?${encodeURIComponent(book.coverImage)}`} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
@@ -803,9 +817,14 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
                       </div>
                     )}
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 space-y-1">
                     <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
                     <p className="text-xs text-slate-400 truncate">{book.author}</p>
+                    {book.format && (
+                        <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
+                            {book.format}
+                        </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -865,9 +884,12 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
                     >
                         <TrashIcon className="w-4 h-4" />
                     </button>
-                  <div className="mt-2">
+                  <div className="mt-2 space-y-1">
                     <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
                     <p className="text-xs text-slate-400 truncate">{book.author}</p>
+                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
+                        {book.format || 'EPUB'}
+                    </span>
                   </div>
                 </div>
               ))}

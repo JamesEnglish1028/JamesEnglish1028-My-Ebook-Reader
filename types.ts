@@ -13,6 +13,7 @@ export interface BookRecord {
   providerName?: string;
   description?: string;
   subjects?: string[];
+  format?: 'EPUB' | 'PDF' | string;
 }
 
 export interface BookMetadata {
@@ -27,6 +28,7 @@ export interface BookMetadata {
   providerName?: string;
   description?: string;
   subjects?: string[];
+  format?: 'EPUB' | 'PDF' | string;
 }
 
 export interface ReadAloudSettings {
@@ -96,6 +98,7 @@ export interface CatalogBook {
   publicationDate?: string;
   providerId?: string;
   subjects?: string[];
+  format?: 'EPUB' | 'PDF' | string;
 }
 
 export interface CatalogNavigationLink {

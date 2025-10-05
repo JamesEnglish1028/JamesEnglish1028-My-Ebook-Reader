@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import { BookMetadata, CatalogBook, CoverAnimationData, BookRecord } from '../types';
 import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
@@ -71,6 +72,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
   const coverImage = book.coverImage ? ('id' in book ? book.coverImage : `https://corsproxy.io/?${encodeURIComponent(book.coverImage)}`) : null;
   const providerId = (book as any).providerId || (book as any).isbn;
   const providerName = (book as BookMetadata).providerName;
+  const format = ('format' in book && book.format) || (isLibraryBook(book) ? 'EPUB' : undefined);
 
 
   const handleReadClick = () => {
@@ -175,9 +177,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                         Read Book
                     </button>
                 ) : (
-                    <button onClick={handleAddToBookshelf} disabled={importStatus.isLoading} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={handleAddToBookshelf} disabled={importStatus.isLoading || (!!format && format !== 'EPUB')} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
                         <DownloadIcon className="w-6 h-6 mr-2" />
-                        Add to Bookshelf
+                        {!!format && format !== 'EPUB' ? `Cannot Import ${format}` : 'Add to Bookshelf'}
                     </button>
                 )}
             </div>
@@ -213,7 +215,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                     </section>
                 )}
 
-                {(book.publisher || book.publicationDate || providerId) && (
+                {(book.publisher || book.publicationDate || providerId || format) && (
                     <section>
                         <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
                         <div className="bg-slate-800/50 rounded-lg border border-slate-700">
@@ -238,6 +240,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                                             {providerName && (
                                                 <span className="block text-xs text-slate-400">from {providerName}</span>
                                             )}
+                                        </dd>
+                                    </div>
+                                )}
+                                {format && (
+                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                        <dt className="text-sm font-medium text-slate-400">Format</dt>
+                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
+                                           <span className="bg-slate-700 text-slate-300 text-xs font-medium px-2 py-1 rounded-md">
+                                                {format}
+                                            </span>
                                         </dd>
                                     </div>
                                 )}

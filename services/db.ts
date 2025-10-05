@@ -85,8 +85,8 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
       if (cursor) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects } = cursor.value;
-        books.push({ id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects });
+        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format } = cursor.value;
+        books.push({ id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format });
         cursor.continue();
       } else {
         resolve(books);
@@ -128,8 +128,8 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
     request.onsuccess = () => {
       const bookRecord = request.result as BookRecord | undefined;
       if (bookRecord) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects } = bookRecord;
-        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects });
+        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format } = bookRecord;
+        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format });
       } else {
         resolve(null);
       }

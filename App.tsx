@@ -71,7 +71,8 @@ const App: React.FC = () => {
     fileName: string = 'Untitled Book',
     source: 'file' | 'catalog' = 'file',
     providerName?: string,
-    providerId?: string
+    providerId?: string,
+    format?: string
   ): Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }> => {
     setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
     try {
@@ -103,6 +104,7 @@ const App: React.FC = () => {
           providerName: providerName,
           description: metadata.description,
           subjects: subjects,
+          format: format || 'EPUB', // Default to EPUB for file uploads
         };
 
         if (finalProviderId) {
@@ -137,6 +139,12 @@ const App: React.FC = () => {
   }, [handleReturnToLibrary]);
 
   const handleImportFromCatalog = useCallback(async (book: CatalogBook, catalogName?: string) => {
+    if (book.format && book.format.toUpperCase() !== 'EPUB') {
+        const error = `Cannot import this book. The application currently only supports the EPUB format, but this book is a ${book.format}.`;
+        setImportStatus({ isLoading: false, message: '', error });
+        return { success: false };
+    }
+    
     setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
     try {
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(book.downloadUrl)}`;
@@ -150,8 +158,8 @@ const App: React.FC = () => {
         throw new Error(errorMessage);
       }
       const epubData = await response.arrayBuffer();
-      // Pass the providerId from the catalog book object to ensure it's saved correctly.
-      return await processAndSaveBook(epubData, book.title, 'catalog', catalogName, book.providerId);
+      // Pass the providerId and format from the catalog book object to ensure they're saved correctly.
+      return await processAndSaveBook(epubData, book.title, 'catalog', catalogName, book.providerId, book.format);
     } catch (error) {
       console.error("Error importing from catalog:", error);
       let message = "Download failed. The file may no longer be available or there was a network issue.";
