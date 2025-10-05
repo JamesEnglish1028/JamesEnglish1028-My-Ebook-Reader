@@ -114,10 +114,10 @@ const App: React.FC = () => {
             if (!pdfjsLib) {
                 throw new Error("PDF processing library is not available.");
             }
-            // FIX: Convert ArrayBuffer to a Uint8Array to prevent a cloning error
-            // when pdf.js passes the data to its web worker.
+            // pdf.js's web worker cannot handle a raw ArrayBuffer.
+            // It must be converted to a Uint8Array to prevent a cloning error.
             const pdfData = new Uint8Array(epubData);
-            const loadingTask = pdfjsLib.getDocument(pdfData);
+            const loadingTask = pdfjsLib.getDocument({ data: pdfData });
             const pdf = await loadingTask.promise;
             const metadata = await pdf.getMetadata();
             const info = metadata.info;

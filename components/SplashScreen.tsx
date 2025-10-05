@@ -13,11 +13,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ isVisible }) => {
       }`}
     >
       <div className="animate-pulse">
-        <Logo className="w-32 h-32 text-sky-400" />
+        <Logo full className="w-64" />
       </div>
-      <h1 className="text-2xl font-bold text-slate-300 mt-6 tracking-wider">
-        MeBooks
-      </h1>
     </div>
   );
 };
