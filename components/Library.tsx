@@ -1,44 +1,173 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../services/db';
-import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink } from '../types';
-import { UploadIcon, GlobeIcon, ChevronDownIcon, DownloadIcon, ChevronRightIcon } from './icons';
+import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
+import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon } from './icons';
 import Spinner from './Spinner';
 import ManageCatalogsModal from './ManageCatalogsModal';
+import DuplicateBookModal from './DuplicateBookModal';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface LibraryProps {
   onOpenBook: (id: number, animationData: CoverAnimationData) => void;
+  onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog') => void;
+  processAndSaveBook: (epubData: ArrayBuffer, fileName?: string, source?: 'file' | 'catalog') => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
+  importStatus: { isLoading: boolean; message: string; error: string | null; };
+  setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
 }
 
-const blobUrlToBase64 = async (blobUrl: string): Promise<string> => {
-    const response = await fetch(blobUrl);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+
+    const errorNode = xmlDoc.querySelector('parsererror');
+    if (errorNode) {
+      console.error("XML Parsing Error:", errorNode.textContent);
+      throw new Error('Failed to parse catalog XML. The URL may not point to a valid OPDS feed, or the response was not XML.');
+    }
+
+    const entries = Array.from(xmlDoc.querySelectorAll('entry'));
+    const books: CatalogBook[] = [];
+    const navLinks: CatalogNavigationLink[] = [];
+    const pagination: CatalogPagination = {};
+    
+    const feedLinks = Array.from(xmlDoc.querySelectorAll('feed > link'));
+    feedLinks.forEach(link => {
+        const rel = link.getAttribute('rel');
+        const href = link.getAttribute('href');
+        if (href) {
+            const fullUrl = new URL(href, baseUrl).href;
+            if (rel === 'next') pagination.next = fullUrl;
+            if (rel === 'previous') pagination.prev = fullUrl;
+            if (rel === 'first') pagination.first = fullUrl;
+            if (rel === 'last') pagination.last = fullUrl;
+        }
     });
+
+    entries.forEach(entry => {
+      const title = entry.querySelector('title')?.textContent || 'Untitled';
+      const acquisitionLink = entry.querySelector('link[rel="http://opds-spec.org/acquisition"]');
+      const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
+
+      if (acquisitionLink) {
+          const author = entry.querySelector('author > name')?.textContent || 'Unknown Author';
+          const summary = entry.querySelector('summary')?.textContent || entry.querySelector('content')?.textContent || null;
+          const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
+          
+          const coverImageHref = coverLink?.getAttribute('href');
+          const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
+          
+          const downloadUrlHref = acquisitionLink?.getAttribute('href');
+          if(downloadUrlHref) {
+              const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
+              books.push({ title, author, coverImage, downloadUrl, summary });
+          }
+      } else if (subsectionLink) {
+          const navUrl = subsectionLink?.getAttribute('href');
+          if (navUrl) {
+              navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
+          }
+      }
+    });
+
+    return { books, navLinks, pagination };
+}
+
+const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
+    const books: CatalogBook[] = [];
+    const navLinks: CatalogNavigationLink[] = [];
+    const pagination: CatalogPagination = {};
+
+    if (jsonData.links && Array.isArray(jsonData.links)) {
+        jsonData.links.forEach((link: any) => {
+            if (link.href && link.rel) {
+                const fullUrl = new URL(link.href, baseUrl).href;
+                if (link.rel === 'next') pagination.next = fullUrl;
+                if (link.rel === 'previous') pagination.prev = fullUrl;
+                if (link.rel === 'first') pagination.first = fullUrl;
+                if (link.rel === 'last') pagination.last = fullUrl;
+            }
+        });
+    }
+
+    if (jsonData.publications && Array.isArray(jsonData.publications)) {
+        jsonData.publications.forEach((pub: any) => {
+            const metadata = pub.metadata || {};
+            const title = metadata.title || 'Untitled';
+            const author = metadata.author?.[0]?.name || (Array.isArray(metadata.author) ? metadata.author[0] : metadata.author) || 'Unknown Author';
+            const summary = metadata.description || null;
+
+            const acquisitionLink = pub.links?.find((l: any) => l.rel === 'http://opds-spec.org/acquisition' || l.rel === 'http://opds-spec.org/acquisition/open-access');
+            const coverLink = pub.images?.[0];
+
+            if (acquisitionLink?.href) {
+                const downloadUrl = new URL(acquisitionLink.href, baseUrl).href;
+                const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
+                books.push({ title, author, coverImage, downloadUrl, summary });
+            }
+        });
+    }
+
+    if (jsonData.navigation && Array.isArray(jsonData.navigation)) {
+        jsonData.navigation.forEach((link: any) => {
+            if (link.href && link.title) {
+                const url = new URL(link.href, baseUrl).href;
+                navLinks.push({ title: link.title, url, rel: link.rel || '' });
+            }
+        });
+    }
+
+    return { books, navLinks, pagination };
+}
+
+const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
+    try {
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
+            let errorMessage = `The catalog server responded with an error (${statusInfo}). Please check the catalog URL.`;
+            if (response.status === 401 || response.status === 403) {
+                errorMessage = `Could not access catalog (${statusInfo}). This catalog requires authentication (a login or password), which is not supported by this application.`;
+            }
+            throw new Error(errorMessage);
+        }
+        
+        const contentType = response.headers.get('Content-Type') || '';
+
+        if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
+            const jsonData = await response.json();
+            return parseOpds2Json(jsonData, baseUrl);
+        } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
+            const responseText = await response.text();
+            return parseOpds1Xml(responseText, baseUrl);
+        } else {
+            throw new Error(`Unsupported catalog format. Content-Type: "${contentType}".`);
+        }
+    } catch (error) {
+        console.error("Error fetching catalog content:", error);
+        let message = "Could not load content.";
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            message = 'NetworkError: Failed to fetch the content. This could be due to your internet connection, the remote catalog being offline, or the public CORS proxy being temporarily unavailable.';
+        } else if (error instanceof Error) {
+            message = error.message;
+        }
+        return { books: [], navLinks: [], pagination: {}, error: message };
+    }
 };
 
-const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
+
+const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, processAndSaveBook, importStatus, setImportStatus }) => {
   const [books, setBooks] = useState<BookMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [importStatus, setImportStatus] = useState<{
-    isLoading: boolean;
-    message: string;
-    error: string | null;
-  }>({
-    isLoading: false,
-    message: '',
-    error: null,
-  });
 
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [activeCatalog, setActiveCatalog] = useState<Catalog | null>(null);
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
   const [catalogNavLinks, setCatalogNavLinks] = useState<CatalogNavigationLink[]>([]);
   const [catalogNavPath, setCatalogNavPath] = useState<{ name: string, url: string }[]>([]);
+  const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>(null);
 
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -46,19 +175,64 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
   const [isManageCatalogsOpen, setIsManageCatalogsOpen] = useState(false);
   const [isCatalogDropdownOpen, setIsCatalogDropdownOpen] = useState(false);
   
+  const [duplicateBook, setDuplicateBook] = useState<BookRecord | null>(null);
+  const [existingBook, setExistingBook] = useState<BookRecord | null>(null);
+  const [bookToDelete, setBookToDelete] = useState<BookMetadata | null>(null);
+  const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('ebook-sort-order') || 'added-desc');
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+
 
   const fetchBooks = useCallback(async () => {
     setIsLoading(true);
     try {
       const booksData = await db.getBooksMetadata();
-      setBooks(booksData.reverse());
+      setBooks(booksData); // Default sort is by ID desc (recently added)
     } catch (error) {
       console.error("Failed to fetch books:", error);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const sortedBooks = React.useMemo(() => {
+    const sorted = [...books];
+    const [key, direction] = sortOrder.split('-');
+
+    sorted.sort((a, b) => {
+        let valA: any, valB: any;
+        switch(key) {
+            case 'title':
+                valA = a.title.toLowerCase();
+                valB = b.title.toLowerCase();
+                break;
+            case 'author':
+                valA = a.author.toLowerCase();
+                valB = b.author.toLowerCase();
+                break;
+            case 'pubdate':
+                // Handle missing or invalid dates
+                valA = a.publicationDate ? new Date(a.publicationDate).getTime() : 0;
+                valB = b.publicationDate ? new Date(b.publicationDate).getTime() : 0;
+                if (isNaN(valA)) valA = 0;
+                if (isNaN(valB)) valB = 0;
+                break;
+            case 'added':
+            default:
+                valA = a.id!;
+                valB = b.id!;
+                break;
+        }
+
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+    return sorted;
+  }, [books, sortOrder]);
 
   const getCatalogs = useCallback(() => {
     const saved = localStorage.getItem('ebook-catalogs');
@@ -83,89 +257,21 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     }
   }, [catalogs, saveCatalogs, activeCatalog]);
 
-  const fetchAndParseCatalog = useCallback(async (url: string) => {
+  const fetchAndParseCatalog = useCallback(async (url: string, baseUrl?: string) => {
     setIsCatalogLoading(true);
     setCatalogError(null);
     setCatalogBooks([]);
     setCatalogNavLinks([]);
-    try {
-      // Use a CORS proxy to bypass browser security restrictions (CORS)
-      // that prevent fetching data directly from another domain.
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        throw new Error(`The server responded with an error: ${response.status} ${response.statusText}. Please check the URL.`);
-      }
-      
-      const contentType = response.headers.get('content-type') || '';
-      const responseText = await response.text();
-
-      if (contentType.includes('application/json')) {
-        let errorMessage = 'The proxy returned an unexpected JSON response.';
-        try {
-            const jsonResponse = JSON.parse(responseText);
-            if (jsonResponse?.status?.error) {
-                errorMessage = `Could not reach catalog server: ${jsonResponse.status.error}. Please check the URL.`;
-            }
-        } catch (e) {
-            errorMessage = 'The proxy returned a malformed JSON error response.';
-        }
-        throw new Error(errorMessage);
-      }
-
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(responseText, 'application/xml');
-
-      const errorNode = xmlDoc.querySelector('parsererror');
-      if (errorNode) {
-        console.error("XML Parsing Error:", errorNode.textContent);
-        throw new Error('Failed to parse catalog XML. The URL may not point to a valid OPDS feed.');
-      }
-
-      const entries = Array.from(xmlDoc.querySelectorAll('entry'));
-      const books: CatalogBook[] = [];
-      const navLinks: CatalogNavigationLink[] = [];
-
-      entries.forEach(entry => {
-        const title = entry.querySelector('title')?.textContent || 'Untitled';
-        const acquisitionLink = entry.querySelector('link[rel="http://opds-spec.org/acquisition"]');
-        const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
-
-        if (acquisitionLink) {
-            const author = entry.querySelector('author > name')?.textContent || 'Unknown Author';
-            const summary = entry.querySelector('summary')?.textContent || null;
-            const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
-            
-            const coverImageHref = coverLink?.getAttribute('href');
-            const coverImage = coverImageHref ? new URL(coverImageHref, url).href : null;
-            
-            const downloadUrlHref = acquisitionLink?.getAttribute('href');
-            if(downloadUrlHref) {
-                const downloadUrl = new URL(downloadUrlHref, url).href;
-                books.push({ title, author, coverImage, downloadUrl, summary });
-            }
-        } else if (subsectionLink) {
-            const navUrl = subsectionLink?.getAttribute('href');
-            if (navUrl) {
-                navLinks.push({ title, url: new URL(navUrl, url).href, rel: 'subsection' });
-            }
-        }
-      });
-      
-      setCatalogBooks(books);
-      setCatalogNavLinks(navLinks);
-
-    } catch (error) {
-      console.error("Error fetching or parsing catalog:", error);
-      let message = "Could not load catalog. An unknown error occurred.";
-      if (error instanceof Error) {
-        message = error.message;
-      }
-      setCatalogError(message);
-    } finally {
-      setIsCatalogLoading(false);
+    setCatalogPagination(null);
+    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url);
+    if (error) {
+        setCatalogError(error);
+    } else {
+        setCatalogBooks(books);
+        setCatalogNavLinks(navLinks);
+        setCatalogPagination(pagination);
     }
+    setIsCatalogLoading(false);
   }, []);
 
   useEffect(() => {
@@ -178,6 +284,9 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsCatalogDropdownOpen(false);
       }
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
+        setIsSortDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -189,71 +298,32 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     if (catalog) {
       const newPath = [{ name: catalog.name, url: catalog.url }];
       setCatalogNavPath(newPath);
-      fetchAndParseCatalog(catalog.url);
+      fetchAndParseCatalog(catalog.url, catalog.url);
     } else {
       setCatalogBooks([]);
       setCatalogNavLinks([]);
       setCatalogError(null);
       setCatalogNavPath([]);
+      setCatalogPagination(null);
       fetchBooks();
     }
   };
 
-  const handleNavLinkClick = (link: CatalogNavigationLink) => {
+  const handleNavLinkClick = (link: {title: string, url: string}) => {
     const newPath = [...catalogNavPath, { name: link.title, url: link.url }];
     setCatalogNavPath(newPath);
-    fetchAndParseCatalog(link.url);
+    fetchAndParseCatalog(link.url, activeCatalog?.url);
   };
 
   const handleBreadcrumbClick = (index: number) => {
     const newPath = catalogNavPath.slice(0, index + 1);
     setCatalogNavPath(newPath);
-    fetchAndParseCatalog(newPath[index].url);
+    fetchAndParseCatalog(newPath[index].url, activeCatalog?.url);
   };
 
-  const processAndSaveBook = useCallback(async (epubData: ArrayBuffer, fileName: string = 'Untitled Book') => {
-    setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
-    try {
-        const ePub = (window as any).ePub;
-        const book = ePub(epubData);
-        const metadata = await book.loaded.metadata;
-        
-        setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
-        let coverImage: string | null = null;
-        const coverUrl = await book.coverUrl();
-        if (coverUrl) {
-            coverImage = await blobUrlToBase64(coverUrl);
-        }
-
-        const newBook: BookRecord = {
-          title: metadata.title || fileName,
-          author: metadata.creator || 'Unknown Author',
-          coverImage,
-          epubData,
-          publisher: metadata.publisher,
-          publicationDate: metadata.pubdate,
-          isbn: metadata.identifier,
-        };
-
-        setImportStatus(prev => ({ ...prev, message: 'Saving to library...' }));
-        await db.addBook(newBook);
-        
-        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-        setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
-        
-        if (!activeCatalog) {
-          fetchBooks(); 
-        }
-
-    } catch (error) {
-        console.error("Error processing EPUB:", error);
-        let errorMessage = "Failed to import the EPUB file. It might be corrupted or in an unsupported format.";
-        if (error instanceof Error && error.message.includes('File is not a zip')) {
-          errorMessage = "The provided file is not a valid EPUB (it's not a zip archive). Please try a different file.";
-        }
-        setImportStatus({ isLoading: false, message: '', error: errorMessage });
-    }
-  }, [activeCatalog, fetchBooks]);
+  const handlePaginationClick = (url: string) => {
+    fetchAndParseCatalog(url, activeCatalog?.url);
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -264,7 +334,13 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     reader.onload = async (e) => {
         const epubData = e.target?.result as ArrayBuffer;
         if (epubData) {
-            await processAndSaveBook(epubData, file.name);
+            const result = await processAndSaveBook(epubData, file.name, 'file');
+            if (!result.success && result.bookRecord && result.existingBook) {
+                setDuplicateBook(result.bookRecord);
+                setExistingBook(result.existingBook);
+            } else if (result.success && !activeCatalog) {
+                fetchBooks();
+            }
         } else {
             setImportStatus({ isLoading: false, message: '', error: "Could not read file data." });
         }
@@ -275,51 +351,194 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     };
     reader.readAsArrayBuffer(file);
   };
-  
-  const handleImportFromCatalog = useCallback(async (book: CatalogBook) => {
-    setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
+
+  const handleReplaceBook = useCallback(async () => {
+    if (!duplicateBook || !existingBook) return;
+
+    setImportStatus({ isLoading: true, message: 'Replacing book...', error: null });
+    const bookToSave = { ...duplicateBook, id: existingBook.id };
+
+    setDuplicateBook(null);
+    setExistingBook(null);
+
     try {
-      // Use a CORS proxy to bypass browser security restrictions (CORS)
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(book.downloadUrl)}`;
-      const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
-      const epubData = await response.arrayBuffer();
-      await processAndSaveBook(epubData, book.title);
-    } catch (error) {
-      console.error("Error importing from catalog:", error);
-      let message = "Download failed. The file may no longer be available, or there was a network issue. This can also happen due to browser security restrictions (CORS).";
-      if (error instanceof Error && error.message.includes('Failed to fetch')) {
-          message = "Download failed. Please check your network connection.";
+      await db.saveBook(bookToSave);
+      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+      setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
+      if (!activeCatalog) {
+        fetchBooks();
       }
-      setImportStatus({ isLoading: false, message: '', error: message });
+    } catch (error) {
+      console.error("Error replacing book:", error);
+      setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
     }
-  }, [processAndSaveBook]);
+  }, [duplicateBook, existingBook, activeCatalog, fetchBooks, setImportStatus]);
+
+  const handleAddAnyway = useCallback(async () => {
+    if (!duplicateBook) return;
+
+    setImportStatus({ isLoading: true, message: 'Saving new copy...', error: null });
+    const bookToSave = { ...duplicateBook };
+    
+    setDuplicateBook(null);
+    setExistingBook(null);
+
+    try {
+      await db.saveBook(bookToSave);
+      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+      setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
+      if (!activeCatalog) {
+        fetchBooks();
+      }
+    } catch (error) {
+      console.error("Error adding duplicate book:", error);
+      setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
+    }
+  }, [duplicateBook, activeCatalog, fetchBooks, setImportStatus]);
+
+  const handleCancelDuplicate = () => {
+    setDuplicateBook(null);
+    setExistingBook(null);
+    setImportStatus({ isLoading: false, message: '', error: null });
+  };
   
-  const handleBookClick = (event: React.MouseEvent<HTMLDivElement>, book: BookMetadata) => {
-    const coverElement = event.currentTarget.querySelector('.book-cover-container');
-    if (coverElement && book.id) {
-        const rect = coverElement.getBoundingClientRect();
-        const plainRect = {
-            x: rect.x, y: rect.y,
-            width: rect.width, height: rect.height,
-            top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left,
-        };
-        onOpenBook(book.id, { rect: plainRect as DOMRect, coverImage: book.coverImage });
+  const handleLocalBookClick = async (book: BookMetadata) => {
+    if (book.id) {
+        const fullBookMetadata = await db.getBookMetadata(book.id);
+        if (!fullBookMetadata) {
+            console.error("Could not find book details for ID:", book.id);
+            return;
+        }
+        onShowBookDetail(fullBookMetadata, 'library');
     }
   };
 
+  const handleCatalogBookClick = (book: CatalogBook) => {
+      onShowBookDetail(book, 'catalog');
+  };
+
+  const handleToggleNode = useCallback(async (nodeUrl: string) => {
+    const findAndUpdateNode = async (nodes: CatalogNavigationLink[]): Promise<CatalogNavigationLink[] | 'navigated'> => {
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            if (node.url === nodeUrl) {
+                if (node.isExpanded) {
+                    nodes[i] = { ...node, isExpanded: false };
+                } else {
+                    if (node.children) {
+                        nodes[i] = { ...node, isExpanded: true };
+                    } else {
+                        nodes[i] = { ...node, isLoading: true };
+                        setCatalogNavLinks(prev => [...prev]); // Force re-render for spinner
+
+                        const { books, navLinks: newChildren, error } = await fetchCatalogContent(node.url, activeCatalog?.url || node.url);
+
+                        if (error) {
+                            console.error(`Error fetching children for ${node.title}:`, error);
+                            nodes[i] = { ...node, isLoading: false };
+                        } else if (books.length > 0 || (newChildren.length === 0 && books.length === 0)) {
+                             handleNavLinkClick(node);
+                             return 'navigated';
+                        } else {
+                            nodes[i] = { ...node, isLoading: false, isExpanded: true, children: newChildren };
+                        }
+                    }
+                }
+                return nodes;
+            }
+            if (node.children) {
+                const updatedChildren = await findAndUpdateNode(node.children);
+                if (updatedChildren !== 'navigated' && updatedChildren !== null) {
+                    nodes[i] = { ...node, children: updatedChildren };
+                    return nodes;
+                }
+                if (updatedChildren === 'navigated') return 'navigated';
+            }
+        }
+        return nodes;
+    };
+    const updatedLinks = await findAndUpdateNode(catalogNavLinks);
+    if (updatedLinks !== 'navigated') {
+        setCatalogNavLinks(updatedLinks);
+    }
+  }, [activeCatalog, catalogNavLinks, handleNavLinkClick]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!bookToDelete || typeof bookToDelete.id === 'undefined') return;
+
+    try {
+      await db.deleteBook(bookToDelete.id);
+      setBooks(prevBooks => prevBooks.filter(b => b.id !== bookToDelete.id));
+    } catch (error) {
+      console.error("Failed to delete book:", error);
+      // Optional: Set an error state to show a notification to the user
+    } finally {
+      setBookToDelete(null);
+    }
+  }, [bookToDelete]);
+
+  const handleSortChange = (newSortOrder: string) => {
+    setSortOrder(newSortOrder);
+    localStorage.setItem('ebook-sort-order', newSortOrder);
+    setIsSortDropdownOpen(false);
+  };
+
+  const CatalogTreeItem: React.FC<{ link: CatalogNavigationLink, level: number, onToggle: (url: string) => void }> = ({ link, level, onToggle }) => {
+    const hasChildren = link.children && link.children.length > 0;
+    const indentation = 1.5 + (level * 1.5);
+
+    return (
+        <li className="my-1">
+            <div 
+                className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-slate-700/50 transition-colors"
+                style={{ paddingLeft: `${indentation}rem`}}
+            >
+                <div className="flex items-center justify-center w-6 h-6 flex-shrink-0">
+                    { link.isLoading ? (
+                        <Spinner size="small" />
+                    ) : (
+                        <button onClick={() => onToggle(link.url)} className="p-1">
+                            { link.isExpanded ? <FolderOpenIcon className="w-5 h-5 text-sky-400" /> : <FolderIcon className="w-5 h-5 text-slate-400"/>}
+                        </button>
+                    )}
+                </div>
+                <button onClick={() => onToggle(link.url)} className="flex-grow text-left">
+                    <span className="font-semibold text-slate-200">{link.title}</span>
+                </button>
+            </div>
+            {link.isExpanded && hasChildren && (
+                <ul className="pl-4 border-l border-slate-700 ml-3">
+                    {link.children.map(child => (
+                        <CatalogTreeItem key={child.url} link={child} level={level + 1} onToggle={onToggle} />
+                    ))}
+                </ul>
+            )}
+        </li>
+    );
+  };
+
+  const sortOptions = [
+    { key: 'added-desc', label: 'Recently Added' },
+    { key: 'title-asc', label: 'Title (A-Z)' },
+    { key: 'title-desc', label: 'Title (Z-A)' },
+    { key: 'author-asc', label: 'Author (A-Z)' },
+    { key: 'author-desc', label: 'Author (Z-A)' },
+    { key: 'pubdate-desc', label: 'Publication Date (Newest)' },
+    { key: 'pubdate-asc', label: 'Publication Date (Oldest)' },
+  ];
+
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-4 gap-4">
+      <header className="flex justify-between items-start mb-4 gap-4">
         <div ref={dropdownRef} className="relative">
           <button
             onClick={() => setIsCatalogDropdownOpen(prev => !prev)}
-            className="flex items-center gap-2 text-white"
+            className="flex items-center gap-2 text-white text-left"
           >
-            <h1 className="text-4xl font-bold tracking-tight truncate">
+            <h1 className="text-4xl font-bold tracking-tight">
               {activeCatalog ? activeCatalog.name : 'My Library'}
             </h1>
-            <ChevronDownIcon className={`w-6 h-6 transition-transform ${isCatalogDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDownIcon className={`w-6 h-6 transition-transform flex-shrink-0 mt-2 ${isCatalogDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isCatalogDropdownOpen && (
             <div className="absolute top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
@@ -342,7 +561,28 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
+            {!activeCatalog && (
+                <div ref={sortDropdownRef} className="relative">
+                    <button onClick={() => setIsSortDropdownOpen(prev => !prev)} className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200">
+                        <AdjustmentsVerticalIcon className="w-5 h-5 mr-2" />
+                        <span>Sort</span>
+                    </button>
+                    {isSortDropdownOpen && (
+                         <div className="absolute top-full right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
+                             <ul className="p-1 text-white">
+                                {sortOptions.map(option => (
+                                    <li key={option.key}>
+                                        <button onClick={() => handleSortChange(option.key)} className={`w-full text-left px-3 py-2 text-sm rounded-md ${sortOrder === option.key ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
+                                            {option.label}
+                                        </button>
+                                    </li>
+                                ))}
+                             </ul>
+                         </div>
+                    )}
+                </div>
+            )}
             <button onClick={() => setIsManageCatalogsOpen(true)} className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200">
                 <GlobeIcon className="w-5 h-5 mr-2" />
                 <span>Catalogs</span>
@@ -371,10 +611,16 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
           </nav>
       )}
 
-      {(importStatus.isLoading || importStatus.error) && (
+      {(importStatus.isLoading || importStatus.error || importStatus.message === 'Import successful!') && (
         <div className="fixed inset-0 bg-slate-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
             <div className="bg-slate-800 p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
                 {importStatus.isLoading && !importStatus.error && <Spinner text={importStatus.message} />}
+                {importStatus.message === 'Import successful!' && !importStatus.isLoading && (
+                    <div className="flex flex-col items-center">
+                        <h3 className="text-xl font-bold text-green-400 mb-4">Success</h3>
+                        <p className="text-slate-300 mb-6">Book imported successfully!</p>
+                    </div>
+                )}
                 {importStatus.error && (
                     <div className="flex flex-col items-center">
                         <h3 className="text-xl font-bold text-red-400 mb-4">Import Failed</h3>
@@ -402,33 +648,24 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
             </div>
           ) : catalogNavLinks.length > 0 ? (
             <div className="bg-slate-800/50 rounded-lg p-4">
-                <ul className="space-y-2">
+                <ul>
                     {catalogNavLinks.map(link => (
-                        <li key={link.url}>
-                            <button onClick={() => handleNavLinkClick(link)} className="w-full text-left flex items-center justify-between p-3 rounded-md hover:bg-slate-700/50 transition-colors">
-                                <span className="font-semibold text-slate-200">{link.title}</span>
-                                <ChevronRightIcon className="w-5 h-5 text-slate-400"/>
-                            </button>
-                        </li>
+                        <CatalogTreeItem key={link.url} link={link} level={0} onToggle={handleToggleNode} />
                     ))}
                 </ul>
             </div>
           ) : catalogBooks.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
               {catalogBooks.map((book, index) => (
-                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleImportFromCatalog(book)} className="cursor-pointer group relative">
+                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group">
                   <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
                     {book.coverImage ? (
-                      <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={`https://corsproxy.io/?${encodeURIComponent(book.coverImage)}`} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
                         <span className="font-semibold">{book.title}</span>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <DownloadIcon className="w-10 h-10 text-white mb-2" />
-                        <span className="text-white font-bold text-center px-2">Add to Library</span>
-                    </div>
                   </div>
                   <div className="mt-2">
                     <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
@@ -443,6 +680,27 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
               <p className="text-slate-400 mt-2">No categories or books were found here.</p>
             </div>
           )}
+          
+          {catalogPagination && (catalogPagination.prev || catalogPagination.next) && !isCatalogLoading && (
+            <div className="flex justify-between items-center mt-8">
+                <button
+                    onClick={() => catalogPagination.prev && handlePaginationClick(catalogPagination.prev)}
+                    disabled={!catalogPagination.prev}
+                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <LeftArrowIcon className="w-5 h-5 mr-2" />
+                    <span>Previous</span>
+                </button>
+                <button
+                    onClick={() => catalogPagination.next && handlePaginationClick(catalogPagination.next)}
+                    disabled={!catalogPagination.next}
+                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span>Next</span>
+                    <RightArrowIcon className="w-5 h-5 ml-2" />
+                </button>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -450,8 +708,8 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
             <div className="flex justify-center mt-20"><Spinner /></div>
           ) : books.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-              {books.map((book) => (
-                <div key={book.id} onClick={(e) => book.id && handleBookClick(e, book)} className="cursor-pointer group">
+              {sortedBooks.map((book) => (
+                <div key={book.id} onClick={() => book.id && handleLocalBookClick(book)} className="cursor-pointer group relative">
                   <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300 book-cover-container">
                     {book.coverImage ? (
                       <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
@@ -461,6 +719,16 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                       </div>
                     )}
                   </div>
+                   <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setBookToDelete(book);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-slate-900/70 rounded-full text-slate-300 hover:text-white hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+                        aria-label={`Delete ${book.title}`}
+                    >
+                        <TrashIcon className="w-4 h-4" />
+                    </button>
                   <div className="mt-2">
                     <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
                     <p className="text-xs text-slate-400 truncate">{book.author}</p>
@@ -483,6 +751,21 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
         catalogs={catalogs}
         onAddCatalog={handleAddCatalog}
         onDeleteCatalog={handleDeleteCatalog}
+      />
+
+      <DuplicateBookModal
+        isOpen={!!duplicateBook}
+        onClose={handleCancelDuplicate}
+        onReplace={handleReplaceBook}
+        onAddAnyway={handleAddAnyway}
+        bookTitle={duplicateBook?.title || ''}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={!!bookToDelete}
+        onClose={() => setBookToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        bookTitle={bookToDelete?.title || ''}
       />
     </div>
   );

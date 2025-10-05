@@ -7,6 +7,8 @@ export interface BookRecord {
   publisher?: string;
   publicationDate?: string;
   isbn?: string;
+  description?: string;
+  subjects?: string[];
 }
 
 export interface BookMetadata {
@@ -17,6 +19,8 @@ export interface BookMetadata {
   publisher?: string;
   publicationDate?: string;
   isbn?: string;
+  description?: string;
+  subjects?: string[];
 }
 
 export interface ReadAloudSettings {
@@ -88,4 +92,15 @@ export interface CatalogNavigationLink {
   title: string;
   url: string;
   rel: string;
+  // For tree view state
+  isExpanded?: boolean;
+  isLoading?: boolean;
+  children?: CatalogNavigationLink[];
+}
+
+export interface CatalogPagination {
+  next?: string;
+  prev?: string;
+  first?: string;
+  last?: string;
 }
