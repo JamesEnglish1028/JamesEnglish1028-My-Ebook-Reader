@@ -11,10 +11,11 @@ import { uploadLibraryToDrive, downloadLibraryFromDrive } from './services/googl
 import LocalStorageModal from './components/LocalStorageModal';
 import AboutPage from './components/AboutPage';
 import ErrorBoundary from './components/ErrorBoundary';
+import PdfReaderView from './components/PdfReaderView';
 
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'library' | 'reader' | 'bookDetail' | 'about'>('library');
+  const [currentView, setCurrentView] = useState<'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [coverAnimationData, setCoverAnimationData] = useState<CoverAnimationData | null>(null);
   const [activeCatalog, setActiveCatalog] = useState<Catalog | null>(null);
@@ -54,11 +55,17 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleOpenBook = useCallback((id: number, animationData: CoverAnimationData) => {
+  const handleOpenBook = useCallback((id: number, animationData: CoverAnimationData, format: string = 'EPUB') => {
     setSelectedBookId(id);
-    setCoverAnimationData(animationData);
-    setCurrentView('reader');
+    if (format === 'PDF') {
+      setCurrentView('pdfReader');
+      setCoverAnimationData(null); // No animation for PDFs for now
+    } else {
+      setCoverAnimationData(animationData);
+      setCurrentView('reader');
+    }
   }, []);
+
 
   const handleCloseReader = useCallback(() => {
     setSelectedBookId(null);
@@ -99,6 +106,50 @@ const App: React.FC = () => {
     providerId?: string,
     format?: string
   ): Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }> => {
+    
+    if (format === 'PDF') {
+        setImportStatus({ isLoading: true, message: 'Parsing PDF metadata...', error: null });
+        try {
+            const pdfjsLib = (window as any).pdfjsLib;
+            if (!pdfjsLib) {
+                throw new Error("PDF processing library is not available.");
+            }
+            // FIX: Convert ArrayBuffer to a Uint8Array to prevent a cloning error
+            // when pdf.js passes the data to its web worker.
+            const pdfData = new Uint8Array(epubData);
+            const loadingTask = pdfjsLib.getDocument(pdfData);
+            const pdf = await loadingTask.promise;
+            const metadata = await pdf.getMetadata();
+            const info = metadata.info;
+
+            const title = info.Title || fileName.replace(/\.pdf$/i, '');
+            const author = info.Author || 'Unknown Author';
+            
+            setImportStatus({ isLoading: true, message: 'Saving PDF to library...', error: null });
+
+            const newBook: BookRecord = {
+                title: title,
+                author: author,
+                coverImage: null, // PDFs don't have a standard cover like EPUBs
+                epubData: epubData, // Storing PDF data in the 'epubData' field
+                format: 'PDF',
+            };
+            await db.saveBook(newBook);
+            setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+            setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
+            return { success: true };
+        } catch (error) {
+            console.error("Error processing PDF:", error);
+            let errorMessage = "Failed to import the PDF file. It might be corrupted or in an unsupported format.";
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            setImportStatus({ isLoading: false, message: '', error: errorMessage });
+            return { success: false };
+        }
+    }
+
+    // Existing EPUB processing logic
     setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
     try {
         const ePub = (window as any).ePub;
@@ -318,6 +369,18 @@ const App: React.FC = () => {
             />
           </ErrorBoundary>
         );
+      case 'pdfReader':
+        return selectedBookId !== null && (
+            <ErrorBoundary 
+              onReset={handleCloseReader}
+              fallbackMessage="There was an error while trying to display this PDF. Returning to the library."
+            >
+              <PdfReaderView
+                bookId={selectedBookId}
+                onClose={handleCloseReader}
+              />
+            </ErrorBoundary>
+          );
       case 'bookDetail':
         return detailViewData && (
           <ErrorBoundary

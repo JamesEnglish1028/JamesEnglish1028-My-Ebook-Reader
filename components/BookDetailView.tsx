@@ -12,7 +12,7 @@ interface BookDetailViewProps {
   source: 'library' | 'catalog';
   catalogName?: string;
   onBack: () => void;
-  onReadBook: (id: number, animationData: CoverAnimationData) => void;
+  onReadBook: (id: number, animationData: CoverAnimationData, format: string) => void;
   onImportFromCatalog: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
@@ -59,7 +59,7 @@ const formatDate = (dateString: string): string => {
 
 
 const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogName, onBack, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
-  const coverRef = React.useRef<HTMLImageElement>(null);
+  const containerRef = React.useRef<HTMLElement>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [duplicateBook, setDuplicateBook] = useState<BookRecord | null>(null);
   const [existingBook, setExistingBook] = useState<BookRecord | null>(null);
@@ -76,8 +76,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
 
   const handleReadClick = () => {
-    if (libraryBook?.id && coverRef.current) {
-        const rect = coverRef.current.getBoundingClientRect();
+    if (libraryBook?.id && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
          const animationData = {
             rect: {
                 x: rect.x, y: rect.y,
@@ -86,7 +86,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
             } as DOMRect,
             coverImage: libraryBook.coverImage
         };
-      onReadBook(libraryBook.id, animationData);
+      onReadBook(libraryBook.id, animationData, libraryBook.format || 'EPUB');
     }
   };
 
@@ -162,9 +162,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
       <main className="grid md:grid-cols-12 gap-8 md:gap-12">
         {/* Left Column: Cover & Actions */}
-        <aside className="md:col-span-4 lg:col-span-3">
+        <aside ref={containerRef} className="md:col-span-4 lg:col-span-3">
             {coverImage ? (
-                <img ref={coverRef} src={coverImage} alt={book.title} className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]" />
+                <img src={coverImage} alt={book.title} className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]" />
             ) : (
                 <div className="w-full flex items-center justify-center p-4 text-center text-slate-400 bg-slate-800 rounded-lg aspect-[2/3] shadow-2xl">
                     <span className="font-semibold">{book.title}</span>

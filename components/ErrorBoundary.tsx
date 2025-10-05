@@ -12,15 +12,13 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
+  // FIX: Replaced the constructor with class property syntax for state initialization.
+  // This is a more concise and modern approach that resolves the type errors where
+  // the compiler could not find `state` as a property of the component instance.
   public state: State = {
     hasError: false,
     error: null,
   };
-
-  constructor(props: Props) {
-    super(props);
-    this.handleReset = this.handleReset.bind(this);
-  }
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -30,11 +28,12 @@ class ErrorBoundary extends Component<Props, State> {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  // FIX: Switched to binding in the constructor to ensure `this` is correctly bound.
-  private handleReset() {
+  // Using an arrow function for handleReset ensures that 'this' refers to the
+  // component instance when called from an event handler like onClick.
+  private handleReset = () => {
     this.props.onReset();
     this.setState({ hasError: false, error: null });
-  }
+  };
 
   public render() {
     if (this.state.hasError) {

@@ -9,7 +9,7 @@ import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { Logo } from './Logo';
 
 interface LibraryProps {
-  onOpenBook: (id: number, animationData: CoverAnimationData) => void;
+  onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => void;
   processAndSaveBook: (
     epubData: ArrayBuffer, 
@@ -493,7 +493,11 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     reader.onload = async (e) => {
         const epubData = e.target?.result as ArrayBuffer;
         if (epubData) {
-            const result = await processAndSaveBook(epubData, file.name, 'file');
+            let format = 'EPUB';
+            if (file.name.toLowerCase().endsWith('.pdf')) {
+                format = 'PDF';
+            }
+            const result = await processAndSaveBook(epubData, file.name, 'file', undefined, undefined, format);
             if (!result.success && result.bookRecord && result.existingBook) {
                 setDuplicateBook(result.bookRecord);
                 setExistingBook(result.existingBook);
@@ -750,7 +754,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
               <UploadIcon className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Import Book</span>
             </label>
-            <input id="epub-upload" type="file" accept=".epub" className="hidden" onChange={handleFileChange} disabled={importStatus.isLoading} />
+            <input id="epub-upload" type="file" accept=".epub,.pdf" className="hidden" onChange={handleFileChange} disabled={importStatus.isLoading} />
 
             <div ref={settingsMenuRef} className="relative">
                 <button
