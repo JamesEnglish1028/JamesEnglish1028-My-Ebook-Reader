@@ -15,12 +15,75 @@ interface SearchPanelProps {
 
 const SearchResultExcerpt: React.FC<{ excerpt: string; query: string }> = ({ excerpt, query }) => {
     if (!query) return <span>{excerpt}</span>;
-    const parts = excerpt.split(new RegExp(`(${query})`, 'gi'));
+
+    const queryLower = query.toLowerCase();
+    // Normalize whitespace in excerpt to handle line breaks etc. from epub content
+    const normalizedExcerpt = excerpt.replace(/\s+/g, ' ').trim();
+    const excerptLower = normalizedExcerpt.toLowerCase();
+    const queryIndex = excerptLower.indexOf(queryLower);
+
+    if (queryIndex === -1) {
+        // Fallback for safety, query should always be in the excerpt. Highlight within original.
+        const parts = excerpt.split(new RegExp(`(${query})`, 'gi'));
+        return (
+            <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">
+                {parts.map((part, i) =>
+                    part.toLowerCase() === queryLower ? (
+                        <strong key={i} className="text-sky-300 bg-sky-800/50 font-normal rounded">
+                            {part}
+                        </strong>
+                    ) : (
+                        <span key={i}>{part}</span>
+                    )
+                )}
+            </span>
+        );
+    }
+
+    // Find the start of the sentence containing the query.
+    let sentenceStartIndex = normalizedExcerpt.lastIndexOf('.', queryIndex);
+    sentenceStartIndex = Math.max(sentenceStartIndex, normalizedExcerpt.lastIndexOf('!', queryIndex));
+    sentenceStartIndex = Math.max(sentenceStartIndex, normalizedExcerpt.lastIndexOf('?', queryIndex));
+
+    // Find the end of the sentence.
+    let sentenceEndIndex = normalizedExcerpt.indexOf('.', queryIndex + query.length);
+    if (sentenceEndIndex === -1) sentenceEndIndex = Infinity;
+
+    let tempEndIndex = normalizedExcerpt.indexOf('!', queryIndex + query.length);
+    if (tempEndIndex !== -1) sentenceEndIndex = Math.min(sentenceEndIndex, tempEndIndex);
+
+    tempEndIndex = normalizedExcerpt.indexOf('?', queryIndex + query.length);
+    if (tempEndIndex !== -1) sentenceEndIndex = Math.min(sentenceEndIndex, tempEndIndex);
+
+    // If no end punctuation, the sentence might run to the end of the excerpt.
+    if (sentenceEndIndex === Infinity) {
+        sentenceEndIndex = normalizedExcerpt.length;
+    } else {
+        sentenceEndIndex++; // Include the punctuation mark itself
+    }
+
+    // If no start punctuation, sentence starts at the beginning of the excerpt.
+    if (sentenceStartIndex === -1) {
+        sentenceStartIndex = 0;
+    } else {
+        sentenceStartIndex++; // Move past the punctuation mark.
+    }
+    
+    // Extract the potential sentence.
+    let snippet = normalizedExcerpt.substring(sentenceStartIndex, sentenceEndIndex).trim();
+    
+    // Add ellipsis if the extracted snippet seems to be a fragment.
+    const leadingEllipsis = sentenceStartIndex > 0;
+    const trailingEllipsis = sentenceEndIndex < normalizedExcerpt.length;
+
+    // Split the final snippet for highlighting.
+    const parts = snippet.split(new RegExp(`(${query})`, 'gi'));
+    
     return (
         <span className="text-sm text-slate-300 group-hover:text-slate-100 transition-colors">
-            ...
+            {leadingEllipsis && '...'}
             {parts.map((part, i) =>
-                part.toLowerCase() === query.toLowerCase() ? (
+                part.toLowerCase() === queryLower ? (
                     <strong key={i} className="text-sky-300 bg-sky-800/50 font-normal rounded">
                         {part}
                     </strong>
@@ -28,10 +91,11 @@ const SearchResultExcerpt: React.FC<{ excerpt: string; query: string }> = ({ exc
                     <span key={i}>{part}</span>
                 )
             )}
-            ...
+            {trailingEllipsis && '...'}
         </span>
     );
 };
+
 
 const SearchPanel: React.FC<SearchPanelProps> = ({
   isOpen,

@@ -32,7 +32,7 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
     const errorNode = xmlDoc.querySelector('parsererror');
     if (errorNode) {
       console.error("XML Parsing Error:", errorNode.textContent);
-      throw new Error('Failed to parse catalog XML. The URL may not point to a valid OPDS feed, or the response was not XML.');
+      throw new Error('Failed to parse catalog feed. The URL may not point to a valid OPDS feed, or the response was not valid XML.');
     }
 
     const entries = Array.from(xmlDoc.querySelectorAll('entry'));
@@ -54,13 +54,20 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
     });
 
     entries.forEach(entry => {
-      const title = entry.querySelector('title')?.textContent || 'Untitled';
-      const acquisitionLink = entry.querySelector('link[rel="http://opds-spec.org/acquisition"]');
+      const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
+      const allLinks = Array.from(entry.querySelectorAll('link'));
+      
+      const acquisitionLink = allLinks.find(link => {
+          const rel = link.getAttribute('rel') || '';
+          const type = link.getAttribute('type') || '';
+          return rel.includes('opds-spec.org/acquisition') && type.includes('epub+zip');
+      }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
+
       const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
 
       if (acquisitionLink) {
-          const author = entry.querySelector('author > name')?.textContent || 'Unknown Author';
-          const summary = entry.querySelector('summary')?.textContent || entry.querySelector('content')?.textContent || null;
+          const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
+          const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
           const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
           
           const coverImageHref = coverLink?.getAttribute('href');
@@ -68,14 +75,14 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
           
           const downloadUrlHref = acquisitionLink?.getAttribute('href');
           
-          const publisher = entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent;
-          const publicationDate = entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent;
+          const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
+          const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
           const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
           const providerId = identifiers[0]?.textContent?.trim() || undefined;
 
           const subjects = Array.from(entry.querySelectorAll('category'))
-              .map(cat => cat.getAttribute('term'))
-              .filter((term): term is string => term !== null);
+              .map(cat => cat.getAttribute('term')?.trim())
+              .filter((term): term is string => !!term);
 
           if(downloadUrlHref) {
               const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
@@ -103,6 +110,13 @@ const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[]
 }
 
 const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
+    if (!jsonData || typeof jsonData !== 'object') {
+        throw new Error('Invalid catalog format. The response was not a valid JSON object.');
+    }
+    if (!jsonData.metadata || (!jsonData.publications && !jsonData.navigation)) {
+        throw new Error('Invalid catalog format. The JSON file is missing required OPDS 2.0 fields like "metadata", "publications", or "navigation".');
+    }
+
     const books: CatalogBook[] = [];
     const navLinks: CatalogNavigationLink[] = [];
     const pagination: CatalogPagination = {};
@@ -122,11 +136,23 @@ const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[],
     if (jsonData.publications && Array.isArray(jsonData.publications)) {
         jsonData.publications.forEach((pub: any) => {
             const metadata = pub.metadata || {};
-            const title = metadata.title || 'Untitled';
-            const author = metadata.author?.[0]?.name || (Array.isArray(metadata.author) ? metadata.author[0] : metadata.author) || 'Unknown Author';
-            const summary = metadata.description || null;
+            const title = metadata.title?.trim() || 'Untitled';
+            const summary = metadata.description?.trim() || null;
+            
+            let author = 'Unknown Author';
+            if (metadata.author) {
+                if (Array.isArray(metadata.author) && metadata.author.length > 0) {
+                    const firstAuthor = metadata.author[0];
+                    if (typeof firstAuthor === 'string') author = firstAuthor.trim();
+                    else if (firstAuthor?.name) author = firstAuthor.name.trim();
+                } else if (typeof metadata.author === 'string') {
+                    author = metadata.author.trim();
+                } else if (metadata.author?.name) {
+                    author = metadata.author.name.trim();
+                }
+            }
 
-            const acquisitionLink = pub.links?.find((l: any) => l.rel === 'http://opds-spec.org/acquisition' || l.rel === 'http://opds-spec.org/acquisition/open-access');
+            const acquisitionLink = pub.links?.find((l: any) => l.rel?.includes('opds-spec.org/acquisition'));
             const coverLink = pub.images?.[0];
 
             if (acquisitionLink?.href) {
@@ -134,13 +160,15 @@ const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[],
                 const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
 
                 let publisher: string | undefined = undefined;
-                if (typeof metadata.publisher === 'string') {
-                    publisher = metadata.publisher;
-                } else if (metadata.publisher?.name) {
-                    publisher = metadata.publisher.name;
+                if (metadata.publisher) {
+                    if (typeof metadata.publisher === 'string') {
+                        publisher = metadata.publisher.trim();
+                    } else if (metadata.publisher?.name) {
+                        publisher = metadata.publisher.name.trim();
+                    }
                 }
 
-                const publicationDate = metadata.published;
+                const publicationDate = metadata.published?.trim();
 
                 let providerId: string | undefined = undefined;
                 if (typeof metadata.identifier === 'string') {
@@ -155,10 +183,10 @@ const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[],
                 let subjects: string[] = [];
                 if (Array.isArray(metadata.subject)) {
                     subjects = metadata.subject.map((s: any) => {
-                        if (typeof s === 'string') return s;
-                        if (s?.name) return s.name;
+                        if (typeof s === 'string') return s.trim();
+                        if (s?.name) return s.name.trim();
                         return null;
-                    }).filter((s): s is string => s !== null);
+                    }).filter((s): s is string => !!s);
                 }
 
                 books.push({ 
@@ -203,21 +231,33 @@ const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ book
         }
         
         const contentType = response.headers.get('Content-Type') || '';
+        const responseText = await response.text();
 
         if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
-            const jsonData = await response.json();
+            const jsonData = JSON.parse(responseText);
             return parseOpds2Json(jsonData, baseUrl);
         } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
-            const responseText = await response.text();
             return parseOpds1Xml(responseText, baseUrl);
         } else {
-            throw new Error(`Unsupported catalog format. Content-Type: "${contentType}".`);
+            // Attempt to auto-detect format if Content-Type is vague (e.g., text/plain)
+            if (responseText.trim().startsWith('{')) {
+                try {
+                    const jsonData = JSON.parse(responseText);
+                    return parseOpds2Json(jsonData, baseUrl);
+                } catch (e) { /* Fall through to XML parsing */ }
+            }
+            if (responseText.trim().startsWith('<')) {
+                 return parseOpds1Xml(responseText, baseUrl);
+            }
+            throw new Error(`Unsupported or ambiguous catalog format. Content-Type: "${contentType}".`);
         }
     } catch (error) {
-        console.error("Error fetching catalog content:", error);
-        let message = "Could not load content.";
-        if (error instanceof TypeError && error.message === 'Failed to fetch') {
-            message = 'NetworkError: Failed to fetch the content. This could be due to your internet connection, the remote catalog being offline, or the public CORS proxy being temporarily unavailable.';
+        console.error("Error fetching or parsing catalog content:", error);
+        let message = "Could not load content from the catalog.";
+        if (error instanceof SyntaxError) { // JSON.parse error
+            message = "Failed to parse catalog feed. The response was not valid JSON."
+        } else if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            message = 'Network Error: Failed to fetch the content. This could be due to your internet connection, the remote catalog being offline, or the public CORS proxy being temporarily unavailable.';
         } else if (error instanceof Error) {
             message = error.message;
         }
