@@ -12,13 +12,16 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  // FIX: Refactored to use modern class property syntax for state initialization
-  // and an arrow function for the event handler. This avoids potential `this`
-  // context issues and removes the need for a constructor.
-  state: State = {
-    hasError: false,
-    error: null,
-  };
+  // FIX: Use constructor to initialize state and bind event handlers
+  // to ensure 'this' context is correctly set, resolving errors with 'this.props' and 'this.setState'.
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+    this.handleReset = this.handleReset.bind(this);
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -28,10 +31,10 @@ class ErrorBoundary extends Component<Props, State> {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  handleReset = () => {
+  handleReset() {
     this.props.onReset();
     this.setState({ hasError: false, error: null });
-  };
+  }
 
   render() {
     if (this.state.hasError) {

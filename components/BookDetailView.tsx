@@ -6,6 +6,7 @@ import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
 import Spinner from './Spinner';
 import DuplicateBookModal from './DuplicateBookModal';
 import { db } from '../services/db';
+import { proxiedUrl } from '../services/utils';
 
 interface BookDetailViewProps {
   book: BookMetadata | CatalogBook;
@@ -69,7 +70,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
   const description = 'description' in book ? book.description : catalogBook?.summary;
   const isLongDescription = description && description.length > 400;
-  const coverImage = book.coverImage ? ('id' in book ? book.coverImage : `https://corsproxy.io/?${encodeURIComponent(book.coverImage)}`) : null;
+  const coverImage = book.coverImage ? ('id' in book ? book.coverImage : proxiedUrl(book.coverImage)) : null;
   const providerId = (book as any).providerId || (book as any).isbn;
   const providerName = (book as BookMetadata).providerName;
   const format = ('format' in book && book.format) || (isLibraryBook(book) ? 'EPUB' : undefined);

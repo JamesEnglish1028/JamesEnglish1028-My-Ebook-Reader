@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect } from 'react';
 import Library from './components/Library';
 import ReaderView from './components/ReaderView';
@@ -14,7 +12,7 @@ import LocalStorageModal from './components/LocalStorageModal';
 import AboutPage from './components/AboutPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import PdfReaderView from './components/PdfReaderView';
-import { generatePdfCover, blobUrlToBase64, imageUrlToBase64 } from './services/utils';
+import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl } from './services/utils';
 
 
 const App: React.FC = () => {
@@ -93,6 +91,7 @@ const App: React.FC = () => {
   const processAndSaveBook = useCallback(async (
     bookData: ArrayBuffer,
     fileName: string = 'Untitled Book',
+    authorName?: string,
     source: 'file' | 'catalog' = 'file',
     providerName?: string,
     providerId?: string,
@@ -111,7 +110,7 @@ const App: React.FC = () => {
         setImportStatus({ isLoading: true, message: 'Saving PDF to library...', error: null });
         try {
             const title = fileName.replace(/\.(pdf)$/i, '');
-            const author = 'Unknown Author';
+            const author = authorName || 'Unknown Author';
             
             if (!finalCoverImage && source === 'file') {
                 finalCoverImage = await generatePdfCover(title, author);
@@ -144,7 +143,7 @@ const App: React.FC = () => {
     // Existing EPUB processing logic
     setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
     try {
-        const ePub = (window as any).ePub;
+        const ePub = window.ePub;
         const book = ePub(bookData);
         const metadata = await book.loaded.metadata;
 
@@ -215,7 +214,7 @@ const App: React.FC = () => {
     
     setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
     try {
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(book.downloadUrl)}`;
+      const proxyUrl = proxiedUrl(book.downloadUrl);
       const response = await fetch(proxyUrl);
       if (!response.ok) {
         const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
@@ -223,10 +222,13 @@ const App: React.FC = () => {
         if (response.status === 401 || response.status === 403) {
             errorMessage = `Download failed (${statusInfo}). This catalog or book requires authentication (a login or password), which is not supported by this application.`;
         }
+        if (response.status === 429) {
+            errorMessage = `Download failed (${statusInfo}). The request was rate-limited by the server or the proxy. Please wait a moment and try again.`;
+        }
         throw new Error(errorMessage);
       }
       const bookData = await response.arrayBuffer();
-      return await processAndSaveBook(bookData, book.title, 'catalog', catalogName, book.providerId, book.format, book.coverImage);
+      return await processAndSaveBook(bookData, book.title, book.author, 'catalog', catalogName, book.providerId, book.format, book.coverImage);
     } catch (error) {
       console.error("Error importing from catalog:", error);
       let message = "Download failed. The file may no longer be available or there was a network issue.";
@@ -349,7 +351,6 @@ const App: React.FC = () => {
     switch(currentView) {
       case 'reader':
         return selectedBookId !== null && (
-          // FIX: Wrapped ReaderView in ErrorBoundary to handle component-level errors.
           <ErrorBoundary 
             onReset={handleCloseReader}
             fallbackMessage="There was an error while trying to display this book. Returning to the library."
@@ -363,7 +364,6 @@ const App: React.FC = () => {
         );
       case 'pdfReader':
         return selectedBookId !== null && (
-          // FIX: Wrapped PdfReaderView in ErrorBoundary to handle component-level errors.
             <ErrorBoundary 
               onReset={handleCloseReader}
               fallbackMessage="There was an error while trying to display this PDF. Returning to the library."
@@ -376,7 +376,6 @@ const App: React.FC = () => {
           );
       case 'bookDetail':
         return detailViewData && (
-          // FIX: Wrapped BookDetailView in ErrorBoundary to handle component-level errors.
           <ErrorBoundary
             onReset={handleReturnToLibrary}
             fallbackMessage="There was an error showing the book details. Returning to the library."
@@ -398,7 +397,6 @@ const App: React.FC = () => {
       case 'library':
       default:
         return (
-          // FIX: Wrapped Library in ErrorBoundary to handle component-level errors.
           <ErrorBoundary
             onReset={() => window.location.reload()}
             fallbackMessage="There was a critical error in the library. Please try reloading the application."

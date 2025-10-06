@@ -105,10 +105,31 @@ export const blobUrlToBase64 = async (blobUrl: string): Promise<string> => {
     });
 };
 
+// FIX: Switched to a different CORS proxy to resolve network errors.
+const CORS_PROXY_URL = 'https://cors.eu.org/';
+
+/**
+ * Wraps a URL with a CORS proxy to prevent cross-origin issues.
+ * @param url The URL to proxy.
+ * @returns The proxied URL.
+ */
+export const proxiedUrl = (url: string): string => {
+  try {
+    // Check if the URL is valid before trying to proxy it.
+    new URL(url);
+    // This proxy just prepends its URL to the target URL.
+    return `${CORS_PROXY_URL}${url}`;
+  } catch (e) {
+    // If the URL is invalid, return an empty string or a placeholder to avoid breaking image tags.
+    console.error("Invalid URL passed to proxiedUrl:", url);
+    return '';
+  }
+};
+
 
 export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
     try {
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const proxyUrl = proxiedUrl(url);
         const response = await fetch(proxyUrl);
         if (!response.ok) {
             console.error(`Failed to fetch cover image from ${url}, status: ${response.status}`);

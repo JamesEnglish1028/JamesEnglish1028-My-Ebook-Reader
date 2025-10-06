@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { db } from '../services/db';
 import { BookRecord, ReaderSettings, TocItem, Bookmark, SearchResult, CoverAnimationData, Citation } from '../types';
@@ -9,139 +10,27 @@ import SearchPanel from './SearchPanel';
 import Spinner from './Spinner';
 import CitationModal from './CitationModal';
 import BookmarkModal from './BookmarkModal';
+import {
+  getReaderSettings,
+  saveReaderSettings,
+  getBookmarksForBook,
+  saveBookmarksForBook,
+  getCitationsForBook,
+  saveCitationsForBook,
+  getLastPositionForBook,
+  saveLastPositionForBook,
+  getLastSpokenPositionForBook,
+  saveLastSpokenPositionForBook,
+  performBookSearch,
+  findFirstChapter
+} from '../services/readerUtils';
+
 
 interface ReaderViewProps {
   bookId: number;
   onClose: () => void;
   animationData: CoverAnimationData | null;
 }
-
-const defaultSettings: ReaderSettings = {
-  fontSize: 100, // in percent
-  theme: 'light',
-  flow: 'paginated',
-  fontFamily: 'Original',
-  citationFormat: 'apa',
-  readAloud: {
-    voiceURI: null,
-    rate: 0.9,
-    pitch: 1,
-    volume: 1,
-  },
-};
-
-// --- LocalStorage & Data Persistence Helpers ---
-const STORAGE_PREFIX = 'ebook-reader';
-const getStorageKey = (type: string, bookId: number | string) => `${STORAGE_PREFIX}-${type}-${bookId}`;
-
-const getBookmarksForBook = (bookId: number): Bookmark[] => {
-    const saved = localStorage.getItem(getStorageKey('bookmarks', bookId));
-    return saved ? JSON.parse(saved) : [];
-};
-
-const saveBookmarksForBook = (bookId: number, bookmarks: Bookmark[]) => {
-    localStorage.setItem(getStorageKey('bookmarks', bookId), JSON.stringify(bookmarks));
-};
-
-const getCitationsForBook = (bookId: number): Citation[] => {
-    const saved = localStorage.getItem(getStorageKey('citations', bookId));
-    return saved ? JSON.parse(saved) : [];
-};
-
-const saveCitationsForBook = (bookId: number, citations: Citation[]) => {
-    localStorage.setItem(getStorageKey('citations', bookId), JSON.stringify(citations));
-};
-
-const getLastPositionForBook = (bookId: number): string | null => {
-    return localStorage.getItem(getStorageKey('pos', bookId));
-};
-
-const saveLastPositionForBook = (bookId: number, cfi: string) => {
-    localStorage.setItem(getStorageKey('pos', bookId), cfi);
-};
-
-const getLastSpokenPositionForBook = (bookId: number): string | null => {
-    return localStorage.getItem(getStorageKey('speech-pos', bookId));
-};
-
-const saveLastSpokenPositionForBook = (bookId: number, cfi: string) => {
-    localStorage.setItem(getStorageKey('speech-pos', bookId), cfi);
-};
-
-const getReaderSettings = (): ReaderSettings => {
-    const savedSettings = localStorage.getItem(getStorageKey('settings', 'global'));
-    const parsedSettings = savedSettings ? JSON.parse(savedSettings) : {};
-    return {
-      ...defaultSettings,
-      ...parsedSettings,
-      readAloud: {
-        ...defaultSettings.readAloud,
-        ...(parsedSettings.readAloud || {}),
-      },
-    };
-};
-
-const saveReaderSettings = (settings: ReaderSettings) => {
-    localStorage.setItem(getStorageKey('settings', 'global'), JSON.stringify(settings));
-};
-
-
-// --- EPUB Interaction Helpers ---
-
-const performBookSearch = async (book: any, query: string): Promise<SearchResult[]> => {
-    if (!query || !book) return [];
-    
-    const searchPromises = book.spine.spineItems.map((item: any) => 
-        item.load(book.load.bind(book)).then(() => {
-            const results = item.find(query.trim());
-            item.unload();
-            return Promise.resolve(results);
-        }).catch(() => {
-            item.unload();
-            return Promise.resolve([]);
-        })
-    );
-    const nestedResults = await Promise.all(searchPromises);
-    return [].concat(...nestedResults);
-};
-
-const findFirstChapter = async (book: any): Promise<string | undefined> => {
-  if (book.navigation?.landmarks?.length > 0) {
-    const bodyMatter = book.navigation.landmarks.find((l: any) => l.type?.includes('bodymatter'));
-    if (bodyMatter?.href) return bodyMatter.href;
-  }
-
-  if (book.packaging?.guide?.length > 0) {
-    const textReference = book.packaging.guide.find((ref: any) => ref.type?.toLowerCase().includes('text'));
-    if (textReference?.href) return textReference.href;
-  }
-
-  for (const item of book.spine.items) {
-    try {
-      const section = await book.spine.get(item.href);
-      if (!section) continue;
-
-      const doc = await section.load();
-      const body = doc?.body;
-
-      let isLikelyContentPage = false;
-      if (body) {
-        const textContent = body.textContent || '';
-        if (textContent.trim().length > 300) {
-          isLikelyContentPage = true;
-        }
-      }
-
-      section.unload();
-
-      if (isLikelyContentPage) return item.href;
-    } catch (error) {
-       console.warn(`Could not parse section ${item.href} when searching for first chapter. Skipping.`, error);
-    }
-  }
-
-  return book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
-};
 
 // --- Read Aloud Helpers ---
 
@@ -579,7 +468,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       try {
         setIsLoading(true);
 
-        const ePub = (window as any).ePub;
+        const ePub = window.ePub;
         const bookInstance = ePub(bookData.epubData);
         bookRef.current = bookInstance;
         

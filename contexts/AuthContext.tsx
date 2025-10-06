@@ -30,8 +30,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('ebook-reader-drive-folder-id');
     localStorage.removeItem('ebook-reader-drive-file-id');
     localStorage.removeItem('ebook-reader-last-sync');
-    if ((window as any).gapi?.client) {
-      (window as any).gapi.client.setToken(null);
+    if (window.gapi?.client) {
+      window.gapi.client.setToken(null);
     }
   }, []);
 
@@ -45,8 +45,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       const profile = await userInfoResponse.json();
       
-      if ((window as any).gapi?.client) {
-          (window as any).gapi.client.setToken({ access_token: accessToken });
+      if (window.gapi?.client) {
+          window.gapi.client.setToken({ access_token: accessToken });
       } else {
           console.warn("gapi.client not ready when fetching profile.");
       }
