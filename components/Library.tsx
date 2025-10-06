@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../services/db';
-import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
-import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon, SettingsIcon } from './icons';
+import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry } from '../types';
+import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon, SettingsIcon, PlusIcon, CheckIcon } from './icons';
 import Spinner from './Spinner';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import DuplicateBookModal from './DuplicateBookModal';
@@ -25,8 +25,8 @@ interface LibraryProps {
   ) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
-  activeCatalog: Catalog | null;
-  setActiveCatalog: React.Dispatch<React.SetStateAction<Catalog | null>>;
+  activeOpdsSource: Catalog | CatalogRegistry | null;
+  setActiveOpdsSource: React.Dispatch<React.SetStateAction<Catalog | CatalogRegistry | null>>;
   catalogNavPath: { name: string, url: string }[];
   setCatalogNavPath: React.Dispatch<React.SetStateAction<{ name: string, url: string }[]>>;
   onOpenCloudSyncModal: () => void;
@@ -34,14 +34,29 @@ interface LibraryProps {
   onShowAbout: () => void;
 }
 
-const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, processAndSaveBook, importStatus, setImportStatus, activeCatalog, setActiveCatalog, catalogNavPath, setCatalogNavPath, onOpenCloudSyncModal, onOpenLocalStorageModal, onShowAbout }) => {
+const Library: React.FC<LibraryProps> = ({ 
+  onOpenBook, 
+  onShowBookDetail, 
+  processAndSaveBook, 
+  importStatus, 
+  setImportStatus, 
+  activeOpdsSource, 
+  setActiveOpdsSource, 
+  catalogNavPath, 
+  setCatalogNavPath, 
+  onOpenCloudSyncModal, 
+  onOpenLocalStorageModal, 
+  onShowAbout 
+}) => {
   const [books, setBooks] = useState<BookMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
+  const [registries, setRegistries] = useState<CatalogRegistry[]>([]);
+
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
   const [catalogNavLinks, setCatalogNavLinks] = useState<CatalogNavigationLink[]>([]);
-  const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>(null);
+  const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>([]);
 
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -63,7 +78,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
 
 
   const fetchBooks = useCallback(async () => {
-    setIsCatalogLoading(false); // Turn off catalog spinner if active
+    setIsCatalogLoading(false); 
     setIsLoading(true);
     try {
       const booksData = await db.getBooksMetadata();
@@ -91,7 +106,6 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
                 valB = b.author.toLowerCase();
                 break;
             case 'pubdate':
-                // Handle missing or invalid dates
                 valA = a.publicationDate ? new Date(a.publicationDate).getTime() : 0;
                 valB = b.publicationDate ? new Date(b.publicationDate).getTime() : 0;
                 if (isNaN(valA)) valA = 0;
@@ -111,69 +125,40 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     return sorted;
   }, [books, sortOrder]);
 
-  const getCatalogs = useCallback(() => {
-    const saved = localStorage.getItem('ebook-catalogs');
+  const getFromStorage = useCallback((key: string) => {
+    const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : [];
   }, []);
 
-  const saveCatalogs = useCallback((catalogsToSave: Catalog[]) => {
-    localStorage.setItem('ebook-catalogs', JSON.stringify(catalogsToSave));
-    setCatalogs(catalogsToSave);
+  const saveToStorage = useCallback((key: string, data: any[]) => {
+    localStorage.setItem(key, JSON.stringify(data));
   }, []);
-
+  
   const handleAddCatalog = useCallback((name: string, url: string) => {
     const newCatalog: Catalog = { id: new Date().toISOString(), name, url };
-    saveCatalogs([...catalogs, newCatalog]);
-  }, [catalogs, saveCatalogs]);
-
-  const fetchAndParseCatalog = useCallback(async (url: string, baseUrl?: string) => {
-    setIsLoading(false); // Turn off library spinner if active
-    setIsCatalogLoading(true);
-    setCatalogError(null);
-    setCatalogBooks([]);
-    setCatalogNavLinks([]);
-    setCatalogPagination(null);
-    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url);
-    if (error) {
-        setCatalogError(error);
-    } else {
-        setCatalogBooks(books);
-        setCatalogNavLinks(navLinks);
-        setCatalogPagination(pagination);
-    }
-    setIsCatalogLoading(false);
-  }, []);
-
-  const handleSelectCatalog = useCallback((catalog: Catalog | null) => {
-    setIsCatalogDropdownOpen(false);
-    if (catalog) {
-      // Only reset the path if switching to a new catalog
-      if (activeCatalog?.id !== catalog.id) {
-        setActiveCatalog(catalog);
-        setCatalogNavPath([{ name: catalog.name, url: catalog.url }]);
-      }
-    } else {
-      // Switching to My Library
-      setActiveCatalog(null);
-      setCatalogNavPath([]);
-    }
-  }, [activeCatalog, setActiveCatalog, setCatalogNavPath]);
+    const currentCatalogs = getFromStorage('ebook-catalogs');
+    const updatedCatalogs = [...currentCatalogs, newCatalog];
+    saveToStorage('ebook-catalogs', updatedCatalogs);
+    setCatalogs(updatedCatalogs);
+  }, [getFromStorage, saveToStorage]);
 
   const handleDeleteCatalog = useCallback((id: string) => {
-    const updatedCatalogs = catalogs.filter(c => c.id !== id);
-    saveCatalogs(updatedCatalogs);
-    if (activeCatalog?.id === id) {
-      handleSelectCatalog(null);
+    const currentCatalogs = getFromStorage('ebook-catalogs');
+    const updatedCatalogs = currentCatalogs.filter((c: Catalog) => c.id !== id);
+    saveToStorage('ebook-catalogs', updatedCatalogs);
+    setCatalogs(updatedCatalogs);
+    if (activeOpdsSource?.id === id) {
+      handleSelectSource('library');
     }
-  }, [catalogs, saveCatalogs, activeCatalog, handleSelectCatalog]);
+  }, [activeOpdsSource, getFromStorage, saveToStorage]);
 
   const handleUpdateCatalog = useCallback((id: string, newName: string) => {
-    const updatedCatalogs = catalogs.map(c => 
-        c.id === id ? { ...c, name: newName } : c
-    );
-    saveCatalogs(updatedCatalogs);
-    if (activeCatalog?.id === id) {
-        setActiveCatalog(prev => prev ? { ...prev, name: newName } : null);
+    const currentCatalogs = getFromStorage('ebook-catalogs');
+    const updatedCatalogs = currentCatalogs.map((c: Catalog) => c.id === id ? { ...c, name: newName } : c);
+    saveToStorage('ebook-catalogs', updatedCatalogs);
+    setCatalogs(updatedCatalogs);
+    if (activeOpdsSource?.id === id) {
+        setActiveOpdsSource(prev => prev ? { ...prev, name: newName } : null);
         setCatalogNavPath(prev => {
             if (prev.length > 0) {
                 const newPath = [...prev];
@@ -183,21 +168,98 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
             return prev;
         });
     }
-  }, [catalogs, saveCatalogs, activeCatalog, setActiveCatalog, setCatalogNavPath]);
+  }, [activeOpdsSource, getFromStorage, saveToStorage, setActiveOpdsSource, setCatalogNavPath]);
+
+  const handleAddRegistry = useCallback((name: string, url: string) => {
+    const newRegistry: CatalogRegistry = { id: new Date().toISOString(), name, url };
+    const currentRegistries = getFromStorage('ebook-reader-registries');
+    const updatedRegistries = [...currentRegistries, newRegistry];
+    saveToStorage('ebook-reader-registries', updatedRegistries);
+    setRegistries(updatedRegistries);
+  }, [getFromStorage, saveToStorage]);
+
+  const handleDeleteRegistry = useCallback((id: string) => {
+    const currentRegistries = getFromStorage('ebook-reader-registries');
+    const updatedRegistries = currentRegistries.filter((r: CatalogRegistry) => r.id !== id);
+    saveToStorage('ebook-reader-registries', updatedRegistries);
+    setRegistries(updatedRegistries);
+    if (activeOpdsSource?.id === id) {
+      handleSelectSource('library');
+    }
+  }, [activeOpdsSource, getFromStorage, saveToStorage]);
+
+  const handleUpdateRegistry = useCallback((id: string, newName: string) => {
+    const currentRegistries = getFromStorage('ebook-reader-registries');
+    const updatedRegistries = currentRegistries.map((r: CatalogRegistry) => r.id === id ? { ...r, name: newName } : r);
+    saveToStorage('ebook-reader-registries', updatedRegistries);
+    setRegistries(updatedRegistries);
+    if (activeOpdsSource?.id === id) {
+      setActiveOpdsSource(prev => prev ? { ...prev, name: newName } : null);
+    }
+  }, [activeOpdsSource, getFromStorage, saveToStorage, setActiveOpdsSource]);
+
+  const fetchAndParseSource = useCallback(async (url: string, baseUrl?: string) => {
+    setIsLoading(false);
+    setIsCatalogLoading(true);
+    setCatalogError(null);
+    setCatalogBooks([]);
+    setCatalogNavLinks([]);
+    setCatalogPagination(null);
+
+    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url);
+    if (error) {
+        setCatalogError(error);
+    } else {
+        // A registry is a feed that has navigation but no publications.
+        // For these feeds, filter out any nav links that are also for pagination
+        // to prevent UI loops and redundant controls.
+        const isFeedARegistry = navLinks.length > 0 && books.length === 0;
+        
+        let finalNavLinks = navLinks;
+        if (isFeedARegistry) {
+            const paginationUrls = Object.values(pagination).filter((val): val is string => !!val);
+            finalNavLinks = navLinks.filter(nav => !paginationUrls.includes(nav.url));
+        }
+        
+        setCatalogBooks(books);
+        setCatalogNavLinks(finalNavLinks);
+        setCatalogPagination(pagination);
+    }
+    setIsCatalogLoading(false);
+  }, []);
+  
+  const handleSelectSource = useCallback((source: 'library' | Catalog | CatalogRegistry) => {
+    setIsCatalogDropdownOpen(false);
+    if (source === 'library') {
+      setActiveOpdsSource(null);
+      setCatalogNavPath([]);
+    } else if (activeOpdsSource?.id !== source.id) {
+        setActiveOpdsSource(source);
+        // When a new source is selected, reset the navigation path to its root.
+        setCatalogNavPath([{ name: source.name, url: source.url }]);
+    }
+  }, [activeOpdsSource?.id, setActiveOpdsSource, setCatalogNavPath]);
 
   useEffect(() => {
-    setCatalogs(getCatalogs());
-  }, [getCatalogs]);
+    setCatalogs(getFromStorage('ebook-catalogs'));
+    setRegistries(getFromStorage('ebook-reader-registries'));
+  }, [getFromStorage]);
   
-  // This effect is the single source of truth for what data to fetch and display.
   useEffect(() => {
-    if (activeCatalog && catalogNavPath.length > 0) {
-        const currentUrl = catalogNavPath[catalogNavPath.length - 1].url;
-        fetchAndParseCatalog(currentUrl, activeCatalog.url);
+    if (activeOpdsSource) {
+        // If a source is active but the path is empty (e.g., on first selection or page load), initialize it.
+        if (catalogNavPath.length === 0) {
+            setCatalogNavPath([{ name: activeOpdsSource.name, url: activeOpdsSource.url }]);
+        } else {
+            // Otherwise, fetch content for the current navigation path.
+            const currentPath = catalogNavPath[catalogNavPath.length - 1];
+            fetchAndParseSource(currentPath.url, activeOpdsSource.url);
+        }
     } else {
+        // No active source, so show the local library.
         fetchBooks();
     }
-  }, [activeCatalog, catalogNavPath, fetchAndParseCatalog, fetchBooks]);
+  }, [activeOpdsSource, catalogNavPath, fetchAndParseSource, fetchBooks, setCatalogNavPath]);
   
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -215,16 +277,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleNavLinkClick = (link: {title: string, url: string}) => {
-    setCatalogNavPath(prev => [...prev, { name: link.title, url: link.url }]);
-  };
-
-  const handleBreadcrumbClick = (index: number) => {
-    setCatalogNavPath(prev => prev.slice(0, index + 1));
-  };
-
   const handlePaginationClick = (url: string) => {
-    // Update the URL of the current navigation level to reflect the new page
     setCatalogNavPath(prev => {
         if (prev.length === 0) return prev;
         const newPath = [...prev];
@@ -232,6 +285,14 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
         newPath[newPath.length - 1] = lastItem;
         return newPath;
     });
+  };
+
+  const handleNavLinkClick = (link: {title: string, url: string}) => {
+    setCatalogNavPath(prev => [...prev, { name: link.title, url: link.url }]);
+  };
+
+  const handleBreadcrumbClick = (index: number) => {
+    setCatalogNavPath(prev => prev.slice(0, index + 1));
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,7 +312,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
             if (!result.success && result.bookRecord && result.existingBook) {
                 setDuplicateBook(result.bookRecord);
                 setExistingBook(result.existingBook);
-            } else if (result.success && !activeCatalog) {
+            } else if (result.success && !activeOpdsSource) {
                 fetchBooks();
             }
         } else {
@@ -278,14 +339,14 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
       await db.saveBook(bookToSave);
       setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
       setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
-      if (!activeCatalog) {
+      if (!activeOpdsSource) {
         fetchBooks();
       }
     } catch (error) {
       console.error("Error replacing book:", error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
     }
-  }, [duplicateBook, existingBook, activeCatalog, fetchBooks, setImportStatus]);
+  }, [duplicateBook, existingBook, activeOpdsSource, fetchBooks, setImportStatus]);
 
   const handleAddAnyway = useCallback(async () => {
     if (!duplicateBook) return;
@@ -300,14 +361,14 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
       await db.saveBook(bookToSave);
       setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
       setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
-      if (!activeCatalog) {
+      if (!activeOpdsSource) {
         fetchBooks();
       }
     } catch (error) {
       console.error("Error adding duplicate book:", error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
     }
-  }, [duplicateBook, activeCatalog, fetchBooks, setImportStatus]);
+  }, [duplicateBook, activeOpdsSource, fetchBooks, setImportStatus]);
 
   const handleCancelDuplicate = () => {
     setDuplicateBook(null);
@@ -327,54 +388,76 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
   };
 
   const handleCatalogBookClick = (book: CatalogBook) => {
-      onShowBookDetail(book, 'catalog', activeCatalog?.name);
+      onShowBookDetail(book, 'catalog', activeOpdsSource?.name);
   };
 
   const handleToggleNode = useCallback(async (nodeUrl: string) => {
-    const findAndUpdateNode = async (nodes: CatalogNavigationLink[]): Promise<CatalogNavigationLink[] | 'navigated'> => {
-        for (let i = 0; i < nodes.length; i++) {
-            const node = nodes[i];
-            if (node.url === nodeUrl) {
-                if (node.isExpanded) {
-                    nodes[i] = { ...node, isExpanded: false };
-                } else {
-                    if (node.children) {
-                        nodes[i] = { ...node, isExpanded: true };
-                    } else {
-                        nodes[i] = { ...node, isLoading: true };
-                        setCatalogNavLinks(prev => [...prev]); // Force re-render for spinner
+    const findAndUpdateNode = async (nodes: CatalogNavigationLink[]): Promise<CatalogNavigationLink[]> => {
+      const newNodes = [...nodes];
+      for (let i = 0; i < newNodes.length; i++) {
+        const node = newNodes[i];
+        if (node.url === nodeUrl) {
+          if (node.isExpanded) {
+            newNodes[i] = { ...node, isExpanded: false };
+            return newNodes;
+          }
 
-                        const { books, navLinks: newChildren, error } = await fetchCatalogContent(node.url, activeCatalog?.url || node.url);
+          if (node.children) {
+            newNodes[i] = { ...node, isExpanded: true };
+            return newNodes;
+          }
 
-                        if (error) {
-                            console.error(`Error fetching children for ${node.title}:`, error);
-                            nodes[i] = { ...node, isLoading: false };
-                        } else if (books.length > 0 || (newChildren.length === 0 && books.length === 0)) {
-                             handleNavLinkClick(node);
-                             return 'navigated';
-                        } else {
-                            nodes[i] = { ...node, isLoading: false, isExpanded: true, children: newChildren };
-                        }
-                    }
+          newNodes[i] = { ...node, isLoading: true };
+          setCatalogNavLinks(prevLinks => {
+            const linksCopy = JSON.parse(JSON.stringify(prevLinks));
+            const findAndUpdate = (links: CatalogNavigationLink[]): boolean => {
+              for (const link of links) {
+                if (link.url === nodeUrl) {
+                  link.isLoading = true;
+                  return true;
                 }
-                return nodes;
-            }
-            if (node.children) {
-                const updatedChildren = await findAndUpdateNode(node.children);
-                if (updatedChildren !== 'navigated' && updatedChildren !== null) {
-                    nodes[i] = { ...node, children: updatedChildren };
-                    return nodes;
-                }
-                if (updatedChildren === 'navigated') return 'navigated';
-            }
+                if (link.children && findAndUpdate(link.children)) return true;
+              }
+              return false;
+            };
+            findAndUpdate(linksCopy);
+            return linksCopy;
+          });
+
+          const baseUrl = activeOpdsSource?.url;
+          const { navLinks: newChildren, error } = await fetchCatalogContent(node.url, baseUrl || node.url);
+          
+          if (error) {
+            console.error(`Error fetching children for ${node.title}:`, error);
+            newNodes[i] = { ...node, isLoading: false, _hasFetchedChildren: true, _canExpand: false };
+          } else {
+            const canExpand = newChildren.length > 0;
+            newNodes[i] = { 
+              ...node, 
+              isLoading: false, 
+              isExpanded: canExpand, 
+              children: canExpand ? newChildren : undefined,
+              _hasFetchedChildren: true,
+              _canExpand: canExpand
+            };
+          }
+          return newNodes;
         }
-        return nodes;
+
+        if (node.children) {
+          const updatedChildren = await findAndUpdateNode(node.children);
+          if (updatedChildren !== node.children) {
+            newNodes[i] = { ...node, children: updatedChildren };
+            return newNodes;
+          }
+        }
+      }
+      return newNodes;
     };
+
     const updatedLinks = await findAndUpdateNode(catalogNavLinks);
-    if (updatedLinks !== 'navigated') {
-        setCatalogNavLinks(updatedLinks);
-    }
-  }, [activeCatalog, catalogNavLinks, handleNavLinkClick]);
+    setCatalogNavLinks(updatedLinks);
+}, [activeOpdsSource, catalogNavLinks]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!bookToDelete || typeof bookToDelete.id === 'undefined') return;
@@ -384,7 +467,6 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
       setBooks(prevBooks => prevBooks.filter(b => b.id !== bookToDelete.id));
     } catch (error) {
       console.error("Failed to delete book:", error);
-      // Optional: Set an error state to show a notification to the user
     } finally {
       setBookToDelete(null);
     }
@@ -396,37 +478,216 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     setIsSortDropdownOpen(false);
   };
 
-  const CatalogTreeItem: React.FC<{ link: CatalogNavigationLink, level: number, onToggle: (url: string) => void }> = ({ link, level, onToggle }) => {
-    const hasChildren = link.children && link.children.length > 0;
+  const OpdsNavigationItem: React.FC<{ 
+    link: CatalogNavigationLink;
+    level: number;
+    onToggle: (url: string) => void;
+    onNavigate: (link: { title: string, url: string }) => void;
+  }> = ({ link, level, onToggle, onNavigate }) => {
     const indentation = 1.5 + (level * 1.5);
+    const isAlreadyAdded = catalogs.some(c => c.url === link.url);
+    const isCatalogLink = !!link.isCatalog;
+    
+    // A catalog link is a terminal node in the discovery tree; it doesn't expand further.
+    // A regular navigation link can be expanded if we haven't checked for children yet, or if it has children.
+    const canToggle = !isCatalogLink && (!link._hasFetchedChildren || !!link._canExpand);
+
+    const handleAdd = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!isAlreadyAdded) {
+            handleAddCatalog(link.title, link.url);
+        }
+    };
+
+    const renderIcon = () => {
+      if (isCatalogLink) {
+        return <GlobeIcon className="w-5 h-5 text-sky-400" />;
+      }
+      if (link.isLoading) {
+        return <Spinner size="small" />;
+      }
+      return (
+        <button 
+          onClick={(e) => { e.stopPropagation(); if (canToggle) onToggle(link.url); }}
+          className={`p-1 ${canToggle ? '' : 'opacity-30 cursor-default'}`}
+          aria-label={link.isExpanded ? `Collapse ${link.title}` : `Expand ${link.title}`}
+          disabled={!canToggle}
+        >
+          { link.isExpanded ? <FolderOpenIcon className="w-5 h-5 text-sky-400" /> : <FolderIcon className="w-5 h-5 text-slate-400"/>}
+        </button>
+      );
+    };
 
     return (
-        <li className="my-1">
+        <li className="my-1 group/item">
             <div 
                 className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-slate-700/50 transition-colors"
                 style={{ paddingLeft: `${indentation}rem`}}
             >
                 <div className="flex items-center justify-center w-6 h-6 flex-shrink-0">
-                    { link.isLoading ? (
-                        <Spinner size="small" />
-                    ) : (
-                        <button onClick={() => onToggle(link.url)} className="p-1">
-                            { link.isExpanded ? <FolderOpenIcon className="w-5 h-5 text-sky-400" /> : <FolderIcon className="w-5 h-5 text-slate-400"/>}
-                        </button>
-                    )}
+                    {renderIcon()}
                 </div>
-                <button onClick={() => onToggle(link.url)} className="flex-grow text-left">
-                    <span className="font-semibold text-slate-200">{link.title}</span>
+                 <button onClick={() => onNavigate(link)} className="flex-grow text-left flex items-center justify-between">
+                    <span className="font-semibold text-slate-200 group-hover/item:text-sky-300 transition-colors">{link.title}</span>
+                    <ChevronRightIcon className="w-4 h-4 text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity mr-2" />
+                </button>
+                <button
+                    onClick={handleAdd}
+                    disabled={isAlreadyAdded}
+                    className="flex-shrink-0 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-xs font-bold transition-all disabled:cursor-not-allowed
+                    text-white opacity-0 group-hover/item:opacity-100 focus-within:opacity-100
+                    enabled:bg-sky-500 enabled:hover:bg-sky-600
+                    disabled:bg-green-600/50 disabled:text-green-300"
+                >
+                    {isAlreadyAdded ? <CheckIcon className="w-4 h-4"/> : <PlusIcon className="w-4 h-4"/>}
+                    <span>{isAlreadyAdded ? 'Added' : 'Add'}</span>
                 </button>
             </div>
-            {link.isExpanded && hasChildren && (
+            {!isCatalogLink && link.isExpanded && link.children && link.children.length > 0 && (
                 <ul className="pl-4 border-l border-slate-700 ml-3">
                     {link.children.map(child => (
-                        <CatalogTreeItem key={child.url} link={child} level={level + 1} onToggle={onToggle} />
+                        <OpdsNavigationItem key={child.url} link={child} level={level + 1} onToggle={onToggle} onNavigate={onNavigate} />
                     ))}
                 </ul>
             )}
         </li>
+    );
+  };
+
+  const renderCurrentView = () => {
+    if (isCatalogLoading) {
+      return <div className="flex justify-center mt-20"><Spinner text="Loading..." /></div>;
+    }
+    if (catalogError) {
+      return (
+        <div className="text-center py-20 bg-slate-800 rounded-lg">
+          <h2 className="text-2xl font-semibold text-red-400">Error Loading Source</h2>
+          <p className="text-slate-300 mt-2 max-w-xl mx-auto">{catalogError}</p>
+        </div>
+      );
+    }
+
+    // OPDS VIEW (CATALOG OR REGISTRY)
+    if (activeOpdsSource) {
+        return (
+            <div>
+                {catalogNavLinks.length > 0 && (
+                    <div className="bg-slate-800/50 rounded-lg p-4 mb-6">
+                        <h2 className="text-lg font-semibold text-slate-300 mb-2 px-2">Categories</h2>
+                        <ul>
+                            {catalogNavLinks.map(link => (
+                                <OpdsNavigationItem key={link.url} link={link} level={0} onToggle={handleToggleNode} onNavigate={handleNavLinkClick} />
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                
+                {catalogBooks.length > 0 && (
+                    <>
+                        {catalogNavLinks.length > 0 && <h2 className="text-lg font-semibold text-slate-300 mb-4">Books</h2>}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                            {catalogBooks.map((book, index) => (
+                                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group relative">
+                                    <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
+                                        {book.coverImage ? (
+                                        <img src={proxiedUrl(book.coverImage)} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
+                                        ) : (
+                                        <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
+                                            <span className="font-semibold">{book.title}</span>
+                                        </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-2 space-y-1">
+                                        <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
+                                        <p className="text-xs text-slate-400 truncate">{book.author}</p>
+                                        {book.format && (
+                                            <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
+                                                {book.format}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+                
+                {catalogNavLinks.length === 0 && catalogBooks.length === 0 && (
+                    <div className="text-center py-20 bg-slate-800 rounded-lg">
+                        <h2 className="text-2xl font-semibold text-white">Empty Section</h2>
+                        <p className="text-slate-400 mt-2">No categories or books were found here.</p>
+                    </div>
+                )}
+                
+                {catalogPagination && (catalogPagination.prev || catalogPagination.next) && !isCatalogLoading && (
+                    <div className="flex justify-between items-center mt-8">
+                        <button
+                            onClick={() => catalogPagination.prev && handlePaginationClick(catalogPagination.prev)}
+                            disabled={!catalogPagination.prev}
+                            className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <LeftArrowIcon className="w-5 h-5 mr-2" />
+                            <span>Previous</span>
+                        </button>
+                        <button
+                            onClick={() => catalogPagination.next && handlePaginationClick(catalogPagination.next)}
+                            disabled={!catalogPagination.next}
+                            className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span>Next</span>
+                            <RightArrowIcon className="w-5 h-5 ml-2" />
+                        </button>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // LIBRARY VIEW
+    return (
+        <>
+          {isLoading ? (
+            <div className="flex justify-center mt-20"><Spinner /></div>
+          ) : books.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {sortedBooks.map((book) => (
+                <div key={book.id} onClick={() => book.id && handleLocalBookClick(book)} className="cursor-pointer group relative">
+                  <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300 book-cover-container">
+                    {book.coverImage ? (
+                      <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
+                        <span className="font-semibold">{book.title}</span>
+                      </div>
+                    )}
+                  </div>
+                   <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setBookToDelete(book);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-slate-900/70 rounded-full text-slate-300 hover:text-white hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+                        aria-label={`Delete ${book.title}`}
+                    >
+                        <TrashIcon className="w-4 h-4" />
+                    </button>
+                  <div className="mt-2 space-y-1">
+                    <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
+                    <p className="text-xs text-slate-400 truncate">{book.author}</p>
+                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
+                        {book.format || 'EPUB'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-slate-800 rounded-lg">
+              <h2 className="text-2xl font-semibold text-white">Your library is empty.</h2>
+              <p className="text-slate-400 mt-2">Import your first book or add a catalog to get started!</p>
+            </div>
+          )}
+        </>
     );
   };
 
@@ -440,6 +701,9 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
     { key: 'pubdate-asc', label: 'Publication Date (Oldest)' },
   ];
 
+  const currentTitle = activeOpdsSource ? activeOpdsSource.name : 'My Library';
+  const isBrowsingOpds = !!activeOpdsSource;
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
@@ -451,35 +715,48 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
               className="flex items-center gap-2 text-white text-left"
             >
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-                {activeCatalog ? activeCatalog.name : 'My Library'}
+                {currentTitle}
               </h1>
               <ChevronDownIcon className={`w-6 h-6 transition-transform flex-shrink-0 mt-1 md:mt-2 ${isCatalogDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             {isCatalogDropdownOpen && (
-              <div className="absolute top-full mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
-                <ul className="p-1 text-white">
+              <div className="absolute top-full mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
+                <ul className="p-1 text-white max-h-96 overflow-y-auto">
                   <li>
-                    <button onClick={() => handleSelectCatalog(null)} className={`w-full text-left px-3 py-2 text-sm rounded-md ${!activeCatalog ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
+                    <button onClick={() => handleSelectSource('library')} className={`w-full text-left px-3 py-2 text-sm rounded-md ${!isBrowsingOpds ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
                       My Library
                     </button>
                   </li>
-                  {catalogs.length > 0 && <li className="my-1 border-t border-slate-700"></li>}
-                  {catalogs.map(catalog => (
-                    <li key={catalog.id}>
-                      <button onClick={() => handleSelectCatalog(catalog)} className={`w-full text-left px-3 py-2 text-sm rounded-md truncate ${activeCatalog?.id === catalog.id ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
-                        {catalog.name}
-                      </button>
-                    </li>
-                  ))}
+                  {(catalogs.length > 0 || registries.length > 0) && <li className="my-1 border-t border-slate-700"></li>}
+                  
+                  {catalogs.length > 0 && <>
+                    <li className="px-3 pt-2 pb-1 text-xs font-semibold text-slate-400 uppercase">Catalogs</li>
+                    {catalogs.map(catalog => (
+                      <li key={catalog.id}>
+                        <button onClick={() => handleSelectSource(catalog)} className={`w-full text-left px-3 py-2 text-sm rounded-md truncate ${isBrowsingOpds && activeOpdsSource?.id === catalog.id ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
+                          {catalog.name}
+                        </button>
+                      </li>
+                    ))}
+                  </>}
+                  {registries.length > 0 && <>
+                    <li className="px-3 pt-2 pb-1 text-xs font-semibold text-slate-400 uppercase">Registries</li>
+                    {registries.map(registry => (
+                        <li key={registry.id}>
+                            <button onClick={() => handleSelectSource(registry)} className={`w-full text-left px-3 py-2 text-sm rounded-md truncate ${isBrowsingOpds && activeOpdsSource?.id === registry.id ? 'bg-sky-600' : 'hover:bg-slate-700'}`}>
+                                {registry.name}
+                            </button>
+                        </li>
+                    ))}
+                  </>}
                 </ul>
               </div>
             )}
           </div>
         </div>
 
-
         <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-auto">
-            {!activeCatalog && (
+            {!isBrowsingOpds && (
                 <div ref={sortDropdownRef} className="relative">
                     <button onClick={() => setIsSortDropdownOpen(prev => !prev)} className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg inline-flex items-center transition-colors duration-200">
                         <AdjustmentsVerticalIcon className="w-5 h-5 sm:mr-2" />
@@ -532,7 +809,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
                           className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
                           role="menuitem"
                           >
-                          Manage Catalogs
+                          Manage Sources
                           </button>
                       </li>
                       <li className="my-1 border-t border-slate-700/50" role="separator"></li>
@@ -580,10 +857,10 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
         </div>
       </header>
 
-      {activeCatalog && catalogNavPath.length > 0 && (
+      {isBrowsingOpds && catalogNavPath.length > 0 && (
           <nav aria-label="breadcrumb" className="flex items-center text-sm text-slate-400 mb-6 flex-wrap">
               {catalogNavPath.map((item, index) => (
-                  <React.Fragment key={item.url}>
+                  <React.Fragment key={index}>
                       <button 
                           onClick={() => handleBreadcrumbClick(index)} 
                           className={`hover:text-sky-400 ${index === catalogNavPath.length - 1 ? 'font-semibold text-white' : ''}`}
@@ -622,121 +899,7 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
         </div>
       )}
       
-      {activeCatalog ? (
-        <div>
-          {isCatalogLoading ? (
-            <div className="flex justify-center mt-20"><Spinner text={`Loading...`} /></div>
-          ) : catalogError ? (
-            <div className="text-center py-20 bg-slate-800 rounded-lg">
-                <h2 className="text-2xl font-semibold text-red-400">Error Loading Catalog</h2>
-                <p className="text-slate-300 mt-2 max-w-xl mx-auto">{catalogError}</p>
-            </div>
-          ) : catalogNavLinks.length > 0 ? (
-            <div className="bg-slate-800/50 rounded-lg p-4">
-                <ul>
-                    {catalogNavLinks.map(link => (
-                        <CatalogTreeItem key={link.url} link={link} level={0} onToggle={handleToggleNode} />
-                    ))}
-                </ul>
-            </div>
-          ) : catalogBooks.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-              {catalogBooks.map((book, index) => (
-                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group relative">
-                  <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
-                    {book.coverImage ? (
-                      <img src={proxiedUrl(book.coverImage)} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
-                        <span className="font-semibold">{book.title}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
-                    <p className="text-xs text-slate-400 truncate">{book.author}</p>
-                    {book.format && (
-                        <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
-                            {book.format}
-                        </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20 bg-slate-800 rounded-lg">
-              <h2 className="text-2xl font-semibold text-white">Empty Section</h2>
-              <p className="text-slate-400 mt-2">No categories or books were found here.</p>
-            </div>
-          )}
-          
-          {catalogPagination && (catalogPagination.prev || catalogPagination.next) && !isCatalogLoading && (
-            <div className="flex justify-between items-center mt-8">
-                <button
-                    onClick={() => catalogPagination.prev && handlePaginationClick(catalogPagination.prev)}
-                    disabled={!catalogPagination.prev}
-                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <LeftArrowIcon className="w-5 h-5 mr-2" />
-                    <span>Previous</span>
-                </button>
-                <button
-                    onClick={() => catalogPagination.next && handlePaginationClick(catalogPagination.next)}
-                    disabled={!catalogPagination.next}
-                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span>Next</span>
-                    <RightArrowIcon className="w-5 h-5 ml-2" />
-                </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          {isLoading ? (
-            <div className="flex justify-center mt-20"><Spinner /></div>
-          ) : books.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-              {sortedBooks.map((book) => (
-                <div key={book.id} onClick={() => book.id && handleLocalBookClick(book)} className="cursor-pointer group relative">
-                  <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300 book-cover-container">
-                    {book.coverImage ? (
-                      <img src={book.coverImage} alt={book.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
-                        <span className="font-semibold">{book.title}</span>
-                      </div>
-                    )}
-                  </div>
-                   <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setBookToDelete(book);
-                        }}
-                        className="absolute top-2 right-2 p-1.5 bg-slate-900/70 rounded-full text-slate-300 hover:text-white hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
-                        aria-label={`Delete ${book.title}`}
-                    >
-                        <TrashIcon className="w-4 h-4" />
-                    </button>
-                  <div className="mt-2 space-y-1">
-                    <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
-                    <p className="text-xs text-slate-400 truncate">{book.author}</p>
-                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
-                        {book.format || 'EPUB'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20 bg-slate-800 rounded-lg">
-              <h2 className="text-2xl font-semibold text-white">Your library is empty.</h2>
-              <p className="text-slate-400 mt-2">Import your first EPUB book or add a catalog to get started!</p>
-            </div>
-          )}
-        </>
-      )}
+      {renderCurrentView()}
 
       <ManageCatalogsModal
         isOpen={isManageCatalogsOpen}
@@ -745,6 +908,10 @@ const Library: React.FC<LibraryProps> = ({ onOpenBook, onShowBookDetail, process
         onAddCatalog={handleAddCatalog}
         onDeleteCatalog={handleDeleteCatalog}
         onUpdateCatalog={handleUpdateCatalog}
+        registries={registries}
+        onAddRegistry={handleAddRegistry}
+        onDeleteRegistry={handleDeleteRegistry}
+        onUpdateRegistry={handleUpdateRegistry}
       />
 
       <DuplicateBookModal

@@ -88,6 +88,12 @@ export interface Catalog {
   url: string;
 }
 
+export interface CatalogRegistry {
+  id: string;
+  name: string;
+  url: string;
+}
+
 export interface CatalogBook {
   title: string;
   author: string;
@@ -105,10 +111,14 @@ export interface CatalogNavigationLink {
   title: string;
   url: string;
   rel: string;
+  isCatalog?: boolean;
   // For tree view state
   isExpanded?: boolean;
   isLoading?: boolean;
   children?: CatalogNavigationLink[];
+  // New properties for enhanced UX
+  _hasFetchedChildren?: boolean;
+  _canExpand?: boolean;
 }
 
 export interface CatalogPagination {

@@ -105,8 +105,8 @@ export const blobUrlToBase64 = async (blobUrl: string): Promise<string> => {
     });
 };
 
-// FIX: Switched to a different CORS proxy to resolve network errors.
-const CORS_PROXY_URL = 'https://cors.eu.org/';
+// FIX: Switched to a new CORS proxy to resolve network errors.
+const CORS_PROXY_URL = 'https://corsproxy.io/?';
 
 /**
  * Wraps a URL with a CORS proxy to prevent cross-origin issues.
@@ -117,7 +117,7 @@ export const proxiedUrl = (url: string): string => {
   try {
     // Check if the URL is valid before trying to proxy it.
     new URL(url);
-    // This proxy just prepends its URL to the target URL.
+    // This proxy simply prepends its URL. No encoding needed.
     return `${CORS_PROXY_URL}${url}`;
   } catch (e) {
     // If the URL is invalid, return an empty string or a placeholder to avoid breaking image tags.

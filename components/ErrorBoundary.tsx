@@ -12,31 +12,30 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  // FIX: Use constructor to initialize state and bind event handlers
-  // to ensure 'this' context is correctly set, resolving errors with 'this.props' and 'this.setState'.
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-    };
-    this.handleReset = this.handleReset.bind(this);
-  }
+  // FIX: Replaced constructor with a class property for state initialization
+  // and converted handleReset to an arrow function to avoid binding `this`.
+  // This modern syntax resolves issues where `this.props` and `this.state` were
+  // not being correctly recognized by the TypeScript compiler.
+  state: State = {
+    hasError: false,
+    error: null,
+  };
 
-  static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): State {
+    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  handleReset() {
+  private handleReset = () => {
     this.props.onReset();
     this.setState({ hasError: false, error: null });
-  }
+  };
 
-  render() {
+  public render() {
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center text-white bg-slate-900" role="alert">

@@ -18,6 +18,12 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
       throw new Error('Failed to parse catalog feed. The URL may not point to a valid OPDS feed, or the response was not valid XML.');
     }
 
+    // Add check for the root <feed> element to validate it's an Atom feed.
+    const rootNodeName = xmlDoc.documentElement?.nodeName;
+    if (!rootNodeName || (rootNodeName.toLowerCase() !== 'feed' && !rootNodeName.endsWith(':feed'))) {
+        throw new Error("Invalid Atom/OPDS feed. The XML document is missing the root <feed> element.");
+    }
+
     const entries = Array.from(xmlDoc.querySelectorAll('entry'));
     const books: CatalogBook[] = [];
     const navLinks: CatalogNavigationLink[] = [];
@@ -85,12 +91,18 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
               });
           }
       } else if (subsectionLink) {
-          const navUrl = subsectionLink?.getAttribute('href');
+          // FIX: The variable 'navUrl' was not defined. It should be extracted from the 'href' attribute of the subsectionLink element.
+          const navUrl = subsectionLink.getAttribute('href');
           if (navUrl) {
-              navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
+            navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
           }
       }
     });
+
+    // Add check to see if a valid Atom feed contains no OPDS content.
+    if (entries.length > 0 && books.length === 0 && navLinks.length === 0) {
+        throw new Error("This appears to be a valid Atom feed, but it contains no recognizable OPDS book entries or navigation links. Please ensure the URL points to an OPDS catalog.");
+    }
 
     return { books, navLinks, pagination };
 }
@@ -99,8 +111,8 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     if (!jsonData || typeof jsonData !== 'object') {
         throw new Error('Invalid catalog format. The response was not a valid JSON object.');
     }
-    if (!jsonData.metadata || (!jsonData.publications && !jsonData.navigation)) {
-        throw new Error('Invalid catalog format. The JSON file is missing required OPDS 2.0 fields like "metadata", "publications", or "navigation".');
+    if (!jsonData.metadata) {
+        throw new Error('Invalid OPDS 2.0 feed. The required "metadata" object is missing.');
     }
 
     const books: CatalogBook[] = [];
@@ -193,7 +205,28 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
         });
     }
 
-    if (jsonData.navigation && Array.isArray(jsonData.navigation)) {
+    let hasNavigatedFromCatalogs = false;
+    // Prioritize a custom 'catalogs' array if it exists, as this is a convention for some registries
+    // to list their final set of catalogs.
+    if (jsonData.catalogs && Array.isArray(jsonData.catalogs) && jsonData.catalogs.length > 0) {
+        jsonData.catalogs.forEach((catalog: any) => {
+            const title = catalog.metadata?.title;
+            // FIX: Correctly find the OPDS catalog URL by its specific 'rel' attribute.
+            const catalogLink = catalog.links?.find((l: any) => l.rel === 'http://opds-spec.org/catalog' && l.href);
+
+            if (title && catalogLink) {
+                const url = new URL(catalogLink.href, baseUrl).href;
+                // Treat it as a standard navigation link for the UI, but flag it as a terminal catalog entry.
+                navLinks.push({ title, url, rel: 'subsection', isCatalog: true });
+            }
+        });
+        if (navLinks.length > 0) {
+            hasNavigatedFromCatalogs = true;
+        }
+    }
+
+    // Fallback to the standard 'navigation' array if 'catalogs' is not present or empty.
+    if (!hasNavigatedFromCatalogs && jsonData.navigation && Array.isArray(jsonData.navigation)) {
         jsonData.navigation.forEach((link: any) => {
             if (link.href && link.title) {
                 const url = new URL(link.href, baseUrl).href;
@@ -208,7 +241,12 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 export const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
         const proxyUrl = proxiedUrl(url);
-        const response = await fetch(proxyUrl);
+        // FIX: Added specific Accept header to signal preference for OPDS formats.
+        const response = await fetch(proxyUrl, {
+            headers: {
+                'Accept': 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5'
+            }
+        });
         
         if (!response.ok) {
             const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;

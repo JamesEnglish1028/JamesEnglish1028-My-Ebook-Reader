@@ -547,7 +547,16 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
         
         if (!isMounted) return;
-        await renditionInstance.display(startLocation || undefined);
+        
+        try {
+            await renditionInstance.display(startLocation || undefined);
+        } catch (e) {
+            console.error(`Failed to display start location "${startLocation}". Defaulting to beginning of the book.`, e);
+            // If the initial location fails (e.g., bad CFI), just display the book from the start.
+            if (isMounted) {
+                await renditionInstance.display();
+            }
+        }
         
         if (!isMounted) return;
         setIsLoading(false);

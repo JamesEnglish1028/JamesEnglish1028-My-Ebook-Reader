@@ -3,7 +3,7 @@ import Library from './components/Library';
 import ReaderView from './components/ReaderView';
 import BookDetailView from './components/BookDetailView';
 import { db } from './services/db';
-import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog, Bookmark, Citation, ReaderSettings, SyncPayload } from './types';
+import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog, Bookmark, Citation, ReaderSettings, SyncPayload, CatalogRegistry } from './types';
 import SplashScreen from './components/SplashScreen';
 import SettingsModal from './components/SettingsModal';
 import { useAuth } from './contexts/AuthContext';
@@ -19,7 +19,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [coverAnimationData, setCoverAnimationData] = useState<CoverAnimationData | null>(null);
-  const [activeCatalog, setActiveCatalog] = useState<Catalog | null>(null);
+  const [activeOpdsSource, setActiveOpdsSource] = useState<Catalog | CatalogRegistry | null>(null);
   const [catalogNavPath, setCatalogNavPath] = useState<{ name: string, url: string }[]>([]);
   const [showSplash, setShowSplash] = useState(true);
   const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
@@ -407,8 +407,8 @@ const App: React.FC = () => {
               processAndSaveBook={processAndSaveBook}
               importStatus={importStatus}
               setImportStatus={setImportStatus}
-              activeCatalog={activeCatalog}
-              setActiveCatalog={setActiveCatalog}
+              activeOpdsSource={activeOpdsSource}
+              setActiveOpdsSource={setActiveOpdsSource}
               catalogNavPath={catalogNavPath}
               setCatalogNavPath={setCatalogNavPath}
               onOpenCloudSyncModal={() => setIsCloudSyncModalOpen(true)}
