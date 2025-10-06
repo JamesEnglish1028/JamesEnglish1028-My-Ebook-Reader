@@ -18,7 +18,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
       <main className="max-w-4xl mx-auto prose prose-invert prose-headings:text-sky-300 prose-headings:font-semibold prose-a:text-sky-400 hover:prose-a:text-sky-300 prose-strong:text-slate-100 prose-code:bg-slate-700 prose-code:rounded prose-code:px-1.5 prose-code:py-1 prose-code:font-mono prose-li:marker:text-sky-400">
         <h1>About MeBooks</h1>
         <p className="text-lg text-slate-300">
-          MeBooks is a custom, browser-based ebook reader inspired by Readium's Thorium. This application allows users to import EPUB books into a local library and browse online OPDS catalogs. It is built using modern web technologies and focuses on providing a rich, customizable reading experience with robust library management features.
+          MeBooks is a custom, browser-based ebook reader inspired by Readium's Thorium. This application allows users to import EPUB and PDF books into a local library and browse online OPDS catalogs. It is built using modern web technologies and focuses on providing a rich, customizable reading experience with robust library management features.
         </p>
 
         <h2>Key Features</h2>
@@ -26,7 +26,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
         <h3>Library Management</h3>
         <ul>
           <li><strong>Local-First Storage:</strong> Your books and reading data never leave your computer. Book files are stored in IndexedDB, while settings, catalog lists, and annotations are kept in LocalStorage.</li>
-          <li><strong>EPUB Import:</strong> Import <code>.epub</code> files to build your personal library, displayed with book covers.</li>
+          <li><strong>EPUB &amp; PDF Import:</strong> Import <code>.epub</code> and <code>.pdf</code> files to build your personal library.</li>
           <li><strong>Book Details:</strong> View detailed information for each book, including publication details, subjects, and provider IDs.</li>
           <li><strong>Library Organization:</strong> Sort your library by title, author, publication date, or the date added.</li>
         </ul>
@@ -41,10 +41,11 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
         <h3>Advanced Reader Experience</h3>
         <ul>
             <li><strong>Entirely Browser-Based:</strong> No installation needed. The app runs completely in your web browser.</li>
-            <li><strong>Customizable Reader:</strong> Adjust font size, font family, theme, and reading mode (paginated or scrolled).</li>
-            <li><strong>Rich Reading Tools:</strong> Create bookmarks with notes, generate academic citations (APA, MLA, Chicago), and perform full-text searches.</li>
-            <li><strong>Citation Export:</strong> Export all citations for a book in the standard <code>.ris</code> format for use in reference managers like Zotero or EndNote.</li>
-            <li><strong>Read Aloud (Text-to-Speech):</strong> Listen to your book with synchronized sentence highlighting.</li>
+            <li><strong>Multi-Format Support:</strong> Reads both EPUB and PDF files. EPUBs are rendered using a sophisticated JavaScript engine, while PDFs are displayed using your browser's native, built-in PDF viewer for speed and reliability.</li>
+            <li><strong>Customizable Reader (EPUB only):</strong> Adjust font size, font family, theme, and reading mode (paginated or scrolled).</li>
+            <li><strong>Rich Reading Tools (EPUB only):</strong> Create bookmarks with notes, generate academic citations (APA, MLA, Chicago), and perform full-text searches.</li>
+            <li><strong>Citation Export (EPUB only):</strong> Export all citations for a book in the standard <code>.ris</code> format for use in reference managers like Zotero or EndNote.</li>
+            <li><strong>Read Aloud (Text-to-Speech for EPUB only):</strong> Listen to your book with synchronized sentence highlighting.</li>
         </ul>
 
         <h2>Technology Stack</h2>

@@ -128,7 +128,10 @@ export const uploadLibraryToDrive = async (payload: SyncPayload, books: BookReco
 
     const bookFileUploads = books.map(async (book, index) => {
         onProgress(`Uploading book ${index + 1}/${books.length}: ${book.title}`);
-        await uploadFile(booksFolderId, `${book.id}.epub`, book.epubData, 'application/epub+zip');
+        const format = (book.format || 'epub').toLowerCase();
+        const mimeType = format === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+        const fileName = `${book.id}.${format}`;
+        await uploadFile(booksFolderId, fileName, book.epubData, mimeType);
     });
     await Promise.all(bookFileUploads);
 
@@ -183,8 +186,11 @@ export const downloadLibraryFromDrive = async (onProgress: (message: string) => 
 
         onProgress(`Downloading book ${i + 1}/${payload.library.length}: ${bookMeta.title}`);
         
+        const format = (bookMeta.format || 'epub').toLowerCase();
+        const fileName = `${bookMeta.id}.${format}`;
+
         // Search for the book file by name
-        const bookFileQ = `'${booksFolderId}' in parents and name='${bookMeta.id}.epub' and trashed=false`;
+        const bookFileQ = `'${booksFolderId}' in parents and name='${fileName}' and trashed=false`;
         const bookFileList = await (window as any).gapi.client.drive.files.list({ q: bookFileQ });
 
         if (bookFileList.result.files && bookFileList.result.files.length > 0) {
@@ -208,7 +214,7 @@ export const downloadLibraryFromDrive = async (onProgress: (message: string) => 
             booksWithData.push(bookRecord);
 
         } else {
-             console.warn(`Book file for "${bookMeta.title}" (ID: ${bookMeta.id}) not found in Drive.`);
+             console.warn(`Book file for "${bookMeta.title}" (ID: ${bookMeta.id}, filename: ${fileName}) not found in Drive.`);
         }
     }
     

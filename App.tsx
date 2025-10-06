@@ -1,3 +1,5 @@
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import Library from './components/Library';
 import ReaderView from './components/ReaderView';
@@ -12,6 +14,7 @@ import LocalStorageModal from './components/LocalStorageModal';
 import AboutPage from './components/AboutPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import PdfReaderView from './components/PdfReaderView';
+import { generatePdfCover, blobUrlToBase64, imageUrlToBase64 } from './services/utils';
 
 
 const App: React.FC = () => {
@@ -86,61 +89,50 @@ const App: React.FC = () => {
   const handleShowAbout = useCallback(() => {
     setCurrentView('about');
   }, []);
-  
-  const blobUrlToBase64 = async (blobUrl: string): Promise<string> => {
-      const response = await fetch(blobUrl);
-      const blob = await response.blob();
-      return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-      });
-  };
 
   const processAndSaveBook = useCallback(async (
-    epubData: ArrayBuffer, 
+    bookData: ArrayBuffer,
     fileName: string = 'Untitled Book',
     source: 'file' | 'catalog' = 'file',
     providerName?: string,
     providerId?: string,
-    format?: string
+    format?: string,
+    coverImageUrl?: string | null
   ): Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }> => {
     
-    if (format === 'PDF') {
-        setImportStatus({ isLoading: true, message: 'Parsing PDF metadata...', error: null });
+    let finalCoverImage: string | null = null;
+    if (coverImageUrl) {
+      finalCoverImage = await imageUrlToBase64(coverImageUrl);
+    }
+    
+    const effectiveFormat = format || (fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB');
+
+    if (effectiveFormat === 'PDF') {
+        setImportStatus({ isLoading: true, message: 'Saving PDF to library...', error: null });
         try {
-            const pdfjsLib = (window as any).pdfjsLib;
-            if (!pdfjsLib) {
-                throw new Error("PDF processing library is not available.");
-            }
-            // pdf.js's web worker cannot handle a raw ArrayBuffer.
-            // It must be converted to a Uint8Array to prevent a cloning error.
-            const pdfData = new Uint8Array(epubData);
-            const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-            const pdf = await loadingTask.promise;
-            const metadata = await pdf.getMetadata();
-            const info = metadata.info;
-
-            const title = info.Title || fileName.replace(/\.pdf$/i, '');
-            const author = info.Author || 'Unknown Author';
+            const title = fileName.replace(/\.(pdf)$/i, '');
+            const author = 'Unknown Author';
             
-            setImportStatus({ isLoading: true, message: 'Saving PDF to library...', error: null });
-
+            if (!finalCoverImage && source === 'file') {
+                finalCoverImage = await generatePdfCover(title, author);
+            }
+            
             const newBook: BookRecord = {
                 title: title,
                 author: author,
-                coverImage: null, // PDFs don't have a standard cover like EPUBs
-                epubData: epubData, // Storing PDF data in the 'epubData' field
+                coverImage: finalCoverImage,
+                epubData: bookData,
                 format: 'PDF',
+                providerName,
+                providerId
             };
             await db.saveBook(newBook);
             setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
             setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
             return { success: true };
         } catch (error) {
-            console.error("Error processing PDF:", error);
-            let errorMessage = "Failed to import the PDF file. It might be corrupted or in an unsupported format.";
+            console.error("Error saving PDF:", error);
+            let errorMessage = "Failed to save the PDF file to the library.";
             if (error instanceof Error) {
                 errorMessage = error.message;
             }
@@ -153,34 +145,34 @@ const App: React.FC = () => {
     setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
     try {
         const ePub = (window as any).ePub;
-        const book = ePub(epubData);
+        const book = ePub(bookData);
         const metadata = await book.loaded.metadata;
 
         setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
-        let coverImage: string | null = null;
-        const coverUrl = await book.coverUrl();
-        if (coverUrl) {
-            coverImage = await blobUrlToBase64(coverUrl);
+        if (!finalCoverImage) {
+            const coverUrl = await book.coverUrl();
+            if (coverUrl) {
+                finalCoverImage = await blobUrlToBase64(coverUrl);
+            }
         }
 
         const subjectsRaw = metadata.subject || metadata.subjects;
         const subjects = subjectsRaw ? (Array.isArray(subjectsRaw) ? subjectsRaw.map(s => typeof s === 'object' ? s.name : s) : [subjectsRaw]) : [];
         
-        // Prioritize the provider ID from the catalog feed, fall back to the one in the EPUB file.
         const finalProviderId = providerId || metadata.identifier;
 
         const newBook: BookRecord = {
           title: metadata.title || fileName,
           author: metadata.creator || 'Unknown Author',
-          coverImage,
-          epubData,
+          coverImage: finalCoverImage,
+          epubData: bookData,
           publisher: metadata.publisher,
           publicationDate: metadata.pubdate,
           providerId: finalProviderId,
           providerName: providerName,
           description: metadata.description,
           subjects: subjects,
-          format: format || 'EPUB', // Default to EPUB for file uploads
+          format: 'EPUB',
         };
 
         if (finalProviderId) {
@@ -215,8 +207,8 @@ const App: React.FC = () => {
   }, [handleReturnToLibrary]);
 
   const handleImportFromCatalog = useCallback(async (book: CatalogBook, catalogName?: string) => {
-    if (book.format && book.format.toUpperCase() !== 'EPUB') {
-        const error = `Cannot import this book. The application currently only supports the EPUB format, but this book is a ${book.format}.`;
+    if (book.format && book.format.toUpperCase() !== 'EPUB' && book.format.toUpperCase() !== 'PDF') {
+        const error = `Cannot import this book. The application currently only supports EPUB and PDF formats, but this book is a ${book.format}.`;
         setImportStatus({ isLoading: false, message: '', error });
         return { success: false };
     }
@@ -233,9 +225,8 @@ const App: React.FC = () => {
         }
         throw new Error(errorMessage);
       }
-      const epubData = await response.arrayBuffer();
-      // Pass the providerId and format from the catalog book object to ensure they're saved correctly.
-      return await processAndSaveBook(epubData, book.title, 'catalog', catalogName, book.providerId, book.format);
+      const bookData = await response.arrayBuffer();
+      return await processAndSaveBook(bookData, book.title, 'catalog', catalogName, book.providerId, book.format, book.coverImage);
     } catch (error) {
       console.error("Error importing from catalog:", error);
       let message = "Download failed. The file may no longer be available or there was a network issue.";
@@ -358,6 +349,7 @@ const App: React.FC = () => {
     switch(currentView) {
       case 'reader':
         return selectedBookId !== null && (
+          // FIX: Wrapped ReaderView in ErrorBoundary to handle component-level errors.
           <ErrorBoundary 
             onReset={handleCloseReader}
             fallbackMessage="There was an error while trying to display this book. Returning to the library."
@@ -371,6 +363,7 @@ const App: React.FC = () => {
         );
       case 'pdfReader':
         return selectedBookId !== null && (
+          // FIX: Wrapped PdfReaderView in ErrorBoundary to handle component-level errors.
             <ErrorBoundary 
               onReset={handleCloseReader}
               fallbackMessage="There was an error while trying to display this PDF. Returning to the library."
@@ -383,6 +376,7 @@ const App: React.FC = () => {
           );
       case 'bookDetail':
         return detailViewData && (
+          // FIX: Wrapped BookDetailView in ErrorBoundary to handle component-level errors.
           <ErrorBoundary
             onReset={handleReturnToLibrary}
             fallbackMessage="There was an error showing the book details. Returning to the library."
@@ -404,6 +398,7 @@ const App: React.FC = () => {
       case 'library':
       default:
         return (
+          // FIX: Wrapped Library in ErrorBoundary to handle component-level errors.
           <ErrorBoundary
             onReset={() => window.location.reload()}
             fallbackMessage="There was a critical error in the library. Please try reloading the application."
