@@ -1,88 +1,93 @@
+
 # MeBooks
 
-A custom, browser-based ebook reader inspired by [Readium's Thorium](https://www.edrlab.org/software/thorium-reader/). This application allows users to import EPUB and PDF books into a local library and browse online OPDS catalogs. It is built using modern web technologies and focuses on providing a rich, customizable reading experience with robust library management features.
+A local-first, browser-based ebook reader that supports EPUB and PDF. MeBooks is built as a Single Page Application using React + TypeScript and focuses on a smooth reading experience, per-book persistence, and offline-first behavior.
 
-## Key Features
+This README summarizes the current state (features implemented), developer setup, build instructions, and a short changelog for this release.
 
-### Library Management
--   **Local-First Storage**: Your books and reading data never leave your computer. Book files are stored in IndexedDB, while settings, catalog lists, and annotations are kept in LocalStorage.
--   **EPUB & PDF Import**: Import `.epub` and `.pdf` files to build your personal library.
--   **Book Details**: View detailed information for each book, including publication details, subjects, and provider IDs.
--   **Library Organization**: Sort your library by title, author, publication date, or the date added.
--   **Delete Books**: Permanently remove books from your local library.
+## Current features (highlight)
 
-### Online Catalog Support (OPDS)
--   **Browse Remote Libraries**: Add and manage an unlimited number of public OPDS (Open Publication Distribution System) catalogs.
--   **OPDS v1 & v2 Support**: Compatible with both XML-based (Atom) and JSON-based OPDS feeds.
--   **Seamless Navigation**: Navigate catalog hierarchies, categories, and paginated results.
--   **One-Click Import**: Download books directly from a catalog and add them to your local library.
+- Library: import EPUB and PDF files and store them locally in IndexedDB.
+- EPUB reader: paginated and scrolled flows, font-family and font-size customization, themes (light/dark), bookmarks, citations, full-text search, and read-aloud (TTS).
+- PDF reader: DOM-based PDF rendering using react-pdf/pdfjs (lazy-loaded) with per-book zoom and fit controls and a TOC mapped from PDF outlines.
+- Keyboard shortcuts: navigation and reader controls are available via keyboard (help overlay lists shortcuts).
+- Accessibility: focus management and aria attributes on modals and the help overlay; keyboard-trappable help dialog.
+- Persistence: per-book last-read positions, per-book view state (PDF zoom / EPUB font-size), bookmarks, and citations saved in LocalStorage and IndexedDB.
 
-### Advanced Reader Experience
--   **Entirely Browser-Based**: No installation needed. The app runs completely in your web browser.
--   **Multi-Format Support**: Reads both EPUB and PDF files. EPUBs are rendered using a sophisticated JavaScript engine, while PDFs are displayed using your browser's native, built-in PDF viewer for speed and reliability.
--   **Customizable Reader (EPUB only)**:
-    -   Adjust font size and family (Serif, Sans-Serif, Original).
-    -   Switch between Light and Dark themes.
-    -   Choose your reading mode: `Paginated` (like a physical book) or `Scrolled` (like a webpage).
--   **Rich Reading Tools (EPUB only)**:
-    -   **Bookmarks**: Save your favorite passages with optional notes.
-    -   **Citations**: Create academic citations for specific locations in the book, with support for APA, MLA, and Chicago formats.
-    -   **Citation Export**: Export all citations for a book in the standard `.ris` format for use in reference managers like Zotero or EndNote.
-    -   **Full-Text Search**: Quickly search the entire contents of a book.
--   **Read Aloud (Text-to-Speech for EPUB only)**:
-    -   Listen to your book using your browser's built-in voices.
-    -   Control the voice, speed, and pitch.
-    -   The currently spoken sentence is highlighted in the text for easy following.
+## Notable implementation details
 
-## Technology Stack & Dependencies
+- EPUB rendering: uses the embedded `epub.js` runtime available in the browser environment for DOM-based EPUB rendering and interaction.
+- PDF rendering: uses `react-pdf` and `pdfjs-dist`; the worker file is statically imported to ensure correct MIME and bundler handling.
+- Bundling & dev server: the project uses Vite for development and production builds.
 
-The application is a Single Page Application (SPA) built with the following technologies:
+## Dependencies
 
--   **React**: The core UI library for building the component-based interface.
--   **TypeScript**: Provides static typing for improved code quality and maintainability.
--   **TailwindCSS**: A utility-first CSS framework for styling the application.
--   **epub.js**: The essential library for parsing, rendering, and interacting with EPUB files. It handles content display, navigation, search, and location tracking (CFIs).
--   **JSZip**: A dependency of `epub.js` for unzipping EPUB packages.
+Core dependencies are declared in `package.json`. Key runtime libraries include:
 
-All external dependencies (`React`, `Tailwind`, `epub.js`, `JSZip`) are loaded directly from a CDN in `index.html` for simplicity.
+- react, react-dom
+- react-router-dom
+- react-pdf
+- pdfjs-dist
 
-## Application Architecture
+Dev dependencies include Vite, TypeScript, and React type packages.
 
-### Overall Structure
-The application is managed by the root `App.tsx` component, which switches between four primary views:
-1.  **Library View**: The main interface for displaying the user's local library or browsing a selected OPDS catalog.
-2.  **Book Detail View**: Shows comprehensive metadata for a selected book from either the library or a catalog.
-3.  **EPUB Reader View**: The immersive view for reading a single selected EPUB from the local library.
-4.  **PDF Reader View**: A simple view that uses the browser's native capabilities to display a selected PDF.
+## Developer setup
 
-### State Management
-The app primarily uses React's built-in hooks (`useState`, `useCallback`, etc.). To ensure a seamless user experience, key navigation state (like the active catalog and the user's path within it) is "lifted up" to the `App.tsx` component. This preserves the user's browsing location when they navigate between the library and book detail views.
+Prerequisites:
 
-### Data Persistence
--   **IndexedDB** (`services/db.ts`): Acts as the database for the local library. It stores the full `BookRecord` for each imported book, including the large `epubData` or `pdfData` (an `ArrayBuffer` of the book file).
--   **LocalStorage**: Used for storing smaller, key-value data:
-    -   The list of saved OPDS catalogs.
-    -   Global reader settings (theme, font size, etc.).
-    -   Per-book reading progress, bookmarks, and citations.
+- Node.js (>= 18 recommended)
+- npm (or yarn/pnpm if you prefer)
 
-### OPDS & CORS
-To bypass browser CORS (Cross-Origin Resource Sharing) restrictions when fetching data from external OPDS catalogs, the application routes requests through a public CORS proxy (`corsproxy.io`).
+Quick start:
 
-## File & Component Breakdown
+1. Install dependencies
 
--   **`index.html` / `index.tsx`**: The entry point for the application.
--   **`App.tsx`**: The top-level component. It manages view switching, holds lifted navigation state, and contains the core logic for processing and saving books.
--   **`types.ts`**: Contains all TypeScript interface definitions used throughout the application.
+```bash
+npm install
+```
 
-### Services
--   **`services/db.ts`**: An abstraction layer for all IndexedDB operations (saving, retrieving, deleting books).
+2. Development server (hot reload):
 
-### Components
--   **`components/Library.tsx`**: A multi-purpose component that renders either the user's local book library or the OPDS catalog browser. It contains the logic for fetching and parsing OPDS feeds (both XML and JSON formats) and handles user interactions like sorting and initiating file imports.
--   **`components/ReaderView.tsx`**: The most complex component, responsible for the entire EPUB reading experience. It initializes `epub.js`, manages reader state, and orchestrates all reading-related UI panels and modals.
--   **`components/PdfReaderView.tsx`**: A simple component that embeds the browser's native PDF viewer in an iframe to display PDF files.
--   **`components/BookDetailView.tsx`**: A dedicated view to display detailed information about a book. It adapts its presentation and actions based on whether the book is from the local library or a remote catalog.
--   **`components/ManageCatalogsModal.tsx`**: A modal dialog for users to add, edit, and delete their saved OPDS catalogs.
--   **Panel Components** (`SettingsPanel`, `TocPanel`, `SearchPanel`): Slide-out panels used within the `ReaderView` to provide access to settings, navigation tools (TOC, bookmarks, citations), and search functionality.
--   **Modal Components** (`BookmarkModal`, `CitationModal`, `DuplicateBookModal`, `DeleteConfirmationModal`): Dialogs that handle specific user actions like adding notes, managing import conflicts, and confirming deletions.
--   **Shared Components** (`icons.tsx`, `Spinner.tsx`): Reusable UI elements used across the application.
+```bash
+npm run dev
+```
+
+3. Production build:
+
+```bash
+npm run build
+```
+
+4. Preview production build locally:
+
+```bash
+npm run preview
+```
+
+Notes:
+
+- The PDF worker is imported via Vite (see `components/PdfReaderView.tsx`) to ensure `pdfjs-dist` uses the correct worker URL.
+- EPUB features depend on `epub.js` loaded in the browser; ensure your browser environment allows the app to load the runtime.
+
+## Testing & linting
+
+This repo currently doesn't include a full test suite. Running the production build (`npm run build`) and using the dev server are the primary verification steps. Adding unit and accessibility tests (Playwright/axe) is recommended for future work.
+
+## Short changelog (this release)
+
+- Added EPUB font-size zoom and per-book persistence.
+- Implemented a shared keyboard help modal with accessible focus trapping.
+- Reworked PDF viewer to use `react-pdf` with bundle-friendly worker import and added PDF TOC mapping.
+- Added a small HUD that displays zoom/font-size changes and custom tooltips in the help modal.
+
+## Contributing
+
+Contributions welcome. Open an issue or submit a PR with a short description of the change. For larger work, create a feature branch and open a PR when ready.
+
+## License
+
+This repository does not currently include a license file. Consider adding an appropriate open-source license if you plan to publish the project.
+
+## Release
+
+This README was updated as part of the v1.0.0 release tagging in this repository. See the Git tags for release history.
