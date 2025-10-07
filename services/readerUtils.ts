@@ -130,3 +130,41 @@ export const findFirstChapter = async (book: any): Promise<string | undefined> =
 
   return book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
 };
+
+// --- PDF viewer state (zoom / fit) ---
+export const getPdfViewStateForBook = (bookId: number) => {
+  try {
+    const saved = localStorage.getItem(getStorageKey('pdfview', bookId));
+    return saved ? JSON.parse(saved) : { zoomPercent: 100, fitMode: 'page' };
+  } catch (e) {
+    console.warn('Failed to read pdf view state', e);
+    return { zoomPercent: 100, fitMode: 'page' };
+  }
+};
+
+export const savePdfViewStateForBook = (bookId: number, state: { zoomPercent: number; fitMode: string }) => {
+  try {
+    localStorage.setItem(getStorageKey('pdfview', bookId), JSON.stringify(state));
+  } catch (e) {
+    console.warn('Failed to save pdf view state', e);
+  }
+};
+
+// --- EPUB per-book view state (e.g. font size) ---
+export const getEpubViewStateForBook = (bookId: number) => {
+  try {
+    const saved = localStorage.getItem(getStorageKey('epubview', bookId));
+    return saved ? JSON.parse(saved) : {};
+  } catch (e) {
+    console.warn('Failed to read epub view state', e);
+    return {};
+  }
+};
+
+export const saveEpubViewStateForBook = (bookId: number, state: { fontSize?: number }) => {
+  try {
+    localStorage.setItem(getStorageKey('epubview', bookId), JSON.stringify(state));
+  } catch (e) {
+    console.warn('Failed to save epub view state', e);
+  }
+};

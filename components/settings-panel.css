@@ -1,0 +1,4 @@
+/* Custom font family helpers to avoid inline styles */
+.font-original { font-family: inherit; }
+.font-serif-custom { font-family: Georgia, "Times New Roman", serif; }
+.font-sans-custom { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }

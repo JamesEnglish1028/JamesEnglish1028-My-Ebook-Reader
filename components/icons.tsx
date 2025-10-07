@@ -116,6 +116,12 @@ export const PlusIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+export const MinusIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+  </svg>
+);
+
 export const GlobeIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 01-.354-17.995M12 21a9 9 0 009-9M12 21a9 9 0 00-9-9M12 3c-4.418 0-8 2.015-8 4.5S7.582 12 12 12s8-2.015 8-4.5S16.418 3 12 3z" />
@@ -157,5 +163,24 @@ export const PencilIcon: React.FC<{ className?: string }> = ({ className }) => (
 export const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+// MeBooks book-shaped icon (uses currentColor so it can be tinted via CSS)
+export const MeBooksBookIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 280 320" fill="none">
+    <g fill="currentColor">
+      <rect x="0" y="0" width="36" height="280" rx="18" />
+      <path d="M36 0h200a50 50 0 0150 50v40a50 50 0 01-50 50H36z" />
+      <path d="M36 140h200a50 50 0 0150 50v40a50 50 0 01-50 50H36z" />
+    </g>
+    <g fill="#fff" opacity="0.95">
+      <rect x="120" y="48" width="120" height="14" rx="7" />
+      <rect x="120" y="78" width="120" height="14" rx="7" />
+      <rect x="120" y="108" width="120" height="14" rx="7" />
+      <rect x="120" y="188" width="120" height="14" rx="7" />
+      <rect x="120" y="218" width="120" height="14" rx="7" />
+      <rect x="120" y="248" width="120" height="14" rx="7" />
+    </g>
   </svg>
 );

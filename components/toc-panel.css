@@ -1,0 +1,8 @@
+/* Small helpers for table of contents indentation based on data-level attribute */
+.toc-item[data-level="0"] { padding-left: 0.75rem; }
+.toc-item[data-level="1"] { padding-left: 2rem; }
+.toc-item[data-level="2"] { padding-left: 3.25rem; }
+.toc-item[data-level="3"] { padding-left: 4.5rem; }
+.toc-item[data-level="4"] { padding-left: 5.75rem; }
+.toc-item[data-level="5"] { padding-left: 7rem; }
+.toc-item[data-level="6"] { padding-left: 8.25rem; }

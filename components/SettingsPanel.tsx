@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './settings-panel.css';
 import { ReaderSettings } from '../types';
 import { CloseIcon, BookIcon, SpeakerIcon, PlayIcon } from './icons';
 
@@ -154,7 +155,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
       >
         <div className="p-4 border-b border-slate-700 flex justify-between items-center flex-shrink-0">
           <h3 className="text-xl font-semibold text-white">Settings</h3>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700">
+          <button onClick={onClose} aria-label="Close settings" className="p-2 rounded-full hover:bg-slate-700">
             <CloseIcon className="w-6 h-6" />
           </button>
         </div>
@@ -246,9 +247,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                               onClick={() => onSettingsChange({ fontFamily: fontName })}
                               className={`py-2 px-1 rounded-lg border-2 transition-colors text-center text-sm truncate ${settings.fontFamily === fontName ? 'border-sky-500 bg-sky-500/20' : 'border-slate-600 hover:border-slate-500'}`}
                           >
-                              <span style={{ fontFamily: fontName === 'Serif' ? 'Georgia, serif' : fontName === 'Sans-Serif' ? 'Arial, sans-serif' : 'inherit' }}>
-                                {fontName}
-                              </span>
+                                  <span className={fontName === 'Serif' ? 'font-serif-custom' : fontName === 'Sans-Serif' ? 'font-sans-custom' : 'font-original'}>
+                                    {fontName}
+                                  </span>
                           </button>
                       ))}
                   </div>

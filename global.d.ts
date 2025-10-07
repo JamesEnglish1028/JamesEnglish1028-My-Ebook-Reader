@@ -27,3 +27,9 @@ declare global {
 
 // This export statement is required to make this file a module and allow global declarations.
 export {};
+
+// Allow importing SVG files as URLs (Vite/webpack will return a string URL)
+declare module '*.svg' {
+  const src: string;
+  export default src;
+}

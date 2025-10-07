@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../services/db';
 import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry } from '../types';
-import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon, SettingsIcon, PlusIcon, CheckIcon } from './icons';
+import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon, SettingsIcon, PlusIcon, CheckIcon, MeBooksBookIcon } from './icons';
 import Spinner from './Spinner';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import DuplicateBookModal from './DuplicateBookModal';
@@ -56,7 +56,7 @@ const Library: React.FC<LibraryProps> = ({
 
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
   const [catalogNavLinks, setCatalogNavLinks] = useState<CatalogNavigationLink[]>([]);
-  const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>([]);
+  const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>(null);
 
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -520,10 +520,9 @@ const Library: React.FC<LibraryProps> = ({
 
     return (
         <li className="my-1 group/item">
-            <div 
-                className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-slate-700/50 transition-colors"
-                style={{ paddingLeft: `${indentation}rem`}}
-            >
+      <div 
+        className={`flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-slate-700/50 transition-colors pl-[${indentation}rem]`}
+      >
                 <div className="flex items-center justify-center w-6 h-6 flex-shrink-0">
                     {renderIcon()}
                 </div>
@@ -708,7 +707,7 @@ const Library: React.FC<LibraryProps> = ({
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div className="flex items-center gap-4">
-          <Logo className="w-10 h-10 text-sky-400 flex-shrink-0" />
+          <MeBooksBookIcon className="w-10 h-10 text-sky-400 flex-shrink-0" />
           <div ref={dropdownRef} className="relative">
             <button
               onClick={() => setIsCatalogDropdownOpen(prev => !prev)}
@@ -789,7 +788,7 @@ const Library: React.FC<LibraryProps> = ({
                 className="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-bold p-2 rounded-lg inline-flex items-center transition-colors duration-200 h-[40px] w-[40px] justify-center"
                 aria-label="Open settings menu"
                 aria-haspopup="true"
-                aria-expanded={isSettingsMenuOpen}
+                {...(isSettingsMenuOpen ? { 'aria-expanded': 'true' } : {})}
                 >
                 <SettingsIcon className="w-5 h-5" />
                 </button>

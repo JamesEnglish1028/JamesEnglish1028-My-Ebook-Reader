@@ -1,4 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+// Styles required by react-pdf layers
+import 'react-pdf/dist/Page/TextLayer.css';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Library from './components/Library';
 import ReaderView from './components/ReaderView';
 import BookDetailView from './components/BookDetailView';
@@ -11,11 +15,12 @@ import { uploadLibraryToDrive, downloadLibraryFromDrive } from './services/googl
 import LocalStorageModal from './components/LocalStorageModal';
 import AboutPage from './components/AboutPage';
 import ErrorBoundary from './components/ErrorBoundary';
-import PdfReaderView from './components/PdfReaderView';
+// Lazy-load the PDF reader so its dependencies (react-pdf, pdfjs-dist) are code-split
+const PdfReaderView = lazy(() => import('./components/PdfReaderView'));
 import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl } from './services/utils';
 
 
-const App: React.FC = () => {
+const AppInner: React.FC = () => {
   const [currentView, setCurrentView] = useState<'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [coverAnimationData, setCoverAnimationData] = useState<CoverAnimationData | null>(null);
@@ -55,24 +60,57 @@ const App: React.FC = () => {
     
     return () => clearTimeout(timer);
   }, []);
+  
+
+  const navigate = useNavigate();
+
+  // Optional: auto-open first book for quick QA when URL contains ?autoOpen=first
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const auto = params.get('autoOpen');
+    if (auto === 'first') {
+      (async () => {
+        try {
+          const all = await db.getAllBooks();
+          if (!all || all.length === 0) return;
+          const first = all[0];
+          if (!first || !first.id) return;
+          const format = first.format || 'EPUB';
+          if (format === 'PDF') {
+            navigate(`/pdf/${first.id}`);
+          } else {
+            setSelectedBookId(first.id as number);
+            setCurrentView('reader');
+          }
+        } catch (e) {
+          console.warn('Auto-open failed', e);
+        }
+      })();
+    }
+    // only run on first mount or when search changes
+  }, [location.search, navigate]);
 
   const handleOpenBook = useCallback((id: number, animationData: CoverAnimationData, format: string = 'EPUB') => {
     setSelectedBookId(id);
     if (format === 'PDF') {
-      setCurrentView('pdfReader');
+      // Navigate to the dedicated PDF route; PdfReaderView will read the id from params
       setCoverAnimationData(null); // No animation for PDFs for now
+      navigate(`/pdf/${id}`);
     } else {
       setCoverAnimationData(animationData);
       setCurrentView('reader');
     }
-  }, []);
+  }, [navigate]);
 
 
   const handleCloseReader = useCallback(() => {
     setSelectedBookId(null);
     setCurrentView('library');
     setCoverAnimationData(null);
-  }, []);
+    // If the user was on a route, navigate back to root
+    try { navigate('/'); } catch {}
+  }, [navigate]);
 
   const handleShowBookDetail = useCallback((book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => {
     setDetailViewData({ book, source, catalogName });
@@ -362,18 +400,6 @@ const App: React.FC = () => {
             />
           </ErrorBoundary>
         );
-      case 'pdfReader':
-        return selectedBookId !== null && (
-            <ErrorBoundary 
-              onReset={handleCloseReader}
-              fallbackMessage="There was an error while trying to display this PDF. Returning to the library."
-            >
-              <PdfReaderView
-                bookId={selectedBookId}
-                onClose={handleCloseReader}
-              />
-            </ErrorBoundary>
-          );
       case 'bookDetail':
         return detailViewData && (
           <ErrorBoundary
@@ -440,4 +466,42 @@ const App: React.FC = () => {
   );
 };
 
+const App: React.FC = () => (
+  <BrowserRouter>
+    <Routes>
+      <Route path="/debug/db" element={<DebugDbRoute />} />
+      <Route path="/pdf/:id" element={
+        <Suspense fallback={<div className="w-full h-full flex items-center justify-center">Loading PDF viewer...</div>}>
+          <ErrorBoundary onReset={() => window.location.replace('/')} fallbackMessage="There was an error loading the PDF viewer.">
+            <PdfReaderViewWrapper />
+          </ErrorBoundary>
+        </Suspense>
+      } />
+      <Route path="/*" element={<AppInner />} />
+    </Routes>
+  </BrowserRouter>
+);
+
+// A small wrapper to render the lazy-loaded PdfReaderView component and pass a close handler via navigation
+const PdfReaderViewWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  // Do not pass a bookId prop so PdfReaderView will read the id from the route params
+  return <PdfReaderView onClose={() => navigate('/')} />;
+};
+
 export default App;
+
+const DebugDbRoute: React.FC = () => {
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await db.getAllBooks();
+        console.log('DEBUG DB: all books', all);
+      } catch (e) {
+        console.error('DEBUG DB: error', e);
+      }
+    })();
+  }, []);
+
+  return <div className="p-4 text-white">Debugging DB: check console for output.</div>;
+};

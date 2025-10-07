@@ -8,6 +8,9 @@ import SettingsPanel from './SettingsPanel';
 import TocPanel from './TocPanel';
 import SearchPanel from './SearchPanel';
 import Spinner from './Spinner';
+import ShortcutHelpModal from './ShortcutHelpModal';
+import ZoomHud from './ZoomHud';
+import { getEpubViewStateForBook, saveEpubViewStateForBook } from '../services/readerUtils';
 import CitationModal from './CitationModal';
 import BookmarkModal from './BookmarkModal';
 import {
@@ -154,10 +157,26 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   );
   const [isNavReady, setIsNavReady] = useState(false);
   const [speechState, setSpeechState] = useState<'stopped' | 'playing' | 'paused'>('stopped');
+  const [showHelp, setShowHelp] = useState(false);
+  const [showZoomHud, setShowZoomHud] = useState(false);
+  const zoomHudTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!showZoomHud) return;
+    if (zoomHudTimerRef.current) clearTimeout(zoomHudTimerRef.current);
+    zoomHudTimerRef.current = window.setTimeout(() => setShowZoomHud(false), 1200);
+    return () => {
+      if (zoomHudTimerRef.current) {
+        clearTimeout(zoomHudTimerRef.current);
+        zoomHudTimerRef.current = null;
+      }
+    };
+  }, [showZoomHud]);
   
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings);
 
   const viewerRef = useRef<HTMLDivElement>(null);
+  const coverRef = useRef<HTMLImageElement | null>(null);
   const bookRef = useRef<any>(null);
   const renditionRef = useRef<any>(null);
   const settingsRef = useRef(settings);
@@ -171,6 +190,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const touchStartXRef = useRef<number | null>(null);
   const debounceTimeoutRef = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
+  const renditionResizeTimerRef = useRef<number | null>(null);
   const locationsReadyRef = useRef(false);
   const highlightedCfiRef = useRef<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -207,6 +227,33 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     const timer = setTimeout(() => setAnimationState('expanding'), 50); // Short delay to ensure transition applies
     return () => clearTimeout(timer);
   }, [animationState]);
+
+  // Imperatively update cover image position/size when animation state or animationData changes
+  useEffect(() => {
+    const img = coverRef.current;
+    if (!img || !animationData) return;
+
+    if (animationState === 'start') {
+      // set initial position/size to match library thumbnail
+      img.style.position = 'absolute';
+      img.style.top = `${animationData.rect.top}px`;
+      img.style.left = `${animationData.rect.left}px`;
+      img.style.width = `${animationData.rect.width}px`;
+      img.style.height = `${animationData.rect.height}px`;
+      img.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+    } else if (animationState === 'expanding') {
+      // expand to center
+      img.style.position = 'absolute';
+      img.style.top = '50%';
+      img.style.left = '50%';
+      img.style.transform = 'translate(-50%, -50%)';
+      img.style.width = 'auto';
+      img.style.height = '80vh';
+      img.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+    } else if (animationState === 'fading') {
+      // fade out handled by parent opacity class; keep last transform
+    }
+  }, [animationState, animationData]);
   
   // Fetch book data once, on mount or when bookId changes
   useEffect(() => {
@@ -565,6 +612,15 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             viewerRef.current.style.transition = 'opacity 0.3s ease-in';
             viewerRef.current.style.opacity = '1';
         }
+        // Restore per-book epub view state (e.g., font size) if available
+        try {
+          if (bookId) {
+            const ev = getEpubViewStateForBook(bookId);
+            if (ev && ev.fontSize && typeof ev.fontSize === 'number') {
+              setSettings(prev => ({ ...prev, fontSize: ev.fontSize }));
+            }
+          }
+        } catch (e) { /* ignore */ }
       } catch (error) {
         if (isMounted) {
             console.error("Error initializing EPUB:", error);
@@ -616,6 +672,36 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     saveReaderSettings(settings);
   }, [rendition, settings]);
 
+  // Persist per-book epub view state when font size changes
+  useEffect(() => {
+    if (!bookId) return;
+    try {
+      saveEpubViewStateForBook(bookId, { fontSize: settings.fontSize });
+    } catch (e) {
+      console.warn('Failed to save epub view state', e);
+    }
+  }, [settings.fontSize, bookId]);
+
+  // EPUB-specific zoom handlers (adjust font size percentage)
+  const epubZoomIn = () => {
+    setSettings(s => {
+      const next = Math.min(300, Math.round(s.fontSize * 1.15));
+      return { ...s, fontSize: next };
+    });
+    setShowZoomHud(true);
+  };
+  const epubZoomOut = () => {
+    setSettings(s => {
+      const next = Math.max(50, Math.round(s.fontSize / 1.15));
+      return { ...s, fontSize: next };
+    });
+    setShowZoomHud(true);
+  };
+  const epubToggleFit = () => {
+    // For EPUB, toggle between 'paginated' and 'scrolled' flow as a form of fit toggle
+    setSettings(s => ({ ...s, flow: s.flow === 'paginated' ? 'scrolled' : 'paginated' }));
+  };
+
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
@@ -624,8 +710,29 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   useEffect(() => {
     if (rendition) {
-      const timer = setTimeout(() => rendition.resize(), 50);
-      return () => clearTimeout(timer);
+      // Clear any previous scheduled resize
+      if (renditionResizeTimerRef.current) {
+        clearTimeout(renditionResizeTimerRef.current);
+        renditionResizeTimerRef.current = null;
+      }
+      // Schedule a safe resize — check renditionRef.current at call time
+      renditionResizeTimerRef.current = window.setTimeout(() => {
+        try {
+          if (renditionRef.current && typeof renditionRef.current.resize === 'function') {
+            renditionRef.current.resize();
+          }
+        } catch (e) {
+          // Rendition may have been destroyed; swallow to avoid uncaught exceptions
+          console.warn('Safe resize failed, rendition may no longer be available.', e);
+        }
+      }, 50);
+
+      return () => {
+        if (renditionResizeTimerRef.current) {
+          clearTimeout(renditionResizeTimerRef.current);
+          renditionResizeTimerRef.current = null;
+        }
+      };
     }
   }, [controlsVisible, rendition]);
 
@@ -656,6 +763,50 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const nextPage = useCallback(() => { rendition?.next(); setControlsVisible(true); stopSpeech(); }, [rendition, stopSpeech]);
   const prevPage = useCallback(() => { rendition?.prev(); setControlsVisible(true); stopSpeech(); }, [rendition, stopSpeech]);
+  
+  // Keyboard shortcuts for EPUB reader
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const active = document.activeElement && (document.activeElement as HTMLElement).tagName;
+      if (active === 'INPUT' || active === 'TEXTAREA') return;
+
+      if (e.key === 'ArrowLeft') {
+        prevPage();
+      } else if (e.key === 'ArrowRight') {
+        nextPage();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        nextPage();
+      } else if (e.key.toLowerCase() === 'c') {
+        setShowNavPanel(s => !s);
+      } else if (e.key === '?') {
+        setShowHelp(s => !s);
+      } else if (e.key === '+' || (e.key === '=' && e.shiftKey)) {
+        epubZoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        epubZoomOut();
+      } else if (e.key.toLowerCase() === 'f') {
+        epubToggleFit();
+      } else if (e.key.toLowerCase() === 'b') {
+        // Quick bookmark the current location
+        if (!latestCfiRef.current) return;
+        const newBookmark = {
+          id: new Date().toISOString(),
+          cfi: latestCfiRef.current,
+          label: `Page ${locationInfo.currentPage}`,
+          chapter: currentChapterLabel,
+          description: undefined,
+          createdAt: Date.now(),
+        };
+        const updated = [...bookmarks, newBookmark];
+        setBookmarks(updated);
+        saveBookmarksForBook(bookId, updated);
+      }
+    };
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [prevPage, nextPage, bookmarks, bookId, locationInfo.currentPage, currentChapterLabel]);
   
   useEffect(() => {
     if (!rendition) return;
@@ -891,64 +1042,34 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     <>
       {animationData && animationState !== 'finished' && (
           <div
-              className="fixed inset-0 bg-slate-900 z-50 flex justify-center items-center"
-              style={{
-                  opacity: animationState === 'fading' ? 0 : 1,
-                  transition: 'opacity 0.4s ease-in',
-              }}
-              onTransitionEnd={() => {
-                  if (animationState === 'fading') setAnimationState('finished');
-              }}
+            className={`fixed inset-0 bg-slate-900 z-50 flex justify-center items-center transition-opacity duration-300 ${animationState === 'fading' ? 'opacity-0' : 'opacity-100'}`}
+            onTransitionEnd={() => {
+              if (animationState === 'fading') setAnimationState('finished');
+            }}
           >
-              {animationData.coverImage && (
-                  <img
-                      src={animationData.coverImage}
-                      alt="Expanding book cover"
-                      className="object-contain rounded-lg shadow-2xl"
-                      style={
-                          animationState === 'start'
-                          ? { // Initial position from library
-                              position: 'absolute',
-                              top: `${animationData.rect.top}px`,
-                              left: `${animationData.rect.left}px`,
-                              width: `${animationData.rect.width}px`,
-                              height: `${animationData.rect.height}px`,
-                              transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                          }
-                          : { // Expanded position in center
-                              position: 'absolute',
-                              top: '50%',
-                              left: '50%',
-                              transform: 'translate(-50%, -50%)',
-                              width: 'auto',
-                              height: '80vh',
-                              transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                          }
-                      }
-                      onTransitionEnd={() => {
-                          if (animationState === 'expanding') {
-                              setTimeout(() => setAnimationState('fading'), 200);
-                          }
-                      }}
-                  />
-              )}
+            {animationData.coverImage && (
+              <img
+                ref={coverRef}
+                src={animationData.coverImage}
+                alt="Expanding book cover"
+                className="object-contain rounded-lg shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                onTransitionEnd={() => {
+                  if (animationState === 'expanding') {
+                    setTimeout(() => setAnimationState('fading'), 200);
+                  }
+                }}
+              />
+            )}
           </div>
-      )}
-      <div
-        className="fixed inset-0 bg-slate-900 flex flex-col select-none"
-        style={{
-          opacity: animationState === 'fading' || animationState === 'finished' ? 1 : 0,
-          transition: 'opacity 0.5s ease-out',
-          transitionDelay: animationState === 'fading' ? '0.2s' : '0s',
-        }}
-      >
+        )}
+      <div className={`fixed inset-0 bg-slate-900 flex flex-col select-none transition-opacity duration-500 ${animationState === 'fading' || animationState === 'finished' ? 'opacity-100' : 'opacity-0'}`}>
         <header
           className={`flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-start sm:gap-4 p-2 bg-slate-800 shadow-md z-20 text-white flex-shrink-0 transition-transform duration-300 ease-in-out ${controlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
           onMouseEnter={clearControlsTimeout}
           onMouseLeave={resetControlsTimeout}
         >
-          {/* Left controls */}
-          <div className="flex items-center gap-2 sm:order-1">
+      {/* Left controls */}
+      <div className="flex items-center gap-2 sm:order-1">
               <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close Reader">
                   <CloseIcon className="w-6 h-6" />
               </button>
@@ -962,19 +1083,21 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           
           {/* Right controls */}
           <div className="flex justify-end items-center gap-2 sm:order-3">
-              <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label={speechState === 'playing' ? "Pause Read Aloud" : "Start Read Aloud"}>
+              <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={speechState === 'playing' ? "Pause Read Aloud" : "Start Read Aloud"}>
                 {speechState === 'playing' ? <PauseIcon className="w-6 h-6 text-sky-400" /> : <PlayIcon className="w-6 h-6" />}
               </button>
-              <button onClick={() => setShowSearch(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Search in book">
+              <button onClick={() => setShowSearch(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Search in book">
                 <SearchIcon className="w-6 h-6" />
               </button>
-              <button onClick={() => setShowCitationModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Create citation for this page">
+              <button onClick={() => setShowCitationModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Create citation for this page">
                   <AcademicCapIcon className="w-6 h-6" />
               </button>
-              <button onClick={toggleBookmark} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label={isCurrentPageBookmarked ? "Remove bookmark from this page" : "Add bookmark to this page"}>
+              <button onClick={toggleBookmark} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={isCurrentPageBookmarked ? "Remove bookmark from this page" : "Add bookmark to this page"}>
                   <BookmarkIcon className="w-6 h-6" filled={isCurrentPageBookmarked} />
               </button>
-              <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Settings">
+        <button onClick={() => setShowHelp(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Keyboard help">?
+        </button>
+              <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Settings">
                   <SettingsIcon className="w-6 h-6" />
               </button>
           </div>
@@ -996,7 +1119,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               <Spinner text="Loading Book..." />
             </div>
           )}
-          <div ref={viewerRef} id="viewer" className="w-full h-full" />
+          {/* Viewer receives epub.js rendered content; add subtle padding and max-width for readability */}
+          <div ref={viewerRef} id="viewer" className="w-full h-full p-4 md:p-8 bg-slate-900/20" />
         </div>
 
         <footer
@@ -1010,7 +1134,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                 </button>
             ) : <div className="w-10 h-10 flex-shrink-0" /> /* Placeholder to keep layout consistent */}
             
-            <div className="flex-grow flex flex-col justify-center">
+      <div className="flex-grow flex flex-col justify-center">
                 <input
                     type="range"
                     min="0"
@@ -1023,12 +1147,31 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                 />
                 <div className="text-center text-sm text-slate-300 mt-2" aria-live="polite">
                     {locationInfo.totalPages > 0 && locationsReadyRef.current ? (
-                        <span>Page {locationInfo.currentPage} of {locationInfo.totalPages} &bull; {locationInfo.progress}%</span>
+            <span>Page {locationInfo.currentPage} of {locationInfo.totalPages} &bull; {locationInfo.progress}%</span>
                     ) : (
                         <span className="text-slate-400">Calculating progress...</span>
                     )}
                 </div>
             </div>
+
+      {/* Page jump input for quick navigation */}
+      <div className="w-28 flex flex-col items-center text-sm">
+        <label className="text-slate-300 text-xs">Go to</label>
+        <input
+          type="number"
+          min={1}
+          max={locationInfo.totalPages || 9999}
+          value={locationInfo.currentPage || ''}
+          onChange={(e) => {
+          const v = parseInt(e.target.value || '1', 10);
+          if (isNaN(v) || !bookRef.current?.locations) return;
+          const cfi = bookRef.current.locations.cfiFromLocation(v - 1);
+          if (cfi && rendition) rendition.display(cfi);
+          }}
+          className="w-full text-center rounded-md bg-slate-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          aria-label="Jump to page"
+        />
+      </div>
 
             {settings.flow === 'paginated' ? (
                 <button onClick={nextPage} className="p-2 rounded-full hover:bg-slate-700 transition-colors flex-shrink-0" aria-label="Next Page">
@@ -1076,6 +1219,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           onClose={() => setShowBookmarkModal(false)}
           onSave={handleSaveBookmark}
         />
+        <ShortcutHelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} onZoomIn={epubZoomIn} onZoomOut={epubZoomOut} onToggleFit={epubToggleFit} activeReader={'epub'} />
+        <ZoomHud value={`${settings.fontSize}%`} isOpen={showZoomHud} />
       </div>
     </>
   );

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './toc-panel.css';
 import { TocItem, Bookmark, Citation, ReaderSettings, BookRecord } from '../types';
 import { CloseIcon, ChevronRightIcon, TrashIcon, ExportIcon } from './icons';
 
@@ -148,14 +149,14 @@ const TocListItem: React.FC<{ item: TocItem; onNavigate: (href: string) => void;
 
     const hoverClasses = "hover:bg-sky-500/10";
     
-    const indentationStyle = { paddingLeft: `${0.75 + level * 1.25}rem` };
+    // Use data-level attribute and CSS file for indentation
 
     return (
         <li>
             <button
                 onClick={handleItemClick}
-                className={`w-full text-left py-2 pr-3 rounded-md transition-colors duration-150 ease-in-out flex items-center justify-between group ${hoverClasses}`}
-                style={indentationStyle}
+                data-level={level}
+                className={`toc-item w-full text-left py-2 pr-3 rounded-md transition-colors duration-150 ease-in-out flex items-center justify-between group ${hoverClasses}`}
             >
                 <span className={`${typographyClasses} group-hover:text-sky-300 transition-colors`}>
                     {item.label.trim()}

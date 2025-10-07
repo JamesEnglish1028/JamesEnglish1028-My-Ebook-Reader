@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400">
+  <defs>
+    <style>
+      .text { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-weight: 700; }
+    </style>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4FA3FF"/>
+      <stop offset="100%" stop-color="#2C7CF0"/>
+    </linearGradient>
+  </defs>
+
+  <text class="text" x="60" y="275" font-size="220" fill="#0f172a" letter-spacing="1">Me</text>
+
+  <g transform="translate(480,60)">
+    <rect x="0" y="0" width="36" height="280" rx="18" fill="url(#blue)"/>
+    <path d="M36,0 h200 a50,50 0 0 1 50,50 v40 a50,50 0 0 1 -50,50 H36 z" fill="url(#blue)"/>
+    <path d="M36,140 h200 a50,50 0 0 1 50,50 v40 a50,50 0 0 1 -50,50 H36 z" fill="url(#blue)"/>
+    <path d="M70,36 h150 a28,28 0 0 1 28,28 v12 a28,28 0 0 1 -28,28 H70 z" fill="#1E56B7" opacity="0.18"/>
+    <path d="M70,176 h150 a28,28 0 0 1 28,28 v12 a28,28 0 0 1 -28,28 H70 z" fill="#1E56B7" opacity="0.18"/>
+    <rect x="120" y="48" width="120" height="14" rx="7" fill="#FFFFFF" opacity="0.95"/>
+    <rect x="120" y="78" width="120" height="14" rx="7" fill="#FFFFFF" opacity="0.95"/>
+    <rect x="120" y="108" width="120" height="14" rx="7" fill="#FFFFFF" opacity="0.95"/>
+    <rect x="120" y="188" width="120" height="14" rx="7" fill="#FFFFFF" opacity="0.95"/>
+    <rect x="120" y="218" width="120" height="14" rx="7" fill="#FFFFFF" opacity="0.95"/>
+    <rect x="120" y="248" width="120" height="14" rx="7" fill="#FFFFFF" opacity="0.95"/>
+  </g>
+
+  <text class="text" x="800" y="275" font-size="220" fill="#0f172a" letter-spacing="1">ooks</text>
+</svg>
