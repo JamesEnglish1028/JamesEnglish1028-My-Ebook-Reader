@@ -80,6 +80,28 @@ This repo currently doesn't include a full test suite. Running the production bu
 - Reworked PDF viewer to use `react-pdf` with bundle-friendly worker import and added PDF TOC mapping.
 - Added a small HUD that displays zoom/font-size changes and custom tooltips in the help modal.
 
+## OPDS2 PoC
+
+This release includes a proof-of-concept OPDS2 client and a basic borrow flow for testing with catalogs that require Basic authentication (for example, small library demo servers like Palace Manager).
+
+- The app can detect OPDS2 acquisition links with rel `http://opds-spec.org/acquisition/borrow` and will show a "Borrow" button in the Book Detail view.
+- Borrowing is performed with a POST request to the provided borrow href. If the catalog requires Basic auth, the app will prompt for credentials and can persist them (localStorage) for convenience.
+- This is a PoC: the current flow saves a metadata-only BookRecord into the local IndexedDB on successful borrow. Full acquisition download/import is a planned follow-up.
+
+How to test the PoC locally:
+
+1. Start the dev server: `npm run dev`.
+2. Open the Library settings menu and use the "Add Palace OPDS2 Sample" quick-add entry to add a sample OPDS2 catalog used in tests.
+3. Browse the catalog, open a borrowable entry, and click "Borrow". If the server requires Basic auth you will be prompted to enter credentials (optionally save them).
+4. After a successful borrow the book metadata will appear in the library. Importing the full content is not yet automatic and requires the follow-up work described below.
+
+Planned follow-ups:
+
+- Implement acquisition handling (indirect acquisitions) and the download/import pipeline to convert borrow operations into saved EPUB/PDF content.
+- Add caching/ETag support and robust error handling for OPDS2 fetches.
+- Improve UI for managing stored OPDS credentials.
+
+
 ## Contributing
 
 Contributions welcome. Open an issue or submit a PR with a short description of the change. For larger work, create a feature branch and open a PR when ready.
