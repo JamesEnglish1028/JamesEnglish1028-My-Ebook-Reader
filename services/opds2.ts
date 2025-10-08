@@ -250,3 +250,88 @@ export const borrowOpds2Work = async (borrowHref: string, credentials?: { userna
   if (ct.includes('application/json')) return { ok: true, body: await resp.json() };
   return { ok: true, body: null };
 };
+
+// Resolve an acquisition chain for a given acquisition href. Many OPDS2
+// servers require a POST to a borrow/loan endpoint which returns either JSON
+// containing the content location, or a Location header redirecting to a URL.
+// This helper will attempt a POST (with optional credentials), then follow
+// redirects or JSON-provided URLs. It will also attempt a GET if POST yields
+// a 405 (method not allowed) to support servers that expect GETs.
+export const resolveAcquisitionChain = async (href: string, credentials?: { username: string; password: string } | null, maxRedirects = 5): Promise<string | null> => {
+  let attempts = 0;
+  let current = proxiedUrl(href);
+  const makeHeaders = () => {
+    const h: Record<string,string> = { 'Accept': 'application/json, text/json, */*' };
+    if (credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+    return h;
+  };
+
+  while (attempts < maxRedirects && current) {
+    attempts++;
+    // Try POST first
+    let resp: Response | null = null;
+    try {
+      resp = await fetch(current, { method: 'POST', headers: makeHeaders() });
+    } catch (e) {
+      // network errors — rethrow
+      throw e;
+    }
+
+    if (!resp) return null;
+
+    // If 405, try GET
+    if (resp.status === 405) {
+      resp = await fetch(current, { method: 'GET', headers: makeHeaders() });
+    }
+
+    // If redirect-like response (3xx) and Location header present, follow it
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get('Location') || resp.headers.get('location');
+      if (loc) {
+        current = new URL(loc, current).href;
+        continue;
+      }
+    }
+
+    // Determine ok-ness: some test mocks return plain objects without `ok`.
+    const ok = typeof resp.ok === 'boolean' ? resp.ok : (resp.status >= 200 && resp.status < 300);
+
+    // If OK and JSON body contains a URL, return it
+    if (ok) {
+      const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
+      if (ct.includes('application/json') || ct.includes('text/json')) {
+        const j = await resp.json().catch(() => null);
+        // common fields that might contain the final URL: url, location, href
+        const candidate = j?.url || j?.location || j?.href || j?.contentLocation;
+        if (typeof candidate === 'string' && candidate.length > 0) return new URL(candidate, current).href;
+        // If JSON contains nested 'links' array, try to find a link with rel 'self' or 'content'
+        if (Array.isArray(j?.links)) {
+          const contentLink = j.links.find((l: any) => l?.href && (l.rel === 'content' || l.rel === 'self' || String(l.rel).includes('acquisition')));
+          if (contentLink?.href) return new URL(contentLink.href, current).href;
+        }
+      }
+
+      // If the response has a Location header even on 200, respect it
+      const loc = resp.headers.get('Location') || resp.headers.get('location');
+      if (loc) return new URL(loc, current).href;
+
+      // If content-type is a direct media type, assume current is the content URL
+      if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
+        return current;
+      }
+    }
+
+    // For non-OK statuses (401/403), bubble up by throwing so caller can handle
+    if (resp.status === 401 || resp.status === 403) {
+      const txt = await resp.text().catch(() => '');
+      const e = new Error(`Acquisition failed: ${resp.status} ${resp.statusText} ${txt}`);
+      (e as any).status = resp.status;
+      throw e;
+    }
+
+    // If nothing matched, break to avoid infinite loop
+    break;
+  }
+
+  return null;
+};
