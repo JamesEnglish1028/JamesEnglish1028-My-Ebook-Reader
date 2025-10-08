@@ -6,7 +6,8 @@ services:
     env: docker
     repo: JamesEnglish1028/JamesEnglish1028-My-Ebook-Reader
     branch: main
-    dockerfilePath: proxy/Dockerfile
+  dockerfilePath: ./proxy/Dockerfile
+  dockerContext: ./proxy
     # plan can be 'free', 'starter', 'standard', etc. Pick in the Render UI; this is a placeholder.
     plan: free
     envVars:
