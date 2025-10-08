@@ -45,35 +45,58 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     entries.forEach(entry => {
       const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
       const allLinks = Array.from(entry.querySelectorAll('link'));
-      
+
+      // Build acquisitionLinks array from entry <link> elements
+      const acquisitionLinks = allLinks.map(link => ({
+          rel: link.getAttribute('rel') || '',
+          href: link.getAttribute('href') || '',
+          type: link.getAttribute('type') || '',
+          title: link.getAttribute('title') || undefined
+      }));
+
+      // prefer a link that is an acquisition and indicates a downloadable content type
       const acquisitionLink = allLinks.find(link => {
           const rel = link.getAttribute('rel') || '';
           const type = link.getAttribute('type') || '';
-          return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
-      }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
+          return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf') || type.includes('zip'));
+      }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition')) || allLinks[0];
 
       const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
 
-      if (acquisitionLink) {
-          const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
-          const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
-          const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
-          
-          const coverImageHref = coverLink?.getAttribute('href');
-          const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
-          
-          const downloadUrlHref = acquisitionLink?.getAttribute('href');
-          const mimeType = acquisitionLink?.getAttribute('type') || '';
-          const format = getFormatFromMimeType(mimeType);
-          
-          const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
-          const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
-          const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
-          const providerId = identifiers[0]?.textContent?.trim() || undefined;
+      // Determine cover
+      const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
+      const coverImageHref = coverLink?.getAttribute('href');
+      const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
 
-          const subjects = Array.from(entry.querySelectorAll('category'))
-              .map(cat => cat.getAttribute('term')?.trim())
-              .filter((term): term is string => !!term);
+      // Common metadata
+      const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
+      const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
+      const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
+      const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
+      const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
+      const providerId = identifiers[0]?.textContent?.trim() || undefined;
+      const subjects = Array.from(entry.querySelectorAll('category'))
+          .map(cat => cat.getAttribute('term')?.trim())
+          .filter((term): term is string => !!term);
+
+      if (acquisitionLink) {
+          const downloadUrlHref = acquisitionLink.getAttribute('href');
+          const mimeType = acquisitionLink.getAttribute('type') || '';
+          const format = getFormatFromMimeType(mimeType);
+
+          // detect borrow links: rel may include 'acquisition/borrow' or explicitly be the borrow rel
+          const borrowLinkEl = allLinks.find(link => {
+              const rel = link.getAttribute('rel') || '';
+              const type = link.getAttribute('type') || '';
+              // OPDS1 feeds often mark borrow entries with rel including 'acquisition/borrow'
+              if (rel.includes('acquisition/borrow') || rel.endsWith('/borrow') || rel === 'http://opds-spec.org/acquisition/borrow') return !!link.getAttribute('href');
+              // Some servers expose borrow via an entry link (Atom entry) with type application/atom+xml;type=entry;profile=opds-catalog
+              if (type.includes('application/atom+xml') && type.includes('profile=opds-catalog')) return !!link.getAttribute('href');
+              return false;
+          });
+
+          const isBorrowable = !!borrowLinkEl;
+          const borrowUrl = borrowLinkEl?.getAttribute('href') ? new URL(borrowLinkEl!.getAttribute('href')!, baseUrl).href : undefined;
 
           if(downloadUrlHref) {
               const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
@@ -87,7 +110,10 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   publicationDate: publicationDate || undefined, 
                   providerId, 
                   subjects: subjects.length > 0 ? subjects : undefined,
-                  format
+                  format,
+                  acquisitionLinks,
+                  isBorrowable,
+                  borrowUrl
               });
           }
       } else if (subsectionLink) {
@@ -150,14 +176,35 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                 }
             }
 
-            const acquisitionLink = pub.links?.find((l: any) => l.rel?.includes('opds-spec.org/acquisition'));
+            const links = Array.isArray(pub.links) ? pub.links : [];
+            const acquisitionLink = links.find((l: any) => typeof l.rel === 'string' && l.rel.includes('opds-spec.org/acquisition')) || links.find((l: any) => typeof l.rel === 'string' && l.rel.includes('opds-spec.org'));
             const coverLink = pub.images?.[0];
 
-            if (acquisitionLink?.href) {
-                const downloadUrl = new URL(acquisitionLink.href, baseUrl).href;
+            if (links.length > 0) {
+                // normalize acquisition links and try to find a primary downloadable link
+                const acquisitionLinks = links.map((l: any) => ({ rel: l.rel, href: l.href, type: l.type, properties: l.properties }));
+
+                // prefer a content link that indicates an EPUB/PDF; fall back to the first acquisition-style link or the first link
+                const contentLink = links.find((l: any) => {
+                    const rel = l.rel || '';
+                    const type = l.type || '';
+                    return typeof rel === 'string' && rel.includes('opds-spec.org/acquisition') && (type.includes('epub') || type.includes('pdf') || type.includes('zip'));
+                }) || links.find((l: any) => typeof l.rel === 'string' && l.rel.includes('opds-spec.org/acquisition')) || links[0];
+
+                const downloadUrl = contentLink?.href ? new URL(contentLink.href, baseUrl).href : undefined;
                 const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
-                const mimeType = acquisitionLink?.type || '';
+                const mimeType = contentLink?.type || '';
                 const format = getFormatFromMimeType(mimeType);
+
+                // find a borrow link (OPDS2 rel may be a string or an array)
+                const borrowLink = links.find((l: any) => {
+                    const rel = l.rel;
+                    if (Array.isArray(rel)) return rel.some((r: string) => typeof r === 'string' && (r.includes('acquisition/borrow') || r.endsWith('/borrow')));
+                    if (typeof rel === 'string') return rel.includes('acquisition/borrow') || rel.endsWith('/borrow') || rel === 'http://opds-spec.org/acquisition/borrow';
+                    return false;
+                });
+                const isBorrowable = !!borrowLink;
+                const borrowUrl = borrowLink?.href ? new URL(borrowLink.href, baseUrl).href : undefined;
 
                 let publisher: string | undefined = undefined;
                 if (metadata.publisher) {
@@ -193,13 +240,16 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     title, 
                     author, 
                     coverImage, 
-                    downloadUrl, 
+                    downloadUrl: downloadUrl || '', 
                     summary, 
                     publisher, 
                     publicationDate, 
                     providerId, 
                     subjects: subjects.length > 0 ? subjects : undefined,
-                    format
+                    format,
+                    acquisitionLinks,
+                    isBorrowable,
+                    borrowUrl
                 });
             }
         });

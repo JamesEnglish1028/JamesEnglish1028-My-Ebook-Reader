@@ -6,6 +6,7 @@ import Spinner from './Spinner';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import DuplicateBookModal from './DuplicateBookModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+import OpdsCredentialsModal from './OpdsCredentialsModal';
 import { Logo } from './Logo';
 import { fetchCatalogContent } from '../services/opds';
 import { proxiedUrl } from '../services/utils';
@@ -70,6 +71,7 @@ const Library: React.FC<LibraryProps> = ({
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('ebook-sort-order') || 'added-desc');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isCredentialsOpen, setIsCredentialsOpen] = useState(false);
 
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -811,6 +813,23 @@ const Library: React.FC<LibraryProps> = ({
                           Manage Sources
                           </button>
                       </li>
+                      <li role="none">
+                          <button
+                            onClick={() => {
+                              // Quick-add the Palace sample OPDS2 feed for testing
+                              const sampleUrl = 'https://minotaur.dev.palaceproject.io/aspen-test-library';
+                              handleAddCatalog('Palace Sample (Minotaur)', sampleUrl);
+                              // Select it immediately
+                              const added = (getFromStorage('ebook-catalogs') || []).slice(-1)[0];
+                              if (added) handleSelectSource(added);
+                              setIsSettingsMenuOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
+                            role="menuitem"
+                          >
+                            Add Palace Sample OPDS2
+                          </button>
+                      </li>
                       <li className="my-1 border-t border-slate-700/50" role="separator"></li>
                       <li role="none">
                           <button
@@ -822,6 +841,18 @@ const Library: React.FC<LibraryProps> = ({
                           role="menuitem"
                           >
                           Local Storage
+                          </button>
+                      </li>
+                      <li role="none">
+                          <button
+                            onClick={() => {
+                              setIsCredentialsOpen(true);
+                              setIsSettingsMenuOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-slate-700 block"
+                            role="menuitem"
+                          >
+                            Manage OPDS Credentials
                           </button>
                       </li>
                       <li role="none">
@@ -927,6 +958,7 @@ const Library: React.FC<LibraryProps> = ({
         onConfirm={handleDeleteConfirm}
         bookTitle={bookToDelete?.title || ''}
       />
+      <OpdsCredentialsModal isOpen={isCredentialsOpen} onClose={() => setIsCredentialsOpen(false)} />
     </div>
   );
 };

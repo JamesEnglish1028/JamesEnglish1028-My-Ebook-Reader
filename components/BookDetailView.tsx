@@ -7,6 +7,8 @@ import Spinner from './Spinner';
 import DuplicateBookModal from './DuplicateBookModal';
 import { db } from '../services/db';
 import { proxiedUrl } from '../services/utils';
+import { borrowOpds2Work, findCredentialForUrl, OpdsCredential, saveOpdsCredential } from '../services/opds2';
+import BorrowCredentialsModal from './BorrowCredentialsModal';
 
 interface BookDetailViewProps {
   book: BookMetadata | CatalogBook;
@@ -64,6 +66,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [duplicateBook, setDuplicateBook] = useState<BookRecord | null>(null);
   const [existingBook, setExistingBook] = useState<BookRecord | null>(null);
+  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
+  const [borrowInitialUrl, setBorrowInitialUrl] = useState('');
 
   const libraryBook = isLibraryBook(book) ? book : null;
   const catalogBook = !isLibraryBook(book) ? book : null;
@@ -98,6 +102,95 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
             setDuplicateBook(result.bookRecord);
             setExistingBook(result.existingBook);
         }
+    }
+  };
+
+  const handleBorrow = async () => {
+    if (!catalogBook || !catalogBook.borrowUrl) return;
+    setImportStatus({ isLoading: true, message: 'Attempting to borrow...', error: null });
+
+    // Try stored credentials first
+    const stored = findCredentialForUrl(catalogBook.borrowUrl || catalogBook.downloadUrl);
+    let creds: { username: string; password: string } | null = null;
+    if (stored) {
+      creds = { username: stored.username, password: stored.password };
+    } else {
+      // Open a nicer modal to collect/save credentials
+      setBorrowInitialUrl(catalogBook.borrowUrl || catalogBook.downloadUrl);
+      setIsBorrowModalOpen(true);
+      setImportStatus({ isLoading: false, message: '', error: null });
+      return;
+    }
+
+    try {
+      const res = await borrowOpds2Work(catalogBook.borrowUrl!, catalogName || '', creds as any);
+      if (!res.success) {
+        setImportStatus({ isLoading: false, message: '', error: res.error || 'Borrow failed' });
+        return;
+      }
+
+      // For PoC: add an entry to the library with metadata only (no download)
+      const newRecord = {
+        title: catalogBook.title,
+        author: catalogBook.author,
+        coverImage: catalogBook.coverImage || null,
+        epubData: new ArrayBuffer(0),
+        providerId: catalogBook.providerId,
+        providerName: catalogName,
+        description: catalogBook.summary || undefined,
+        subjects: catalogBook.subjects,
+        format: catalogBook.format || 'EPUB'
+      } as any;
+      await db.saveBook(newRecord);
+      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+      setTimeout(() => {
+        setImportStatus({ isLoading: false, message: '', error: null });
+        onBack();
+      }, 1500);
+    } catch (e) {
+      console.error('Borrow error', e);
+      setImportStatus({ isLoading: false, message: '', error: e instanceof Error ? e.message : 'Borrow failed' });
+    }
+  };
+
+  const handleBorrowModalConfirm = async (c: { username: string; password: string }, save?: boolean, name?: string, urlPattern?: string) => {
+    setIsBorrowModalOpen(false);
+    setImportStatus({ isLoading: true, message: 'Attempting to borrow...', error: null });
+    const creds = { username: c.username, password: c.password };
+
+    try {
+      const res = await borrowOpds2Work(catalogBook!.borrowUrl!, catalogName || '', creds as any);
+      if (!res.success) {
+        setImportStatus({ isLoading: false, message: '', error: res.error || 'Borrow failed' });
+        return;
+      }
+
+      if (save) {
+        const id = `cred-${Date.now()}`;
+        saveOpdsCredential({ id, name: name || `Saved ${id}`, username: creds.username, password: creds.password, urlPattern: urlPattern || borrowInitialUrl });
+      }
+
+      // Add metadata-only entry
+      const newRecord = {
+        title: catalogBook!.title,
+        author: catalogBook!.author,
+        coverImage: catalogBook!.coverImage || null,
+        epubData: new ArrayBuffer(0),
+        providerId: catalogBook!.providerId,
+        providerName: catalogName,
+        description: catalogBook!.summary || undefined,
+        subjects: catalogBook!.subjects,
+        format: catalogBook!.format || 'EPUB'
+      } as any;
+      await db.saveBook(newRecord);
+      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+      setTimeout(() => {
+        setImportStatus({ isLoading: false, message: '', error: null });
+        onBack();
+      }, 1500);
+    } catch (e) {
+      console.error('Borrow error', e);
+      setImportStatus({ isLoading: false, message: '', error: e instanceof Error ? e.message : 'Borrow failed' });
     }
   };
 
@@ -178,10 +271,18 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                         Read Book
                     </button>
                 ) : (
-                    <button onClick={handleAddToBookshelf} disabled={importStatus.isLoading || (!!format && format !== 'EPUB')} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                        <DownloadIcon className="w-6 h-6 mr-2" />
-                        {!!format && format !== 'EPUB' ? `Cannot Import ${format}` : 'Add to Bookshelf'}
-                    </button>
+                        <div className="space-y-3">
+                          {catalogBook?.isBorrowable && (
+                            <button onClick={handleBorrow} disabled={importStatus.isLoading} className="w-full py-3 px-6 rounded-lg bg-rose-600 hover:bg-rose-700 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                              <DownloadIcon className="w-6 h-6 mr-2" />
+                              Borrow
+                            </button>
+                          )}
+                          <button onClick={handleAddToBookshelf} disabled={importStatus.isLoading || (!!format && format !== 'EPUB')} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                            <DownloadIcon className="w-6 h-6 mr-2" />
+                            {!!format && format !== 'EPUB' ? `Cannot Import ${format}` : 'Add to Bookshelf'}
+                          </button>
+                        </div>
                 )}
             </div>
         </aside>
@@ -308,6 +409,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         onAddAnyway={handleAddAnyway}
         bookTitle={duplicateBook?.title || ''}
       />
+      <BorrowCredentialsModal isOpen={isBorrowModalOpen} initialUrl={borrowInitialUrl} onCancel={() => setIsBorrowModalOpen(false)} onConfirm={handleBorrowModalConfirm} />
     </div>
   );
 };

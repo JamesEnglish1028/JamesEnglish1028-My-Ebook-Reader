@@ -105,6 +105,10 @@ export interface CatalogBook {
   providerId?: string;
   subjects?: string[];
   format?: 'EPUB' | 'PDF' | string;
+  // Acquisition details (OPDS2/OPDS1) — optional extra metadata
+  acquisitionLinks?: any[];
+  isBorrowable?: boolean;
+  borrowUrl?: string;
 }
 
 export interface CatalogNavigationLink {
