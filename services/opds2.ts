@@ -53,39 +53,146 @@ export function getCachedEtag(url: string) {
 }
 
 export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
-  // Reuse existing opds.parseOpds2Json logic if available; keep lightweight here.
-  // For now delegate to services/opds.ts parser by dynamically importing to avoid cycle.
-  // This helper will simply call into that module's parser.
-  // We'll implement a small inline parsing fallback for isolated testing.
   const books: CatalogBook[] = [];
   const navLinks: CatalogNavigationLink[] = [];
   const pagination: CatalogPagination = {};
 
+  const toArray = (v: any) => Array.isArray(v) ? v : v ? [v] : [];
+
+  // pagination / top-level links
   if (jsonData.links && Array.isArray(jsonData.links)) {
     jsonData.links.forEach((link: any) => {
       if (link.href && link.rel) {
+        const rels = toArray(link.rel).map((r: any) => String(r));
         const fullUrl = new URL(link.href, baseUrl).href;
-        if (link.rel === 'next') pagination.next = fullUrl;
-        if (link.rel === 'previous') pagination.prev = fullUrl;
-        if (link.rel === 'first') pagination.first = fullUrl;
-        if (link.rel === 'last') pagination.last = fullUrl;
+        if (rels.includes('next')) pagination.next = fullUrl;
+        if (rels.includes('previous')) pagination.prev = fullUrl;
+        if (rels.includes('first')) pagination.first = fullUrl;
+        if (rels.includes('last')) pagination.last = fullUrl;
       }
     });
+  }
+
+  // Helper: find innermost indirectAcquisition type (mime)
+  function findIndirectType(indirect: any): string | undefined {
+    if (!indirect) return undefined;
+    // indirect may be array
+    const arr = Array.isArray(indirect) ? indirect : [indirect];
+    const first = arr[0];
+    if (!first) return undefined;
+    if (first.type) return first.type;
+    if (first.indirectAcquisition) return findIndirectType(first.indirectAcquisition);
+    return undefined;
+  }
+
+  function getFormatFromMimeType(mimeType: string | undefined): string | undefined {
+    if (!mimeType) return undefined;
+    const m = mimeType.toLowerCase();
+    if (m.includes('epub')) return 'EPUB';
+    if (m.includes('pdf')) return 'PDF';
+    return mimeType.split('/')[1]?.toUpperCase() || mimeType;
   }
 
   if (jsonData.publications && Array.isArray(jsonData.publications)) {
     jsonData.publications.forEach((pub: any) => {
       const metadata = pub.metadata || {};
-      const title = metadata.title?.trim() || 'Untitled';
-      const author = Array.isArray(metadata.author) ? (metadata.author[0]?.name || metadata.author[0]) : (metadata.author?.name || metadata.author) || 'Unknown Author';
-      const acquisitionLink = pub.links?.find((l: any) => Array.isArray(l.rel) ? l.rel.includes('http://opds-spec.org/acquisition/borrow') || l.rel.includes('opds-spec.org/acquisition') : (l.rel || '').includes('opds-spec.org/acquisition') || (l.rel === 'http://opds-spec.org/acquisition/borrow'));
-      const coverLink = pub.images?.[0];
-      if (acquisitionLink?.href) {
-        const downloadUrl = new URL(acquisitionLink.href, baseUrl).href;
-        const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
-        const mimeType = acquisitionLink?.type || '';
-        const format = mimeType.includes('pdf') ? 'PDF' : 'EPUB';
-        books.push({ title, author, coverImage, downloadUrl, summary: metadata.description || null, format });
+      const title = (metadata.title && String(metadata.title).trim()) || 'Untitled';
+      // author may be string, object, or array
+      let author = 'Unknown Author';
+      if (metadata.author) {
+        if (Array.isArray(metadata.author) && metadata.author.length > 0) {
+          const a = metadata.author[0];
+          author = typeof a === 'string' ? a : (a?.name || 'Unknown Author');
+        } else if (typeof metadata.author === 'string') author = metadata.author;
+        else if (metadata.author?.name) author = metadata.author.name;
+      }
+
+      const summary = metadata.description || metadata.subtitle || null;
+      const publisher = metadata.publisher?.name || metadata.publisher || undefined;
+      const publicationDate = metadata.published || metadata.issued || undefined;
+
+      // providerId from identifier field (string or array)
+      let providerId: string | undefined = undefined;
+      if (typeof metadata.identifier === 'string') providerId = metadata.identifier;
+      else if (Array.isArray(metadata.identifier) && metadata.identifier.length > 0) {
+        const found = metadata.identifier.find((id: any) => typeof id === 'string');
+        if (found) providerId = found;
+      }
+
+      // subjects
+      let subjects: string[] | undefined = undefined;
+      if (Array.isArray(metadata.subject)) {
+        subjects = metadata.subject.map((s: any) => typeof s === 'string' ? s : (s?.name || '')).filter((s: string) => !!s);
+      }
+
+      // cover image
+      const cover = (pub.images && pub.images[0]) || (metadata.image && metadata.image[0]);
+      const coverImage = cover?.href ? new URL(cover.href, baseUrl).href : (cover?.url ? new URL(cover.url, baseUrl).href : null);
+
+      // links can be an array; each link may have rel as string or array
+      const links = Array.isArray(pub.links) ? pub.links : (pub.links ? [pub.links] : []);
+
+      // Find acquisition links and pick the most appropriate one.
+      const acquisitions: Array<{ href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }> = [];
+      links.forEach((l: any) => {
+        if (!l || !l.href) return;
+        const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
+        // If rel contains 'acquisition' or opds acquisition URIs, treat as acquisition link
+        const isAcq = rels.some((r: string) => r.includes('acquisition') || r === 'http://opds-spec.org/acquisition/borrow' || r === 'http://opds-spec.org/acquisition/loan');
+        if (isAcq) {
+          const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
+          acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
+        }
+      });
+
+      // Decide on a primary acquisition link (prefer borrow, then loan, then any)
+      let chosen: typeof acquisitions[0] | undefined;
+      if (acquisitions.length > 0) {
+        chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
+          || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
+          || acquisitions[0];
+      }
+
+      let downloadUrl: string | undefined = undefined;
+      let format: string | undefined = undefined;
+      if (chosen) {
+        downloadUrl = chosen.href;
+        // Prefer explicit type, else indirect type
+        format = getFormatFromMimeType(chosen.type) || getFormatFromMimeType(chosen.indirectType) || undefined;
+      }
+
+      // If no acquisition link found, sometimes publications include content (resources)
+      if (!downloadUrl && pub.content && Array.isArray(pub.content) && pub.content.length > 0) {
+        const c = pub.content[0];
+        if (c.href) downloadUrl = new URL(c.href, baseUrl).href;
+        if (!format && c.type) format = getFormatFromMimeType(c.type);
+      }
+
+      // Push if we have at least a download URL or cover/title
+      if (title && (downloadUrl || coverImage)) {
+        const book: CatalogBook = {
+          title,
+          author,
+          coverImage: coverImage || null,
+          downloadUrl: downloadUrl || '',
+          summary: summary || null,
+          publisher: publisher || undefined,
+          publicationDate: publicationDate || undefined,
+          providerId: providerId || undefined,
+          subjects: subjects || undefined,
+          format: format || undefined
+        };
+        books.push(book);
+      }
+    });
+  }
+
+  // navigation fallback
+  if (jsonData.navigation && Array.isArray(jsonData.navigation)) {
+    jsonData.navigation.forEach((link: any) => {
+      if (link.href && link.title) {
+        const url = new URL(link.href, baseUrl).href;
+        navLinks.push({ title: link.title, url, rel: link.rel || '' });
       }
     });
   }
