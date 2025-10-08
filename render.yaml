@@ -5,8 +5,8 @@ services:
     env: docker
     repo: JamesEnglish1028/JamesEnglish1028-My-Ebook-Reader
     branch: main
-  dockerfilePath: proxy/Dockerfile
-  dockerContext: .
+    dockerfilePath: proxy/Dockerfile
+    dockerContext: .
     # plan can be 'free', 'starter', 'standard', etc. Pick in the Render UI; this is a placeholder.
     plan: free
     envVars:
@@ -17,7 +17,7 @@ services:
       # Do NOT include PROXY_KEY here; add it in Render dashboard as a secret for production
       # - key: PROXY_KEY
       #   value: "__SECRET__"
-    healthCheckPath: /_health
+  healthCheckPath: /_health
     # Temporary debug build command - prints working directory and proxy contents so Render logs
     # show whether the proxy folder and Dockerfile exist during the build phase. Remove after debugging.
     buildCommand: |
