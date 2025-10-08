@@ -59,8 +59,9 @@ describe('TocPanel keyboard and ARIA', () => {
 
     // Label button is focusable and responds to Enter/Space
     const chapterButton = screen.getByLabelText(/Go to Chapter 1/i) as HTMLElement;
-    chapterButton.focus();
-    expect(chapterButton).toHaveFocus();
+  chapterButton.focus();
+  // Avoid jest-dom matcher during tsc; assert focus via document.activeElement.
+  expect(document.activeElement).toBe(chapterButton);
 
     // Use a userEvent instance for reliable keyboard events in jsdom
     const user = userEvent.setup();
