@@ -1,5 +1,4 @@
-# Render service definition for MeBooks proxy
-# Update `repo` to match your GitHub repo if Render cannot autodetect.
+# Render service definition for MeBooks proxy (moved to repo root so Render will detect it)
 services:
   - type: web
     name: mebooks-proxy
