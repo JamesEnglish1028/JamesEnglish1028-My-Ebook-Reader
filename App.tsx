@@ -4,6 +4,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Library from './components/Library';
+import { useConfirm } from './components/ConfirmContext';
 import ReaderView from './components/ReaderView';
 import BookDetailView from './components/BookDetailView';
 import { db } from './services/db';
@@ -102,6 +103,8 @@ const AppInner: React.FC = () => {
       setCurrentView('reader');
     }
   }, [navigate]);
+
+  const confirm = useConfirm();
 
 
   const handleCloseReader = useCallback(() => {
@@ -324,13 +327,7 @@ const AppInner: React.FC = () => {
 
   const handleDownloadFromDrive = async () => {
     if (!tokenClient) return;
-
-    const confirmed = window.confirm(
-      'DANGER: This will replace your entire local library with the version from Google Drive.\n\n' +
-      'Any local books or changes not uploaded to Drive will be permanently lost.\n\n' +
-      'Are you absolutely sure you want to continue?'
-    );
-
+    const confirmed = await confirm({ message: 'DANGER: This will replace your entire local library with the version from Google Drive.\n\nAny local books or changes not uploaded to Drive will be permanently lost.\n\nAre you absolutely sure you want to continue?', title: 'Dangerous Operation', confirmLabel: 'Yes, replace', cancelLabel: 'Cancel' });
     if (!confirmed) return;
 
     setSyncStatus({ state: 'syncing', message: 'Downloading from Google Drive...' });

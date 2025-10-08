@@ -2,7 +2,10 @@ import React, { useState, useEffect, Suspense, useRef, useCallback } from 'react
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { BookRecord } from '../types';
-import { CloseIcon, LeftArrowIcon, RightArrowIcon, ListIcon, BookmarkIcon } from './icons';
+import { CloseIcon, LeftArrowIcon, RightArrowIcon, ListIcon, BookmarkIcon, AcademicCapIcon } from './icons';
+import BookmarkModal from './BookmarkModal';
+import CitationModal from './CitationModal';
+import { useConfirm } from './ConfirmContext';
 import TocPanel from './TocPanel';
 import { TocItem, Bookmark, Citation, ReaderSettings } from '../types';
 import { getReaderSettings, getBookmarksForBook, getCitationsForBook, saveBookmarksForBook, saveCitationsForBook, getLastPositionForBook, saveLastPositionForBook } from '../services/readerUtils';
@@ -10,6 +13,7 @@ import { getPdfViewStateForBook, savePdfViewStateForBook } from '../services/rea
 import Spinner from './Spinner';
 import ShortcutHelpModal from './ShortcutHelpModal';
 import ZoomHud from './ZoomHud';
+import AddedHud from './AddedHud';
 // Lazy-load react-pdf to keep initial bundle small
 // Importing the package entry dynamically; react-pdf exposes Document and Page components.
 const PDFDocument = React.lazy(() => import('react-pdf').then(m => ({ default: m.Document })));
@@ -45,7 +49,13 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
   const zoomHudTimerRef = React.useRef<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [pdfToc, setPdfToc] = useState<TocItem[]>([]);
+  const [pdfChapterMap, setPdfChapterMap] = useState<Record<number, string>>({});
+  const [addedHudMessage, setAddedHudMessage] = useState<string | null>(null);
+  const addedHudTimerRef = React.useRef<number | null>(null);
   const [showNavPanel, setShowNavPanel] = useState(false);
+  const [showBookmarkModal, setShowBookmarkModal] = useState(false);
+  const [showCitationModal, setShowCitationModal] = useState(false);
+  const confirm = useConfirm();
   const [tocLoading, setTocLoading] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
@@ -193,6 +203,51 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
         }
 
         setPdfToc(mapped);
+        // Build a page->chapter map so we can label bookmarks/citations by chapter when possible
+        try {
+          // Improved resolution: for each toc item, try to resolve its destination to a page index
+          const flat: { page: number; label: string }[] = [];
+          const walk = async (items: TocItem[]) => {
+            for (const it of items) {
+              if (it.href) {
+                // href might be like 'page:N' or other forms; attempt to parse
+                if (it.href.startsWith('page:')) {
+                  const p = Number(it.href.split(':')[1]);
+                  if (!isNaN(p) && p >= 1) flat.push({ page: p, label: it.label });
+                } else {
+                  // Try to resolve named destination via pdf.getDestination
+                  try {
+                    const dest = await pdf.getDestination(it.href as any);
+                    if (Array.isArray(dest) && dest.length > 0) {
+                      try {
+                        const pageIndex = await pdf.getPageIndex(dest[0]);
+                        flat.push({ page: pageIndex + 1, label: it.label });
+                      } catch (e) {
+                        // ignore
+                      }
+                    }
+                  } catch (e) {
+                    // ignore resolution errors
+                  }
+                }
+              }
+              if (it.subitems && it.subitems.length > 0) await walk(it.subitems);
+            }
+          };
+          await walk(mapped);
+          flat.sort((a, b) => a.page - b.page);
+          const map: Record<number, string> = {};
+          for (let i = 0; i < flat.length; i++) {
+            const start = flat[i].page;
+            const end = (i + 1 < flat.length) ? flat[i + 1].page - 1 : (pdf.numPages || start);
+            for (let p = start; p <= end; p++) {
+              map[p] = flat[i].label;
+            }
+          }
+          setPdfChapterMap(map);
+        } catch (e) {
+          console.warn('Failed to build pdf chapter map', e);
+        }
       } catch (e) {
         console.warn('Failed to map PDF outline', e);
         setPdfToc([]);
@@ -354,6 +409,68 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
     }
   }, [bookData]);
 
+  // Save a bookmark created via the modal (with optional note)
+  const handleSaveBookmark = async (note: string) => {
+    if (!bookData?.id) return;
+    // Duplicate detection: don't allow an identical bookmark unless user confirms
+    const exists = bookmarks.some(b => b.cfi === `page:${currentPage}`);
+    if (exists) {
+      try {
+        const ok = await confirm({ message: 'A bookmark already exists for this page. Add another?' });
+        if (!ok) return;
+      } catch (e) {
+        return;
+      }
+    }
+    const newBookmark = {
+      id: new Date().toISOString(),
+      cfi: `page:${currentPage}`,
+      label: `Page ${currentPage}`,
+      chapter: pdfChapterMap[currentPage] || undefined,
+      description: note || undefined,
+      createdAt: Date.now(),
+    } as any;
+    const updated = [...bookmarks, newBookmark];
+    setBookmarks(updated);
+    try { saveBookmarksForBook(bookData.id, updated); } catch (e) { console.warn(e); }
+    setShowBookmarkModal(false);
+    // show added HUD
+    setAddedHudMessage('Bookmark added');
+    if (addedHudTimerRef.current) clearTimeout(addedHudTimerRef.current);
+    addedHudTimerRef.current = window.setTimeout(() => setAddedHudMessage(null), 1400);
+  };
+
+  // Save a citation created via the modal (with optional note)
+  const handleSaveCitation = async (note: string) => {
+    if (!bookData?.id) return;
+    // Duplicate detection: check if a citation already exists for this page & note
+    const exists = citations.some(c => c.pageNumber === currentPage && ((c.note || '') === (note || '')));
+    if (exists) {
+      try {
+        const ok = await confirm({ message: 'An identical citation already exists for this page. Add another?' });
+        if (!ok) return;
+      } catch (e) {
+        return;
+      }
+    }
+    const newCitation = {
+      id: new Date().toISOString(),
+      cfi: `page:${currentPage}`,
+      note: note || undefined,
+      createdAt: Date.now(),
+      pageNumber: currentPage,
+      chapter: pdfChapterMap[currentPage] || undefined,
+    } as any;
+    const updated = [...citations, newCitation];
+    setCitations(updated);
+    try { saveCitationsForBook(bookData.id, updated); } catch (e) { console.warn(e); }
+    setShowCitationModal(false);
+    // show added HUD
+    setAddedHudMessage('Citation added');
+    if (addedHudTimerRef.current) clearTimeout(addedHudTimerRef.current);
+    addedHudTimerRef.current = window.setTimeout(() => setAddedHudMessage(null), 1400);
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -485,6 +602,7 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
   return (
     <div className="fixed inset-0 bg-slate-900 flex flex-col select-none">
       <ZoomHud value={fitMode === 'page' ? `${zoomPercent}%` : `Fit: ${fitMode}`} isOpen={showZoomHud} />
+      <AddedHud message={addedHudMessage || ''} isOpen={!!addedHudMessage} />
       <header className="flex items-center justify-between p-2 bg-slate-800 shadow-md z-20 text-white flex-shrink-0">
         <div className="flex items-center gap-2">
           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Close Reader">
@@ -506,8 +624,14 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
             <button onClick={() => setZoomPercent(z => Math.max(20, Math.round(z / 1.15)))} className="p-2 rounded hover:bg-slate-700" aria-label="Zoom out">-</button>
             <div className="text-sm text-slate-300 px-2">{zoomPercent}%</div>
             <button onClick={() => setZoomPercent(z => Math.min(400, Math.round(z * 1.15)))} className="p-2 rounded hover:bg-slate-700" aria-label="Zoom in">+</button>
-            <button onClick={() => setFitMode(m => m === 'page' ? 'width' : 'page')} className="p-2 rounded hover:bg-slate-700" aria-label="Toggle fit mode">{fitMode === 'page' ? 'Fit Page' : 'Fit Width'}</button>
-            <button onClick={() => setShowHelp(s => !s)} className="p-2 rounded hover:bg-slate-700" aria-label="Keyboard help">?</button>
+      <button onClick={() => setFitMode(m => m === 'page' ? 'width' : 'page')} className="p-2 rounded hover:bg-slate-700" aria-label="Toggle fit mode">{fitMode === 'page' ? 'Fit Page' : 'Fit Width'}</button>
+      <button onClick={() => setShowCitationModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Create citation for this page">
+        <AcademicCapIcon className="w-6 h-6" />
+      </button>
+      <button onClick={() => setShowBookmarkModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Add bookmark to this page">
+        <BookmarkIcon className="w-6 h-6" />
+      </button>
+      <button onClick={() => setShowHelp(s => !s)} className="p-2 rounded hover:bg-slate-700" aria-label="Keyboard help">?</button>
           </div>
         </div>
       </header>
@@ -549,6 +673,9 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
       onToggleFit={() => setFitMode(m => m === 'page' ? 'width' : 'page')}
       activeReader={'pdf'}
     />
+    <BookmarkModal isOpen={showBookmarkModal} onClose={() => setShowBookmarkModal(false)} onSave={handleSaveBookmark} />
+    <CitationModal isOpen={showCitationModal} onClose={() => setShowCitationModal(false)} onSave={handleSaveCitation} />
+    {/* ConfirmModal is provided globally by ConfirmProvider */}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { CloseIcon, TrashIcon } from './icons';
+import { useConfirm } from './ConfirmContext';
 
 interface LocalStorageModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface LocalStorageModalProps {
 
 const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }) => {
   const [bookCount, setBookCount] = useState<number | null>(null);
+  const confirm = useConfirm();
   
   useEffect(() => {
     if (isOpen) {
@@ -21,20 +23,56 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
   }, [isOpen]);
 
   const handleClearLibrary = () => {
-    const confirmed = window.confirm(
-      'DANGER: This will permanently delete your entire local library, including all books, bookmarks, and citations.\n\nThis action cannot be undone.\n\nAre you absolutely sure you want to continue?'
-    );
-    if (confirmed) {
+    (async () => {
+      // Snapshot current library and localStorage keys managed by the app so we can restore on undo
+      let snapshot: { books: any[]; localStorageEntries: Record<string, string | null> } = { books: [], localStorageEntries: {} };
+      try {
+        snapshot.books = await db.getAllBooks();
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('ebook-reader-'))
+          .forEach(key => { snapshot.localStorageEntries[key] = localStorage.getItem(key); });
+      } catch (e) {
+        console.warn('Failed to snapshot library before clear', e);
+      }
+
+      const ok = await confirm({
+        message: 'DANGER: This will permanently delete your entire local library, including all books, bookmarks, and citations.\n\nYou will have a short window to undo this action.',
+        title: 'Dangerous Operation',
+        confirmLabel: 'Yes, delete',
+        variant: 'danger',
+        // undoCallback: when triggered, restore snapshot
+        undoCallback: async () => {
+          try {
+            if (snapshot.books && snapshot.books.length > 0) {
+              for (const b of snapshot.books) {
+                // best-effort restore
+                await db.saveBook(b);
+              }
+            }
+            Object.entries(snapshot.localStorageEntries || {}).forEach(([k, v]) => {
+              if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v as string);
+            });
+            // Reload to apply restored state
+            setTimeout(() => window.location.reload(), 200);
+          } catch (err) {
+            console.error('Failed to restore library on undo', err);
+          }
+        },
+        undoDurationMs: 8000,
+      });
+
+      if (!ok) return;
+
       // Clear all app-related localStorage items
       Object.keys(localStorage)
           .filter(key => key.startsWith('ebook-reader-'))
           .forEach(key => localStorage.removeItem(key));
-      
+
       db.clearAllBooks().then(() => {
         // Reload to apply changes and clear any in-memory state
         window.location.reload();
       });
-    }
+    })();
   };
 
   if (!isOpen) return null;

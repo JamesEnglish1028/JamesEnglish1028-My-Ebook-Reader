@@ -151,3 +151,37 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
         return null;
     }
 };
+
+// Lightweight analytics/event tracking helper used for in-app events during development
+export const trackEvent = (eventName: string, payload?: Record<string, any>) => {
+  try {
+    const detail = { event: eventName, payload: payload || {}, ts: Date.now() };
+    // Emit a window event so consumers (dev tools, tests) can listen
+    try { window.dispatchEvent(new CustomEvent('analytics', { detail })); } catch (e) { /* ignore */ }
+    if (isDebug()) {
+      console.info('trackEvent:', eventName, payload || {});
+    }
+  } catch (e) {
+    // swallow any errors to avoid breaking UI
+    if (isDebug()) console.warn('trackEvent failed', e);
+  }
+};
+
+// Small helper that centralizes debug flag logic. It checks for an explicit
+// client-side flag `window.__MEBOOKS_DEBUG__` or Vite env var VITE_DEBUG.
+export const isDebug = (): boolean => {
+  try {
+    if (typeof window !== 'undefined' && (window as any).__MEBOOKS_DEBUG__) return true;
+  } catch (e) {
+    // ignore
+  }
+  try {
+    // import.meta.env may not be available in some runtimes; guard access
+    // Vite exposes VITE_DEBUG when set in env
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_DEBUG === 'true') return true;
+  } catch (e) {
+    // ignore
+  }
+  return false;
+};

@@ -25,8 +25,10 @@ import {
   getLastSpokenPositionForBook,
   saveLastSpokenPositionForBook,
   performBookSearch,
-  findFirstChapter
+  findFirstChapter,
+  buildTocFromSpine
 } from '../services/readerUtils';
+import { trackEvent, isDebug } from '../services/utils';
 
 
 interface ReaderViewProps {
@@ -156,6 +158,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     animationData ? 'start' : 'finished'
   );
   const [isNavReady, setIsNavReady] = useState(false);
+  const [usedTocFallback, setUsedTocFallback] = useState(false);
+
+  useEffect(() => {
+    if (!usedTocFallback) return;
+    const t = window.setTimeout(() => setUsedTocFallback(false), 8000);
+    return () => clearTimeout(t);
+  }, [usedTocFallback]);
   const [speechState, setSpeechState] = useState<'stopped' | 'playing' | 'paused'>('stopped');
   const [showHelp, setShowHelp] = useState(false);
   const [showZoomHud, setShowZoomHud] = useState(false);
@@ -537,8 +546,31 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           
         const nav = await bookInstance.loaded.navigation;
         if (!isMounted) return;
-        setToc(nav.toc);
-        navigationRef.current = nav;
+        // nav.toc may be undefined for older EPUB2/NCX; build fallback from spine if needed
+        try {
+          if (nav && nav.toc && Array.isArray(nav.toc) && nav.toc.length > 0) {
+            if (isDebug()) console.debug('ReaderView: using navigation.toc with', nav.toc.length, 'entries');
+            setToc(nav.toc);
+            setUsedTocFallback(false);
+          } else {
+            if (isDebug()) console.debug('ReaderView: navigation.toc missing or empty, building fallback TOC from spine');
+            const fallback = buildTocFromSpine(bookInstance);
+            // normalize fallback items to match TocItem shape
+            const normalized = fallback.map((f: any) => ({ id: f.id, href: f.href, label: f.label, subitems: [] }));
+            setToc(normalized as any);
+            setUsedTocFallback(true);
+            // track analytics event for fallback usage
+            try { trackEvent('toc_fallback', { bookId: bookId, fallbackCount: (fallback && fallback.length) || 0 }); } catch (e) { /* ignore */ }
+          }
+        } catch (e) {
+          if (isDebug()) console.warn('Error processing navigation TOC, using fallback', e);
+          const fallback = buildTocFromSpine(bookInstance);
+          const normalized = fallback.map((f: any) => ({ id: f.id, href: f.href, label: f.label, subitems: [] }));
+          setToc(normalized as any);
+          setUsedTocFallback(true);
+          try { trackEvent('toc_fallback', { bookId: bookId, fallbackCount: (fallback && fallback.length) || 0, error: String(e) }); } catch (er) { /* ignore */ }
+        }
+        navigationRef.current = nav || null;
         setIsNavReady(true);
 
         renditionInstance.on('relocated', (location: any) => {
@@ -591,19 +623,31 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         setCitations(getCitationsForBook(bookId));
         speechStartCfiRef.current = getLastSpokenPositionForBook(bookId);
         
-        const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
+  const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
         
         if (!isMounted) return;
         
-        try {
-            await renditionInstance.display(startLocation || undefined);
-        } catch (e) {
-            console.error(`Failed to display start location "${startLocation}". Defaulting to beginning of the book.`, e);
-            // If the initial location fails (e.g., bad CFI), just display the book from the start.
-            if (isMounted) {
-                await renditionInstance.display();
-            }
-        }
+              // Try to display the preferred startLocation, but be defensive: if the section
+              // is missing (common in older/corrupted EPUBs), fall back to the first spine item
+              // or a bare rendition.display() call.
+              if (renditionInstance) {
+                try {
+                  await renditionInstance.display(startLocation || undefined);
+                } catch (err: any) {
+                  console.warn(`rendition.display failed for ${startLocation}. Attempting spine fallback.`, err);
+                  // Try first spine href when possible
+                  try {
+                    const firstSpineHref = bookInstance?.spine?.items && bookInstance.spine.items.length > 0 ? bookInstance.spine.items[0].href : undefined;
+                    if (firstSpineHref) {
+                      await renditionInstance.display(firstSpineHref);
+                    } else {
+                      await renditionInstance.display();
+                    }
+                  } catch (err2) {
+                    console.error('Failed to display book using spine fallback or default', err2);
+                  }
+                }
+              }
         
         if (!isMounted) return;
         setIsLoading(false);
@@ -839,9 +883,87 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         return updated;
     });
   };
-  const handleTocNavigate = (href: string) => { stopSpeech(); rendition?.display(href); setShowNavPanel(false); };
-  const handleBookmarkNavigate = (cfi: string) => { stopSpeech(); rendition?.display(cfi); setShowNavPanel(false); };
-  const handleCitationNavigate = (cfi: string) => { stopSpeech(); rendition?.display(cfi); setShowNavPanel(false); };
+  const safeDisplay = useCallback(async (loc?: string) => {
+    if (!renditionRef.current) {
+      if (isDebug()) console.warn('safeDisplay: rendition not ready');
+      return;
+    }
+    try {
+      await renditionRef.current.display(loc || undefined);
+    } catch (err) {
+      if (isDebug()) console.warn('safeDisplay: rendition.display failed for', loc, err);
+      // Try resolving common older/NCX idref cases and href variants before falling back
+      try {
+        const book = bookRef.current;
+        const tried = new Set<string>();
+
+        const tryDisplay = async (candidate?: string) => {
+          if (!candidate || tried.has(candidate)) return false;
+          tried.add(candidate);
+          try {
+            if (isDebug()) console.debug('safeDisplay: trying candidate', candidate);
+            await renditionRef.current.display(candidate);
+            return true;
+          } catch (e) {
+            if (isDebug()) console.debug('safeDisplay: candidate failed', candidate, e);
+            return false;
+          }
+        };
+
+        // If no loc provided, try first spine item or default display
+        if (!loc) {
+          const firstSpineHref = book?.spine?.items && book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
+          if (firstSpineHref && await tryDisplay(firstSpineHref)) return;
+          await tryDisplay(undefined);
+          return;
+        }
+
+        const orig = loc;
+        // Try the original loc
+        if (await tryDisplay(orig)) return;
+
+        // Strip fragment and retry (chapter.html#id -> chapter.html)
+        const noFrag = orig.split('#')[0];
+        if (noFrag !== orig && await tryDisplay(noFrag)) return;
+
+        // If loc looks like an idref (no slash, no dot), attempt to find matching spine item by id/idref
+        const looksLikeIdref = !/[\/.]/.test(orig);
+        if (looksLikeIdref && book?.spine?.items) {
+          for (const item of book.spine.items) {
+            if (item.id === orig || item.idref === orig || (item.href && item.href.split('#')[0].endsWith(orig))) {
+              const candidateHref = item.href;
+              if (candidateHref && await tryDisplay(candidateHref)) return;
+            }
+          }
+        }
+
+        // Try matching spine hrefs that end with the noFrag path portion
+        if (book?.spine?.items) {
+          const tail = noFrag.split('/').pop();
+          if (tail) {
+            for (const item of book.spine.items) {
+              if (item.href && item.href.split('#')[0].endsWith(tail)) {
+                if (await tryDisplay(item.href)) return;
+              }
+            }
+          }
+        }
+
+        // Try first spine item as a last content fallback
+        const firstSpineHref = book?.spine?.items && book.spine.items.length > 0 ? book.spine.items[0].href : undefined;
+        if (firstSpineHref && await tryDisplay(firstSpineHref)) return;
+
+        // Finally try display without args
+        await tryDisplay(undefined);
+        } catch (err2) {
+        console.error('safeDisplay: rendition.display fallback failed', err2);
+      }
+    }
+  }, []);
+
+  const handleTocNavigate = (href: string) => { stopSpeech(); void safeDisplay(href); setShowNavPanel(false); };
+  const handleBookmarkNavigate = (cfi: string) => { stopSpeech(); void safeDisplay(cfi); setShowNavPanel(false); };
+  const handleCitationNavigate = (cfi: string) => { stopSpeech(); void safeDisplay(cfi); setShowNavPanel(false); };
 
   const handleSaveBookmark = useCallback(async (description: string) => {
     if (!latestCfiRef.current) return;
@@ -981,10 +1103,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     
     stopSpeech();
     setShowSearch(false);
-  
-    rendition.display(cfi).then(() => {
-      rendition.annotations.add('highlight', cfi, {}, undefined, 'hl', { 'fill': 'yellow', 'fill-opacity': '0.3' });
-      setCurrentHighlightCfi(cfi);
+    void safeDisplay(cfi).then(() => {
+      try {
+        rendition.annotations.add('highlight', cfi, {}, undefined, 'hl', { 'fill': 'yellow', 'fill-opacity': '0.3' });
+        setCurrentHighlightCfi(cfi);
+      } catch (e) {
+        console.warn('Failed to add highlight after navigation', e);
+      }
     });
   }, [rendition, currentHighlightCfi, stopSpeech]);
 
@@ -1005,7 +1130,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       if (sliderTimeoutRef.current) clearTimeout(sliderTimeoutRef.current);
       sliderTimeoutRef.current = window.setTimeout(() => {
         const cfi = bookRef.current.locations.cfiFromPercentage(newProgress / 100);
-        rendition.display(cfi);
+        void safeDisplay(cfi);
       }, 150);
     }
   };
@@ -1068,6 +1193,20 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           onMouseEnter={clearControlsTimeout}
           onMouseLeave={resetControlsTimeout}
         >
+      {/* Fallback TOC banner */}
+      {usedTocFallback && (
+        <div className="absolute left-1/2 transform -translate-x-1/2 top-full mt-2 z-40">
+          <div className="bg-amber-600 text-black px-4 py-2 rounded shadow-md flex items-center gap-4">
+            <span className="text-sm">This book's navigation was incomplete; a fallback contents list was used.</span>
+            <button onClick={() => {
+                const firstHref = bookRef.current?.spine?.items && bookRef.current.spine.items.length > 0 ? bookRef.current.spine.items[0].href : undefined;
+                if (firstHref) void safeDisplay(firstHref);
+                setUsedTocFallback(false);
+              }} className="bg-black/10 hover:bg-black/20 px-3 py-1 rounded text-sm font-semibold">Open first content</button>
+            <button onClick={() => setUsedTocFallback(false)} className="px-2 py-1 text-sm underline">Dismiss</button>
+          </div>
+        </div>
+      )}
       {/* Left controls */}
       <div className="flex items-center gap-2 sm:order-1">
               <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close Reader">
@@ -1166,7 +1305,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           const v = parseInt(e.target.value || '1', 10);
           if (isNaN(v) || !bookRef.current?.locations) return;
           const cfi = bookRef.current.locations.cfiFromLocation(v - 1);
-          if (cfi && rendition) rendition.display(cfi);
+          if (cfi) void safeDisplay(cfi);
           }}
           className="w-full text-center rounded-md bg-slate-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-500"
           aria-label="Jump to page"
