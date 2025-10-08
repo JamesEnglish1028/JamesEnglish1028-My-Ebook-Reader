@@ -17,6 +17,19 @@ services:
       # Do NOT include PROXY_KEY here; add it in Render dashboard as a secret for production
       # - key: PROXY_KEY
       #   value: "__SECRET__"
-  healthCheckPath: /_health
-    # No buildCommand: use Dockerfile at repo root
+    healthCheckPath: /_health
+    # Debug build command - prints working directory and proxy contents so Render logs
+    # show whether the proxy folder and Dockerfile exist during the build phase.
+    buildCommand: |
+      echo "=== build debug start ==="
+      pwd || true
+      echo "--- repo root listing ---"
+      ls -la || true
+      echo "--- /opt/render/project/src listing ---"
+      ls -la /opt/render/project/src || true
+      echo "--- proxy listing ---"
+      ls -la proxy || true
+      echo "--- head proxy/Dockerfile ---"
+      head -n 50 proxy/Dockerfile || true
+      echo "=== build debug end ==="
     startCommand: ''
