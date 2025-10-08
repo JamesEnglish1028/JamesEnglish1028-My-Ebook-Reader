@@ -284,12 +284,13 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
       resp = await fetch(current, { method: 'GET', headers: makeHeaders() });
     }
 
-    // If redirect-like response (3xx) and Location header present, follow it
+    // If redirect-like response (3xx) and Location header present, treat it as the
+    // final content URL and return it. Many servers respond with a redirect to
+    // the actual media URL after a borrow/loan POST.
     if (resp.status >= 300 && resp.status < 400) {
-      const loc = resp.headers.get('Location') || resp.headers.get('location');
+      const loc = (resp.headers && typeof resp.headers.get === 'function') ? (resp.headers.get('Location') || resp.headers.get('location')) : null;
       if (loc) {
-        current = new URL(loc, current).href;
-        continue;
+        return new URL(loc, current).href;
       }
     }
 
