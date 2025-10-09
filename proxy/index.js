@@ -100,10 +100,28 @@ app.all('/proxy', async (req, res) => {
         res.setHeader('Content-Type', 'application/octet-stream');
         res.status(200);
         const c = spawn('curl', ['-sS', '-L', targetUrl.toString()]);
+        let killed = false;
+        // Kill curl if it hangs for more than 30s
+        const killTimer = setTimeout(() => {
+          killed = true;
+          try { c.kill('SIGKILL'); } catch (e) { /* ignore */ }
+        }, 30_000);
+        c.on('error', (e) => {
+          clearTimeout(killTimer);
+          console.error('curl spawn error', e);
+          if (!res.headersSent) {
+            try { res.status(502).json({ error: 'Curl fallback spawn failed', details: e && e.message ? e.message : String(e) }); } catch (e) { /* ignore */ }
+          }
+        });
+        c.stdout.on('error', (e) => {
+          console.error('curl stdout error', e);
+        });
         c.stdout.pipe(res);
         c.stderr.on('data', (d) => console.error('curl stderr:', d.toString().slice(0,2000)));
-        c.on('close', (code) => {
-          if (code !== 0) console.error('curl exited with code', code);
+        c.on('close', (code, signal) => {
+          clearTimeout(killTimer);
+          if (killed) console.error('curl killed due to timeout');
+          if (code !== 0) console.error('curl exited with code', code, 'signal', signal);
         });
         return;
       }
