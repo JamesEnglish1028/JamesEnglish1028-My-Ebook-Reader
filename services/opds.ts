@@ -281,6 +281,63 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
                 'Accept': 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5'
             }
         });
+
+        // If the direct fetch returned a redirect (3xx) or the response lacks CORS
+        // headers when we attempted a direct fetch, the browser will block reading
+        // the body. In that case, retry the request via the configured proxy.
+        const isRedirect = response.status >= 300 && response.status < 400;
+        const hasCorsHeader = !!response.headers.get('Access-Control-Allow-Origin');
+        const usedDirect = fetchUrl === url;
+        if ((isRedirect || (usedDirect && !hasCorsHeader)) && proxiedUrl) {
+            const proxyFetchUrl = proxiedUrl(url);
+            const proxiedResp = await fetch(proxyFetchUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5'
+                }
+            });
+            // Replace response with proxied response for parsing below
+            if (proxiedResp) {
+                // Note: we can't reassign the const `response`, so read proxiedResp into locals used below
+                const contentType = proxiedResp.headers.get('Content-Type') || '';
+                const responseText = await proxiedResp.text();
+
+                // Detect proxy-level rejections (common when HOST_ALLOWLIST blocks the target)
+                if (proxiedResp.status === 403) {
+                    try {
+                        const parsed = contentType.includes('application/json') ? JSON.parse(responseText) : null;
+                        if (parsed && parsed.error && typeof parsed.error === 'string' && parsed.error.toLowerCase().includes('host')) {
+                            throw new Error(`Proxy denied access to host for ${url}. The proxy's HOST_ALLOWLIST may need to include the upstream host.`);
+                        }
+                    } catch (e) {
+                        // If parsing fails, still surface a helpful message
+                        throw new Error(`Proxy returned 403 for ${url}. The proxy may be blocking this host.`);
+                    }
+                }
+
+                if (contentType.includes('text/html') && responseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+                    throw new Error('The CORS proxy returned an HTML page instead of the catalog feed. This might indicate the proxy service is down or blocking the request. Please try another catalog or check back later.');
+                }
+
+                if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
+                    const jsonData = JSON.parse(responseText);
+                    return parseOpds2Json(jsonData, baseUrl);
+                } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
+                    return parseOpds1Xml(responseText, baseUrl);
+                } else {
+                    if (responseText.trim().startsWith('{')) {
+                        try {
+                            const jsonData = JSON.parse(responseText);
+                            return parseOpds2Json(jsonData, baseUrl);
+                        } catch (e) { /* Fall through to XML parsing */ }
+                    }
+                    if (responseText.trim().startsWith('<')) {
+                         return parseOpds1Xml(responseText, baseUrl);
+                    }
+                    throw new Error(`Unsupported or ambiguous catalog format. Content-Type: "${contentType}".`);
+                }
+            }
+        }
         
         if (!response.ok) {
             const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
@@ -296,6 +353,18 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
         
         const contentType = response.headers.get('Content-Type') || '';
         const responseText = await response.text();
+
+        // If the proxy returned a JSON 403 error body, surface a clearer message
+        if (response.status === 403 && contentType.includes('application/json')) {
+            try {
+                const parsed = JSON.parse(responseText);
+                if (parsed && parsed.error && typeof parsed.error === 'string') {
+                    throw new Error(`Proxy error: ${parsed.error}`);
+                }
+            } catch (e) {
+                throw new Error(`Proxy returned 403 for ${url}`);
+            }
+        }
 
         // FIX: Add specific check for HTML response from a faulty proxy
         if (contentType.includes('text/html') && responseText.trim().toLowerCase().startsWith('<!doctype html>')) {
