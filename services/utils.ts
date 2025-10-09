@@ -107,6 +107,9 @@ export const blobUrlToBase64 = async (blobUrl: string): Promise<string> => {
 
 // FIX: Switched to a new CORS proxy to resolve network errors.
 const CORS_PROXY_URL = 'https://corsproxy.io/?';
+// Own proxy URL can be configured via Vite env var VITE_OWN_PROXY_URL
+const OWN_PROXY_URL: string = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_OWN_PROXY_URL) ? (import.meta as any).env.VITE_OWN_PROXY_URL : '';
+const FORCE_PROXY = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_FORCE_PROXY === 'true');
 
 /**
  * Wraps a URL with a CORS proxy to prevent cross-origin issues.
@@ -117,12 +120,58 @@ export const proxiedUrl = (url: string): string => {
   try {
     // Check if the URL is valid before trying to proxy it.
     new URL(url);
-    // This proxy simply prepends its URL. No encoding needed.
-    return `${CORS_PROXY_URL}${url}`;
+    // If the app is configured to always use an owned proxy, prefer it
+    if (OWN_PROXY_URL) {
+      // Normalize OWN_PROXY_URL so callers can set either the root host or the full /proxy path.
+      // - If user set e.g. https://example.com, we convert to https://example.com/proxy
+      // - If user set https://example.com/proxy or https://example.com/proxy/, we keep it
+      let base = OWN_PROXY_URL.trim();
+      // remove trailing slashes
+      base = base.replace(/\/+$/, '');
+      if (!base.endsWith('/proxy')) base = `${base}/proxy`;
+      const sep = base.includes('?') ? '&' : '?';
+      if (FORCE_PROXY) return `${base}${sep}url=${encodeURIComponent(url)}`;
+      return `${base}${sep}url=${encodeURIComponent(url)}`;
+    }
+    // Fallback to the public CORS proxy
+    return `${CORS_PROXY_URL}${encodeURIComponent(url)}`;
   } catch (e) {
     // If the URL is invalid, return an empty string or a placeholder to avoid breaking image tags.
     console.error("Invalid URL passed to proxiedUrl:", url);
     return '';
+  }
+};
+
+/**
+ * Probe a URL to see if it can be fetched directly from the browser (CORS allowance).
+ * If the probe fails (network/CORS), return a proxied URL that will be used instead.
+ *
+ * Notes:
+ * - Uses a HEAD request to minimize transferred data where supported. Some servers may
+ *   not support HEAD (405); in that case we fall back to using the proxy.
+ * - Browsers will perform preflight automatically when the request requires it. This
+ *   helper attempts a lightweight probe so we can choose the proxy only when necessary.
+ */
+export const maybeProxyForCors = async (url: string): Promise<string> => {
+  try {
+    // Validate URL first
+    new URL(url);
+  } catch (e) {
+    console.error('Invalid URL for maybeProxyForCors:', url);
+    return '';
+  }
+
+  try {
+    // Try a lightweight HEAD probe to check CORS allowance. If the server responds OK,
+    // we can attempt the full request directly. If it errors (TypeError due to CORS),
+    // we'll fall back to the proxy.
+    const resp = await fetch(url, { method: 'HEAD', mode: 'cors' });
+    if (resp && resp.ok) return url;
+    // If server doesn't support HEAD (405) or returns an error, prefer the proxy.
+    return proxiedUrl(url);
+  } catch (e) {
+    // Likely a network or CORS error — use the proxy.
+    return proxiedUrl(url);
   }
 };
 
