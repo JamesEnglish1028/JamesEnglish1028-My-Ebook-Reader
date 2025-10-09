@@ -87,15 +87,65 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
 
   function getFormatFromMimeType(mimeType: string | undefined): string | undefined {
     if (!mimeType) return undefined;
-    const m = mimeType.toLowerCase();
-    if (m.includes('epub')) return 'EPUB';
-    if (m.includes('pdf')) return 'PDF';
-    return mimeType.split('/')[1]?.toUpperCase() || mimeType;
+    const clean = String(mimeType).split(';')[0].trim().toLowerCase();
+    if (clean.includes('epub') || clean === 'application/epub+zip') return 'EPUB';
+    if (clean.includes('pdf') || clean === 'application/pdf') return 'PDF';
+    // For non-media types (e.g., application/atom+xml;type=entry) return undefined
+    return undefined;
   }
 
   if (jsonData.publications && Array.isArray(jsonData.publications)) {
     jsonData.publications.forEach((pub: any) => {
       const metadata = pub.metadata || {};
+      // Normalize links: some providers (e.g., Palace) embed XML serialized
+      // <link> elements inside JSON string fields. Detect string-serialized
+      // XML and convert to a links array so downstream logic can find
+      // acquisition links as usual.
+      if (typeof pub.links === 'string' && pub.links.trim().startsWith('<')) {
+        try {
+          const parser = new DOMParser();
+          const xml = parser.parseFromString(pub.links, 'application/xml');
+          const parsedLinks: any[] = [];
+          Array.from(xml.querySelectorAll('link')).forEach((ln: Element) => {
+            const href = ln.getAttribute('href');
+            const rel = ln.getAttribute('rel');
+            const type = ln.getAttribute('type');
+            const obj: any = {};
+            if (href) obj.href = href;
+            if (rel) obj.rel = rel;
+            if (type) obj.type = type;
+            parsedLinks.push(obj);
+          });
+          if (parsedLinks.length > 0) pub.links = parsedLinks;
+        } catch (e) {
+          // ignore and let existing logic handle other shapes
+        }
+      }
+
+      // Some feeds may put link XML inside properties or other fields
+      if (!pub.links && pub.properties && typeof pub.properties === 'object') {
+        const maybeLinks = pub.properties.links || pub.properties.link || pub.properties.acquisitions;
+        if (typeof maybeLinks === 'string' && maybeLinks.trim().startsWith('<')) {
+          try {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(maybeLinks, 'application/xml');
+            const parsedLinks: any[] = [];
+            Array.from(xml.querySelectorAll('link')).forEach((ln: Element) => {
+              const href = ln.getAttribute('href');
+              const rel = ln.getAttribute('rel');
+              const type = ln.getAttribute('type');
+              const obj: any = {};
+              if (href) obj.href = href;
+              if (rel) obj.rel = rel;
+              if (type) obj.type = type;
+              parsedLinks.push(obj);
+            });
+            if (parsedLinks.length > 0) pub.links = parsedLinks;
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
       const title = (metadata.title && String(metadata.title).trim()) || 'Untitled';
       // author may be string, object, or array
       let author = 'Unknown Author';
@@ -260,33 +310,40 @@ export const borrowOpds2Work = async (borrowHref: string, credentials?: { userna
 export const resolveAcquisitionChain = async (href: string, credentials?: { username: string; password: string } | null, maxRedirects = 5): Promise<string | null> => {
   let attempts = 0;
   let current = proxiedUrl(href);
-  const makeHeaders = () => {
+  const makeHeaders = (withCreds = false) => {
     const h: Record<string,string> = { 'Accept': 'application/json, text/json, */*' };
-    if (credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+    if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
     return h;
   };
 
+  // If credentials are provided, some servers expect an authenticated GET rather
+  // than a POST. Use a heuristic: prefer GET when credentials are present.
+  const preferGetWhenCreds = !!credentials;
+
   while (attempts < maxRedirects && current) {
     attempts++;
-    // Try POST first
     let resp: Response | null = null;
     try {
-      resp = await fetch(current, { method: 'POST', headers: makeHeaders() });
+      if (preferGetWhenCreds) {
+        // Try GET first when credentials supplied
+        resp = await fetch(current, { method: 'GET', headers: makeHeaders(true) });
+        if (resp.status === 405) {
+          resp = await fetch(current, { method: 'POST', headers: makeHeaders(true) });
+        }
+      } else {
+        // Default: try POST first, then GET on 405
+        resp = await fetch(current, { method: 'POST', headers: makeHeaders(false) });
+        if (resp.status === 405) {
+          resp = await fetch(current, { method: 'GET', headers: makeHeaders(false) });
+        }
+      }
     } catch (e) {
-      // network errors — rethrow
       throw e;
     }
 
     if (!resp) return null;
 
-    // If 405, try GET
-    if (resp.status === 405) {
-      resp = await fetch(current, { method: 'GET', headers: makeHeaders() });
-    }
-
-    // If redirect-like response (3xx) and Location header present, treat it as the
-    // final content URL and return it. Many servers respond with a redirect to
-    // the actual media URL after a borrow/loan POST.
+    // Treat 3xx + Location as final content URL
     if (resp.status >= 300 && resp.status < 400) {
       const loc = (resp.headers && typeof resp.headers.get === 'function') ? (resp.headers.get('Location') || resp.headers.get('location')) : null;
       if (loc) {
@@ -294,43 +351,47 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
       }
     }
 
-    // Determine ok-ness: some test mocks return plain objects without `ok`.
     const ok = typeof resp.ok === 'boolean' ? resp.ok : (resp.status >= 200 && resp.status < 300);
+    const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
 
-    // If OK and JSON body contains a URL, return it
     if (ok) {
-      const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
       if (ct.includes('application/json') || ct.includes('text/json')) {
         const j = await resp.json().catch(() => null);
-        // common fields that might contain the final URL: url, location, href
         const candidate = j?.url || j?.location || j?.href || j?.contentLocation;
         if (typeof candidate === 'string' && candidate.length > 0) return new URL(candidate, current).href;
-        // If JSON contains nested 'links' array, try to find a link with rel 'self' or 'content'
         if (Array.isArray(j?.links)) {
           const contentLink = j.links.find((l: any) => l?.href && (l.rel === 'content' || l.rel === 'self' || String(l.rel).includes('acquisition')));
           if (contentLink?.href) return new URL(contentLink.href, current).href;
         }
       }
 
-      // If the response has a Location header even on 200, respect it
       const loc = resp.headers.get('Location') || resp.headers.get('location');
       if (loc) return new URL(loc, current).href;
 
-      // If content-type is a direct media type, assume current is the content URL
       if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
         return current;
       }
     }
 
-    // For non-OK statuses (401/403), bubble up by throwing so caller can handle
+    // If server demands authentication, surface the auth document when present.
     if (resp.status === 401 || resp.status === 403) {
-      const txt = await resp.text().catch(() => '');
-      const e = new Error(`Acquisition failed: ${resp.status} ${resp.statusText} ${txt}`);
-      (e as any).status = resp.status;
-      throw e;
+      // Try to parse an OPDS authentication document
+      const contentText = await resp.text().catch(() => '');
+      let authDoc: any = null;
+      try {
+        if ((resp.headers.get && (resp.headers.get('Content-Type') || '').includes('application/vnd.opds.authentication.v1.0+json')) || contentText.trim().startsWith('{')) {
+          authDoc = JSON.parse(contentText);
+        }
+      } catch (e) {
+        authDoc = null;
+      }
+
+      const err = new Error(`Acquisition requires authentication: ${resp.status} ${resp.statusText}`);
+      (err as any).status = resp.status;
+      if (authDoc) (err as any).authDocument = authDoc;
+      throw err;
     }
 
-    // If nothing matched, break to avoid infinite loop
     break;
   }
 

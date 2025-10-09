@@ -51,7 +51,9 @@ const HOST_ALLOWLIST = exactMatches;
 console.log('proxy: exactHosts=', Array.from(exactMatches), 'suffixHosts=', suffixMatches, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS, 'DEBUG_ALLOW_ALL=', envAllowAll);
 
 function stripHopByHop(headers) {
-  const hop = ['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade'];
+  // Exclude hop-by-hop headers and headers that must not be forwarded
+  // from the original browser request such as Host, Origin, and Referer.
+  const hop = ['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade','host','origin','referer'];
   const out = {};
   for (const [k,v] of Object.entries(headers || {})) {
     if (!hop.includes(k.toLowerCase())) out[k] = v;

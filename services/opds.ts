@@ -270,9 +270,24 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 
 export const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
-        // Try direct fetch first (CORS-capable). maybeProxyForCors will probe the URL
-        // and return either the original URL (if direct fetch should work) or a proxied URL.
-        const fetchUrl = await maybeProxyForCors(url);
+        // Some providers (notably Palace / palace.io and related hosts) operate
+        // primarily for native clients and don't expose CORS consistently. For
+        // those hosts we should force requests through our owned proxy so the
+        // browser won't be blocked. Detect palace-like hosts and skip the probe.
+        const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
+        const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+
+        let fetchUrl: string;
+        if (isPalaceHost) {
+            // Force owned proxy for palace hosts to ensure acquisition links and
+            // embedded XML are reachable from the browser (via our server-side proxy).
+            fetchUrl = proxiedUrl(url);
+        } else {
+            // Try direct fetch first (CORS-capable). maybeProxyForCors will probe the URL
+            // and return either the original URL (if direct fetch should work) or a proxied URL.
+            const { maybeProxyForCors } = await import('./utils');
+            fetchUrl = await maybeProxyForCors(url);
+        }
         // FIX: Added specific Accept header to signal preference for OPDS formats.
         const response = await fetch(fetchUrl, {
             method: 'GET',
