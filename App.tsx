@@ -18,7 +18,9 @@ import AboutPage from './components/AboutPage';
 import ErrorBoundary from './components/ErrorBoundary';
 // Lazy-load the PDF reader so its dependencies (react-pdf, pdfjs-dist) are code-split
 const PdfReaderView = lazy(() => import('./components/PdfReaderView'));
-import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl } from './services/utils';
+import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl, maybeProxyForCors } from './services/utils';
+import OpdsCredentialsModal from './components/OpdsCredentialsModal';
+import { resolveAcquisitionChain, findCredentialForUrl, saveOpdsCredential } from './services/opds2';
 
 
 const AppInner: React.FC = () => {
@@ -51,6 +53,10 @@ const AppInner: React.FC = () => {
     message: '',
     error: null,
   });
+
+  const [credentialPrompt, setCredentialPrompt] = useState<{ isOpen: boolean; host: string | null; pendingHref?: string | null; pendingBook?: CatalogBook | null; pendingCatalogName?: string | undefined; authDocument?: any | null }>(
+    { isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined, authDocument: null }
+  );
 
   // Initialize DB on app start & handle splash screen
   useEffect(() => {
@@ -255,8 +261,31 @@ const AppInner: React.FC = () => {
     
     setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
     try {
-      const proxyUrl = proxiedUrl(book.downloadUrl);
-      const response = await fetch(proxyUrl);
+      // If this is an OPDS2 acquisition flow, attempt to resolve the acquisition chain
+      let finalUrl = book.downloadUrl;
+      try {
+        // try to resolve; will throw on 401/403 so we can prompt
+        const cred = findCredentialForUrl(book.downloadUrl);
+        const resolved = await resolveAcquisitionChain(book.downloadUrl, cred ? { username: cred.username, password: cred.password } : null);
+        if (resolved) finalUrl = resolved;
+      } catch (e: any) {
+        // If auth error, prompt for credentials and allow retry
+        if (e?.status === 401 || e?.status === 403) {
+          setImportStatus({ isLoading: false, message: '', error: null });
+          setCredentialPrompt({ isOpen: true, host: new URL(book.downloadUrl).host, pendingHref: book.downloadUrl, pendingBook: book, pendingCatalogName: catalogName });
+          setCredentialPrompt(prev => ({ ...prev, authDocument: undefined }));
+          return { success: false };
+        }
+        throw e;
+      }
+
+  const proxyUrl = await maybeProxyForCors(finalUrl);
+      const storedCred = findCredentialForUrl(book.downloadUrl);
+      const downloadHeaders: Record<string,string> = {};
+      if (storedCred) {
+        downloadHeaders['Authorization'] = `Basic ${btoa(`${storedCred.username}:${storedCred.password}`)}`;
+      }
+      const response = await fetch(proxyUrl, { headers: downloadHeaders });
       if (!response.ok) {
         const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
         let errorMessage = `Download failed. The server responded with an error (${statusInfo}). The book might not be available at this address.`;
@@ -282,6 +311,72 @@ const AppInner: React.FC = () => {
       return { success: false };
     }
   }, [processAndSaveBook]);
+
+  // Handler invoked by credential modal when user submits credentials
+  const handleCredentialSubmit = useCallback(async (username: string, password: string, save: boolean) => {
+    if (!credentialPrompt.pendingHref) {
+      setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null });
+      return;
+    }
+    const href = credentialPrompt.pendingHref;
+    try {
+      const resolved = await resolveAcquisitionChain(href, { username, password });
+      if (resolved && credentialPrompt.pendingBook) {
+        // Optionally save credential
+        if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
+        // Proceed to import using resolved URL
+        setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
+        setImportStatus({ isLoading: true, message: `Downloading ${credentialPrompt.pendingBook.title}...`, error: null });
+  const proxyUrl = await maybeProxyForCors(resolved);
+  const downloadHeaders: Record<string,string> = {};
+  // Use the credentials the user just supplied for the download
+  if (username && password) downloadHeaders['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
+  const response = await fetch(proxyUrl, { headers: downloadHeaders });
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.status}`);
+        }
+        const bookData = await response.arrayBuffer();
+        await processAndSaveBook(bookData, credentialPrompt.pendingBook.title, credentialPrompt.pendingBook.author, 'catalog', credentialPrompt.pendingCatalogName, credentialPrompt.pendingBook.providerId, credentialPrompt.pendingBook.format, credentialPrompt.pendingBook.coverImage);
+      } else {
+        setImportStatus({ isLoading: false, message: '', error: 'Failed to resolve acquisition URL.' });
+        setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
+          if (credentialPrompt.authDocument) {
+            // Handle the authDocument as needed
+          }
+      }
+    } catch (error) {
+      console.error('Credential resolve/import failed', error);
+      setImportStatus({ isLoading: false, message: '', error: error instanceof Error ? error.message : 'Failed to authenticate and download the book.' });
+      setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
+    }
+  }, [credentialPrompt, processAndSaveBook]);
+
+  // Track last auth link opened (for telemetry/testing) and provide a retry action
+  const [lastAuthLinkOpened, setLastAuthLinkOpened] = useState<string | null>(null);
+
+  const handleOpenAuthLink = useCallback((href: string) => {
+    setLastAuthLinkOpened(href);
+    // The actual window.open is already handled in the modal; we just record it here.
+  }, []);
+
+  const handleRetryAfterProviderLogin = useCallback(async () => {
+    // Retry resolving the pending href if available
+    if (!credentialPrompt.pendingHref || !credentialPrompt.pendingBook) return;
+    setImportStatus({ isLoading: true, message: 'Retrying download after provider login...', error: null });
+    try {
+      const resolved = await resolveAcquisitionChain(credentialPrompt.pendingHref, null);
+      if (!resolved) throw new Error('Failed to resolve after login');
+      const proxyUrl = await maybeProxyForCors(resolved);
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+      const bookData = await response.arrayBuffer();
+      await processAndSaveBook(bookData, credentialPrompt.pendingBook.title, credentialPrompt.pendingBook.author, 'catalog', credentialPrompt.pendingCatalogName, credentialPrompt.pendingBook.providerId, credentialPrompt.pendingBook.format, credentialPrompt.pendingBook.coverImage);
+      setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
+    } catch (e) {
+      console.error('Retry after provider login failed', e);
+      setImportStatus({ isLoading: false, message: '', error: e instanceof Error ? e.message : 'Retry failed' });
+    }
+  }, [credentialPrompt, processAndSaveBook]);
   
   const gatherDataForUpload = async (): Promise<{ payload: SyncPayload; booksWithData: BookRecord[] }> => {
     const booksWithData = await db.getAllBooks();
@@ -458,6 +553,15 @@ const AppInner: React.FC = () => {
       <LocalStorageModal
         isOpen={isLocalStorageModalOpen}
         onClose={() => setIsLocalStorageModalOpen(false)}
+      />
+      <OpdsCredentialsModal
+        isOpen={credentialPrompt.isOpen}
+        host={credentialPrompt.host}
+        authDocument={credentialPrompt.authDocument}
+        onClose={() => setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined })}
+        onSubmit={handleCredentialSubmit}
+        onOpenAuthLink={handleOpenAuthLink}
+        onRetry={handleRetryAfterProviderLogin}
       />
     </div>
   );

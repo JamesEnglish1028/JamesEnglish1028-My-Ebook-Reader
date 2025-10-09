@@ -1,5 +1,143 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
 import { proxiedUrl, maybeProxyForCors } from './utils';
+// NOTE: prefer a static import for `maybeProxyForCors` instead of a dynamic import
+// because static imports keep bundling deterministic and avoid creating a
+// separate dynamic chunk for a small utility module. This prevents Vite from
+// warning about a module being both statically and dynamically imported and
+// simplifies chunking in production builds.
+
+// Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
+function uint8ToBinaryString(u8: Uint8Array): string {
+    // Use chunking to avoid call stack / argument length issues
+    const CHUNK = 0x8000;
+    let result = '';
+    for (let i = 0; i < u8.length; i += CHUNK) {
+        const slice = u8.subarray(i, i + CHUNK);
+        result += String.fromCharCode.apply(null, Array.prototype.slice.call(slice));
+    }
+    return result;
+}
+
+// Helper: read all bytes from a cloned response in a way that's tolerant of
+// browser implementations that may throw on response.arrayBuffer(). Try
+// arrayBuffer() first, then fall back to reading the stream with getReader().
+// Cache response bytes so we don't attempt to read the same stream multiple times
+const responseByteCache: WeakMap<any, Uint8Array> = new WeakMap();
+
+async function readAllBytes(resp: Response): Promise<Uint8Array> {
+    // Return cached bytes if already read for this response object
+    try {
+        const cached = responseByteCache.get(resp);
+        if (cached) return cached;
+    } catch (_) {}
+    // Defensive read supporting test mocks (which may not implement clone()/arrayBuffer())
+    try {
+        // Try arrayBuffer() on the original response first. Some environments
+        // implement arrayBuffer() reliably and this avoids cloning and reader
+        // locking issues in some browsers/runtimes.
+        if (resp && typeof resp.arrayBuffer === 'function') {
+            try {
+                const buf = await resp.arrayBuffer();
+                const result = new Uint8Array(buf);
+                try { responseByteCache.set(resp, result); } catch (_) {}
+                return result;
+            } catch (_) {
+                // fallthrough to clone/read logic
+            }
+        }
+
+        if (resp && typeof resp.clone === 'function') {
+            const c = resp.clone();
+            try {
+                const buf = await c.arrayBuffer();
+                const out = new Uint8Array(buf);
+                try { responseByteCache.set(resp, out); } catch (_) {}
+                return out;
+            } catch (e) {
+                const reader = c.body && (c.body as any).getReader ? (c.body as any).getReader() : null;
+                if (!reader) throw e;
+                const chunks: Uint8Array[] = [];
+                let total = 0;
+                while (true) {
+                    // eslint-disable-next-line no-await-in-loop
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    if (value) {
+                        const u8 = value instanceof Uint8Array ? value : new Uint8Array(value);
+                        chunks.push(u8);
+                        total += u8.length;
+                    }
+                }
+                const out = new Uint8Array(total);
+                let offset = 0;
+                for (const chunk of chunks) {
+                    out.set(chunk, offset);
+                    offset += chunk.length;
+                }
+                try { responseByteCache.set(resp, out); } catch (_) {}
+                return out;
+            }
+        }
+
+        if (resp && typeof resp.text === 'function') {
+            const txt = await resp.text();
+            let encoded: Uint8Array;
+            if (typeof TextEncoder !== 'undefined') encoded = new TextEncoder().encode(txt);
+            else if (typeof Buffer !== 'undefined') encoded = new Uint8Array(Buffer.from(txt, 'utf-8'));
+            else encoded = new Uint8Array();
+            try { responseByteCache.set(resp, encoded); } catch (_) {}
+            return encoded;
+        }
+
+        if (resp && resp.body) {
+            if (resp.body instanceof Uint8Array) {
+                try { responseByteCache.set(resp, resp.body); } catch (_) {}
+                return resp.body;
+            }
+            // @ts-ignore
+            if (typeof Buffer !== 'undefined' && Buffer.isBuffer(resp.body)) {
+                const out = new Uint8Array(resp.body);
+                try { responseByteCache.set(resp, out); } catch (_) {}
+                return out;
+            }
+        }
+
+        return new Uint8Array();
+    } catch (e) {
+        throw e;
+    }
+}
+
+// Helper: read response body as text but gracefully handle decoding errors
+async function safeReadText(resp: Response): Promise<string> {
+    try {
+        const u8 = await readAllBytes(resp);
+        try {
+            return new TextDecoder('utf-8', { fatal: false }).decode(u8);
+        } catch (e) {
+            try { return new TextDecoder('iso-8859-1', { fatal: false }).decode(u8); } catch (e2) { return uint8ToBinaryString(u8); }
+        }
+    } catch (e) {
+        console.warn('safeReadText: fallback decode failed', e);
+        try {
+            if (resp && typeof resp.text === 'function') return await resp.text();
+        } catch (_) {}
+        return '';
+    }
+}
+
+// Helper to capture the first N bytes of a response for debugging (base64)
+async function captureFirstBytes(resp: Response, maxBytes = 512): Promise<string> {
+    try {
+        const u8 = await readAllBytes(resp);
+        const slice = u8.subarray(0, Math.min(u8.length, maxBytes));
+        const binary = uint8ToBinaryString(slice);
+        return btoa(binary);
+    } catch (e) {
+        console.warn('captureFirstBytes failed', e);
+        return '';
+    }
+}
 
 export const getFormatFromMimeType = (mimeType: string | undefined): string | undefined => {
     if (!mimeType) return undefined;
@@ -268,14 +406,19 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     return { books, navLinks, pagination };
 }
 
-export const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
+export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVersion: 'auto' | '1' | '2' = 'auto'): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
         // Some providers (notably Palace / palace.io and related hosts) operate
         // primarily for native clients and don't expose CORS consistently. For
         // those hosts we should force requests through our owned proxy so the
         // browser won't be blocked. Detect palace-like hosts and skip the probe.
-        const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
-        const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+    const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
+    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+
+    // Diagnostic: log host classification so we can confirm palace hosts are being
+    // forced through the owned proxy and that the fetchUrl matches expectations.
+    // eslint-disable-next-line no-console
+    console.debug('[mebooks] fetchCatalogContent - hostname:', hostname, 'isPalaceHost:', isPalaceHost, 'forcedVersion:', forcedVersion);
 
         let fetchUrl: string;
         if (isPalaceHost) {
@@ -285,17 +428,35 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
         } else {
             // Try direct fetch first (CORS-capable). maybeProxyForCors will probe the URL
             // and return either the original URL (if direct fetch should work) or a proxied URL.
-            const { maybeProxyForCors } = await import('./utils');
             fetchUrl = await maybeProxyForCors(url);
         }
+        // Choose Accept header based on forcedVersion so servers return the expected format
+        // For Palace-hosted servers we prefer XML/Atom regardless of the forcedVersion
+        // because many palace endpoints respond better to XML-first Accept headers.
+        const acceptHeader = isPalaceHost || forcedVersion === '1'
+            ? 'application/atom+xml;profile=opds-catalog, application/xml, text/xml, application/opds+json;q=0.8, application/json;q=0.6, */*;q=0.4'
+            : 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5';
+
         // FIX: Added specific Accept header to signal preference for OPDS formats.
+        // Diagnostic: log which URL we'll fetch so the browser console shows whether
+        // a proxied URL or the direct URL is used.
+        // eslint-disable-next-line no-console
+        console.debug('[mebooks] fetchCatalogContent - fetchUrl:', fetchUrl, 'accept:', acceptHeader);
         const response = await fetch(fetchUrl, {
             method: 'GET',
             mode: 'cors',
             headers: {
-                'Accept': 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5'
+                'Accept': acceptHeader
             }
         });
+
+        // Diagnostic: log the initial response status and Content-Type as observed
+        // by the browser. This helps identify whether the response the app sees
+        // is JSON, XML, or missing headers.
+        try {
+            // eslint-disable-next-line no-console
+            console.debug('[mebooks] initial response - status:', response.status, 'content-type:', response.headers.get('Content-Type'));
+        } catch (e) { /* ignore logging failures */ }
 
         // If the direct fetch returned a redirect (3xx) or the response lacks CORS
         // headers when we attempted a direct fetch, the browser will block reading
@@ -303,19 +464,19 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
         const isRedirect = response.status >= 300 && response.status < 400;
         const hasCorsHeader = !!response.headers.get('Access-Control-Allow-Origin');
         const usedDirect = fetchUrl === url;
-        if ((isRedirect || (usedDirect && !hasCorsHeader)) && proxiedUrl) {
+    if ((isRedirect || (usedDirect && !hasCorsHeader)) && proxiedUrl) {
             const proxyFetchUrl = proxiedUrl(url);
             const proxiedResp = await fetch(proxyFetchUrl, {
                 method: 'GET',
                 headers: {
-                    'Accept': 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5'
+                    'Accept': acceptHeader
                 }
             });
             // Replace response with proxied response for parsing below
             if (proxiedResp) {
                 // Note: we can't reassign the const `response`, so read proxiedResp into locals used below
                 const contentType = proxiedResp.headers.get('Content-Type') || '';
-                const responseText = await proxiedResp.text();
+                const responseText = await safeReadText(proxiedResp);
 
                 // Detect proxy-level rejections (common when HOST_ALLOWLIST blocks the target)
                 if (proxiedResp.status === 403) {
@@ -334,17 +495,49 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
                     throw new Error('The CORS proxy returned an HTML page instead of the catalog feed. This might indicate the proxy service is down or blocking the request. Please try another catalog or check back later.');
                 }
 
-                if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
-                    const jsonData = JSON.parse(responseText);
-                    return parseOpds2Json(jsonData, baseUrl);
+                        // If caller requested a forced version, prefer that parsing path even if Content-Type
+                        // suggests otherwise. Log the decision for diagnostics.
+                        // eslint-disable-next-line no-console
+                        console.debug('[mebooks] proxied response - forcedVersion:', forcedVersion, 'contentType:', contentType, 'url:', url);
+                        if (forcedVersion === '1' && responseText.trim().startsWith('<')) {
+                                    // eslint-disable-next-line no-console
+                                    console.debug('[mebooks] Forcing OPDS1 (XML) parse for proxied response');
+                                    return parseOpds1Xml(responseText, baseUrl);
+                                }
+
+                        if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+                    try {
+                        const jsonData = JSON.parse(responseText);
+                        return parseOpds2Json(jsonData, baseUrl);
+                    } catch (e) {
+                        // Some Palace endpoints return Atom XML but incorrectly set Content-Type
+                        // to application/json; if the body looks like XML, try parsing as XML.
+                        if (responseText && responseText.trim().startsWith('<')) {
+                            try {
+                                // eslint-disable-next-line no-console
+                                console.debug('[mebooks] proxied response body appears to be XML despite JSON Content-Type; attempting XML parse');
+                                return parseOpds1Xml(responseText, baseUrl);
+                            } catch (xmlErr) {
+                                // fall through to diagnostics below
+                            }
+                        }
+                        const b64 = await captureFirstBytes(proxiedResp).catch(() => '');
+                        // eslint-disable-next-line no-console
+                        console.warn('[mebooks] Failed to JSON.parse proxied response; first bytes (base64):', b64);
+                        throw new Error(`Failed to parse proxied JSON response for ${url}. First bytes (base64): ${b64}`);
+                    }
                 } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
                     return parseOpds1Xml(responseText, baseUrl);
                 } else {
-                    if (responseText.trim().startsWith('{')) {
+                    if (forcedVersion !== '1' && responseText.trim().startsWith('{')) {
                         try {
                             const jsonData = JSON.parse(responseText);
                             return parseOpds2Json(jsonData, baseUrl);
-                        } catch (e) { /* Fall through to XML parsing */ }
+                        } catch (e) {
+                            const b64 = await captureFirstBytes(proxiedResp).catch(() => '');
+                            console.warn('Failed to auto-parse proxied JSON; first bytes (base64):', b64);
+                            throw new Error(`Failed to parse proxied JSON response for ${url}. First bytes (base64): ${b64}`);
+                        }
                     }
                     if (responseText.trim().startsWith('<')) {
                          return parseOpds1Xml(responseText, baseUrl);
@@ -366,8 +559,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
             throw new Error(errorMessage);
         }
         
-        const contentType = response.headers.get('Content-Type') || '';
-        const responseText = await response.text();
+    const contentType = response.headers.get('Content-Type') || '';
+    const responseText = await safeReadText(response);
 
         // If the proxy returned a JSON 403 error body, surface a clearer message
         if (response.status === 403 && contentType.includes('application/json')) {
@@ -386,14 +579,31 @@ export const fetchCatalogContent = async (url: string, baseUrl: string): Promise
              throw new Error('The CORS proxy returned an HTML page instead of the catalog feed. This might indicate the proxy service is down or blocking the request. Please try another catalog or check back later.');
         }
 
-        if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
-            const jsonData = JSON.parse(responseText);
-            return parseOpds2Json(jsonData, baseUrl);
+        // Respect forcedVersion preference for responses read from the direct fetch path.
+        // Diagnostic: log forcedVersion and content type for the direct response path
+        // eslint-disable-next-line no-console
+        console.debug('[mebooks] direct response - forcedVersion:', forcedVersion, 'contentType:', contentType, 'url:', url);
+        if (forcedVersion === '1' && responseText.trim().startsWith('<')) {
+            // eslint-disable-next-line no-console
+            console.debug('[mebooks] Forcing OPDS1 (XML) parse for direct response');
+            return parseOpds1Xml(responseText, baseUrl);
+        }
+
+    if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+            try {
+                const jsonData = JSON.parse(responseText);
+                return parseOpds2Json(jsonData, baseUrl);
+            } catch (e) {
+                const b64 = await captureFirstBytes(response).catch(() => '');
+                // eslint-disable-next-line no-console
+                console.warn('[mebooks] Failed to JSON.parse response; first bytes (base64):', b64);
+                throw new Error(`Failed to parse JSON response for ${url}. First bytes (base64): ${b64}`);
+            }
         } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
             return parseOpds1Xml(responseText, baseUrl);
         } else {
             // Attempt to auto-detect format if Content-Type is vague (e.g., text/plain)
-            if (responseText.trim().startsWith('{')) {
+            if (forcedVersion !== '1' && responseText.trim().startsWith('{')) {
                 try {
                     const jsonData = JSON.parse(responseText);
                     return parseOpds2Json(jsonData, baseUrl);
