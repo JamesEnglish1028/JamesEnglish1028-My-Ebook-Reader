@@ -62,10 +62,19 @@ function stripHopByHop(headers) {
 }
 
 app.options('/proxy', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
+  // Respect the requesting Origin when present so callers that send credentials
+  // can be allowed. Fall back to configured ALLOW_ORIGIN or wildcard.
+  const allowOrigin = req.headers.origin || process.env.ALLOW_ORIGIN || '*';
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,HEAD,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  // Allow headers requested by the browser's preflight, falling back to a
+  // sensible default that includes Accept and common auth headers.
+  const requested = req.headers['access-control-request-headers'];
+  const allowHeaders = requested || 'Accept,Content-Type,Authorization,x-proxy-key';
+  res.setHeader('Access-Control-Allow-Headers', allowHeaders);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Expose useful headers to the client
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type,Content-Length,ETag');
   res.sendStatus(204);
 });
 
@@ -76,9 +85,17 @@ app.get('/_health', (req, res) => {
 
 app.all('/proxy', async (req, res) => {
   try {
-    // Ensure CORS headers are always present for browser clients
-    res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Ensure CORS headers are always present for browser clients. Mirror the
+  // incoming Origin when available so requests with credentials succeed.
+  const allowOrigin = req.headers.origin || process.env.ALLOW_ORIGIN || '*';
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type,Content-Length,ETag');
+    // Explicitly tell browsers not to attempt a content-encoding decode of
+    // the proxied stream. Some intermediaries may alter encoding headers
+    // or node-fetch may decompress; setting identity avoids double-decode
+    // errors in the browser (NS_ERROR_INVALID_CONTENT_ENCODING).
+    try { res.setHeader('Content-Encoding', 'identity'); } catch (e) { /* ignore */ }
 
     const target = req.query.url;
     if (!target) return res.status(400).json({ error: 'Missing url parameter' });
@@ -153,6 +170,8 @@ app.all('/proxy', async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Content-Type', 'application/octet-stream');
+        // Ensure browsers don't try to decode this stream
+        res.setHeader('Content-Encoding', 'identity');
         res.status(200);
         const c = spawn('curl', ['-sS', '-L', targetUrl.toString()]);
         let killed = false;
@@ -182,11 +201,16 @@ app.all('/proxy', async (req, res) => {
       }
       throw fetchErr;
     }
-    // Copy safe headers from upstream, excluding hop-by-hop
+    // Copy safe headers from upstream, excluding hop-by-hop and encoding/length
+    // Note: node-fetch may decompress upstream responses; if we forward a
+    // decompressed stream but keep Content-Encoding the browser will try to
+    // decode the body again and fail with NS_ERROR_INVALID_CONTENT_ENCODING.
+    // Avoid forwarding content-encoding/content-length so the browser treats
+    // the stream as-is.
     upstream.headers.forEach((value, key) => {
-      if (!['transfer-encoding','connection'].includes(key.toLowerCase())) {
-        try { res.setHeader(key, value); } catch (e) { /* ignore header set errors */ }
-      }
+      const k = key.toLowerCase();
+      if (['transfer-encoding','connection','content-encoding','content-length'].includes(k)) return;
+      try { res.setHeader(key, value); } catch (e) { /* ignore header set errors */ }
     });
 
     // Ensure CORS headers remain present after copying upstream headers
