@@ -589,7 +589,18 @@ const Library: React.FC<LibraryProps> = ({
                                 <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group relative">
                                     <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
                                         {book.coverImage ? (
-                                        <img src={proxiedUrl(book.coverImage)} alt={book.title} className="w-full h-full object-cover" loading="lazy" />
+                                        <img
+                                            src={book.coverImage}
+                                            alt={book.title}
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                            onError={(e) => {
+                                              const img = e.currentTarget as HTMLImageElement;
+                                              // Prevent infinite retry loop by clearing handler first
+                                              img.onerror = null as any;
+                                              img.src = proxiedUrl(book.coverImage as string);
+                                            }}
+                                        />
                                         ) : (
                                         <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
                                             <span className="font-semibold">{book.title}</span>

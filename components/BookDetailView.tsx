@@ -70,7 +70,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
   const description = 'description' in book ? book.description : catalogBook?.summary;
   const isLongDescription = description && description.length > 400;
-  const coverImage = book.coverImage ? ('id' in book ? book.coverImage : proxiedUrl(book.coverImage)) : null;
+  // Use direct cover image URL in the browser first; fall back to proxy on error.
+  const coverImage = book.coverImage ? book.coverImage : null;
   const providerId = (book as any).providerId || (book as any).isbn;
   const providerName = (book as BookMetadata).providerName;
   const format = ('format' in book && book.format) || (isLibraryBook(book) ? 'EPUB' : undefined);
@@ -165,7 +166,18 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         {/* Left Column: Cover & Actions */}
         <aside ref={containerRef} className="md:col-span-4 lg:col-span-3">
             {coverImage ? (
-                <img src={coverImage} alt={book.title} className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]" />
+                <img
+                    src={coverImage}
+                    alt={book.title}
+                    className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.onerror = null as any;
+                      if (typeof book.coverImage === 'string') {
+                        img.src = proxiedUrl(book.coverImage);
+                      }
+                    }}
+                />
             ) : (
                 <div className="w-full flex items-center justify-center p-4 text-center text-slate-400 bg-slate-800 rounded-lg aspect-[2/3] shadow-2xl">
                     <span className="font-semibold">{book.title}</span>
