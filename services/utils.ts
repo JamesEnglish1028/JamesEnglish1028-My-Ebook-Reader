@@ -153,6 +153,17 @@ export const proxiedUrl = (url: string): string => {
  *   helper attempts a lightweight probe so we can choose the proxy only when necessary.
  */
 export const maybeProxyForCors = async (url: string): Promise<string> => {
+  // If developer explicitly requests forcing the owned proxy, respect it immediately.
+  if (FORCE_PROXY) {
+    try {
+      // Validate URL before proxying
+      new URL(url);
+      return proxiedUrl(url);
+    } catch (e) {
+      console.error('Invalid URL for maybeProxyForCors when forcing proxy:', url);
+      return '';
+    }
+  }
   try {
     // Validate URL first
     new URL(url);
