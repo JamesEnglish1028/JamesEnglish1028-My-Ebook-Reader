@@ -118,7 +118,10 @@ app.all('/proxy', async (req, res) => {
       method: req.method,
       headers: stripHopByHop(req.headers),
       body: ['GET','HEAD','OPTIONS'].includes(req.method) ? undefined : req.body,
-      redirect: 'manual',
+      // Follow redirects for safe idempotent requests so the client receives
+      // the final resource rather than an intermediate 3xx that the browser
+      // would then try to follow (and potentially be blocked by CORS).
+      redirect: (['GET','HEAD'].includes(req.method) ? 'follow' : 'manual'),
     };
     // If upstream is HTTPS, provide an agent that enforces TLS 1.2+ to avoid
     // handshake failures with older/strict CDNs/load-balancers.
