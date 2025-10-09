@@ -40,3 +40,14 @@ services:
     healthCheckPath: /_health
     # (Debug buildCommand removed now that build succeeds)
     startCommand: ''
+
+- type: static
+  name: mebooks-web
+  repo: https://github.com/JamesEnglish1028/JamesEnglish1028-My-Ebook-Reader
+  branch: main
+  buildCommand: npm ci && npm run build
+  publishPath: dist
+  plan: free
+  envVars:
+    - key: VITE_OWN_PROXY_URL
+      value: https://jamesenglish1028-my-ebook-reader.onrender.com
