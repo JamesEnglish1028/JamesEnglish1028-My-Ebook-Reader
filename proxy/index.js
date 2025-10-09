@@ -85,7 +85,30 @@ app.all('/proxy', async (req, res) => {
       fetchOpts.agent = new https.Agent({ keepAlive: true, minVersion: 'TLSv1.2', ciphers: PREFERRED_CIPHERS, honorCipherOrder: true });
     }
 
-    const upstream = await fetch(targetUrl.toString(), fetchOpts);
+    let upstream;
+    try {
+      upstream = await fetch(targetUrl.toString(), fetchOpts);
+    } catch (fetchErr) {
+      console.error('fetch failed, attempting curl fallback', fetchErr && fetchErr.code ? { code: fetchErr.code } : fetchErr);
+      // For TLS handshake errors (EPROTO) or other fetch failures, try using system curl as a fallback
+      if (fetchErr && (fetchErr.code === 'EPROTO' || fetchErr.code === 'ERR_SSL_PROTOCOL_ERROR' || fetchErr.code === 'ECONNRESET')) {
+        const { spawn } = require('child_process');
+        console.log('Spawning curl fallback for', targetUrl.toString());
+        // Set response headers early
+        res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.status(200);
+        const c = spawn('curl', ['-sS', '-L', targetUrl.toString()]);
+        c.stdout.pipe(res);
+        c.stderr.on('data', (d) => console.error('curl stderr:', d.toString().slice(0,2000)));
+        c.on('close', (code) => {
+          if (code !== 0) console.error('curl exited with code', code);
+        });
+        return;
+      }
+      throw fetchErr;
+    }
     // Copy safe headers from upstream, excluding hop-by-hop
     upstream.headers.forEach((value, key) => {
       if (!['transfer-encoding','connection'].includes(key.toLowerCase())) {
