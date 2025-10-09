@@ -162,12 +162,30 @@ export const maybeProxyForCors = async (url: string): Promise<string> => {
   }
 
   try {
-    // Try a lightweight HEAD probe to check CORS allowance. If the server responds OK,
-    // we can attempt the full request directly. If it errors (TypeError due to CORS),
-    // we'll fall back to the proxy.
-    const resp = await fetch(url, { method: 'HEAD', mode: 'cors' });
-    if (resp && resp.ok) return url;
-    // If server doesn't support HEAD (405) or returns an error, prefer the proxy.
+    // Try a lightweight HEAD probe to check CORS allowance. If the server responds
+    // with an OK (2xx) and the Access-Control-Allow-Origin header permits our origin,
+    // we can attempt the full request directly. Treat redirects (3xx) or non-matching
+    // CORS headers as reasons to use the proxy.
+    const resp = await fetch(url, { method: 'HEAD', mode: 'cors', redirect: 'manual' });
+    if (!resp) return proxiedUrl(url);
+
+    // If the server returned a redirect, don't attempt to fetch directly — use proxy.
+    if (resp.status >= 300 && resp.status < 400) return proxiedUrl(url);
+
+    // If server returned a success status, check CORS header.
+    if (resp.status >= 200 && resp.status < 300) {
+      const allow = resp.headers.get('access-control-allow-origin');
+      try {
+        const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
+        if (allow === '*' || (allow && origin && allow === origin)) {
+          return url;
+        }
+      } catch (e) {
+        // If we can't determine window origin, be conservative and use the proxy
+      }
+    }
+
+    // Fallback to proxy for any other status (including 4xx/5xx or missing CORS header)
     return proxiedUrl(url);
   } catch (e) {
     // Likely a network or CORS error — use the proxy.
