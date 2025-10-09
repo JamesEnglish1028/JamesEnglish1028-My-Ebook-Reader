@@ -9,13 +9,9 @@ services:
   plan: free
   region: ohio
   healthCheckPath: /_health
-  dockerContext: proxy
+  dockerContext: .
   dockerfilePath: proxy/Dockerfile
   autoDeployTrigger: commit
-  buildFilter:
-    paths:
-    - proxy/**
-    - proxy/Dockerfile
   envVars:
     - key: HOST_ALLOWLIST
       value: opds.example,cdn.example
