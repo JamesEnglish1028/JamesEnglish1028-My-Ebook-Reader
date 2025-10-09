@@ -23,10 +23,11 @@ app.use(rateLimit({ windowMs: 60_000, max: 60 }));
 
 const rawHosts = process.env.HOST_ALLOWLIST || 'opds.example,cdn.example';
 const hostList = rawHosts.split(',').map(s => s.trim()).filter(Boolean);
-const ALLOW_ALL_HOSTS = hostList.includes('*') || hostList.length === 0;
+const envAllowAll = process.env.DEBUG_ALLOW_ALL === '1' || process.env.FORCE_ALLOW_ALL === '1';
+const ALLOW_ALL_HOSTS = envAllowAll || hostList.includes('*') || hostList.length === 0;
 const HOST_ALLOWLIST = new Set(hostList);
 
-console.log('proxy: HOST_ALLOWLIST=', hostList, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS);
+console.log('proxy: HOST_ALLOWLIST=', hostList, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS, 'DEBUG_ALLOW_ALL=', envAllowAll, 'timestamp=', new Date().toISOString());
 
 function stripHopByHop(headers) {
   const hop = ['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade'];
