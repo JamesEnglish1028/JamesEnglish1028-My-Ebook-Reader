@@ -114,9 +114,20 @@ app.all('/proxy', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Build headers to send upstream, normally stripping Host/Origin/Referer
+    // to avoid confusing upstream routing. However, some providers (notably
+    // Palace) expect an Origin header and will return OPDS content only when
+    // an appropriate Origin is present. Preserve the incoming Origin for
+    // palace hosts to improve compatibility.
+    const upstreamHeaders = stripHopByHop(req.headers);
+    const targetHost = targetUrl.hostname || '';
+    if ((targetHost.includes('palace') || targetHost.includes('palaceproject.io')) && req.headers && req.headers.origin) {
+      upstreamHeaders['origin'] = req.headers.origin;
+    }
+
     const fetchOpts = {
       method: req.method,
-      headers: stripHopByHop(req.headers),
+      headers: upstreamHeaders,
       body: ['GET','HEAD','OPTIONS'].includes(req.method) ? undefined : req.body,
       // Follow redirects for safe idempotent requests so the client receives
       // the final resource rather than an intermediate 3xx that the browser
