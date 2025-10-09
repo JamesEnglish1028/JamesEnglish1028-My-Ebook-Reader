@@ -171,7 +171,7 @@ export const maybeProxyForCors = async (url: string): Promise<string> => {
 
     // If the server returned a redirect, don't attempt to fetch directly — use proxy.
     if (resp.status >= 300 && resp.status < 400) {
-      console.debug('[maybeProxyForCors] HEAD probe redirect', { url, status: resp.status });
+      console.log('[maybeProxyForCors] HEAD probe redirect', { url, status: resp.status });
       return proxiedUrl(url);
     }
 
@@ -180,14 +180,14 @@ export const maybeProxyForCors = async (url: string): Promise<string> => {
       const allow = resp.headers.get('access-control-allow-origin');
       try {
         const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
-        console.debug('[maybeProxyForCors] HEAD probe', { url, status: resp.status, allow, origin });
+        console.log('[maybeProxyForCors] HEAD probe', { url, status: resp.status, allow, origin });
         if (allow === '*' || (allow && origin && allow === origin)) {
-          console.debug('[maybeProxyForCors] using direct URL', { url });
+          console.log('[maybeProxyForCors] using direct URL', { url });
           return url;
         }
       } catch (e) {
         // If we can't determine window origin, be conservative and use the proxy
-        console.debug('[maybeProxyForCors] error determining origin, falling back to proxy', { url, err: e });
+  console.log('[maybeProxyForCors] error determining origin, falling back to proxy', { url, err: e });
       }
     }
 
