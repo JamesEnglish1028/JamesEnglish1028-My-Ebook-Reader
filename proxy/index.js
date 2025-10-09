@@ -21,7 +21,12 @@ app.use(bodyParser.raw({ type: '*/*', limit: '200mb' }));
 // Basic rate limit
 app.use(rateLimit({ windowMs: 60_000, max: 60 }));
 
-const HOST_ALLOWLIST = new Set((process.env.HOST_ALLOWLIST || 'opds.example,cdn.example').split(','));
+const rawHosts = process.env.HOST_ALLOWLIST || 'opds.example,cdn.example';
+const hostList = rawHosts.split(',').map(s => s.trim()).filter(Boolean);
+const ALLOW_ALL_HOSTS = hostList.includes('*') || hostList.length === 0;
+const HOST_ALLOWLIST = new Set(hostList);
+
+console.log('proxy: HOST_ALLOWLIST=', hostList, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS);
 
 function stripHopByHop(headers) {
   const hop = ['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade'];
@@ -53,7 +58,7 @@ app.all('/proxy', async (req, res) => {
     let targetUrl;
     try { targetUrl = new URL(target); } catch (err) { return res.status(400).json({ error: 'Invalid URL' }); }
 
-    if (!HOST_ALLOWLIST.has(targetUrl.hostname)) return res.status(403).json({ error: 'Host not allowed' });
+  if (!ALLOW_ALL_HOSTS && !HOST_ALLOWLIST.has(targetUrl.hostname)) return res.status(403).json({ error: 'Host not allowed' });
 
     // Optional API key enforcement
     if (process.env.PROXY_KEY && req.header('x-proxy-key') !== process.env.PROXY_KEY) {
