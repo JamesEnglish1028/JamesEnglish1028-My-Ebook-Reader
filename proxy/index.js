@@ -28,9 +28,27 @@ const rawHosts = process.env.HOST_ALLOWLIST || 'opds.example,cdn.example';
 const hostList = rawHosts.split(',').map(s => s.trim()).filter(Boolean);
 const envAllowAll = process.env.DEBUG_ALLOW_ALL === '1' || process.env.FORCE_ALLOW_ALL === '1';
 const ALLOW_ALL_HOSTS = envAllowAll || hostList.includes('*') || hostList.length === 0;
-const HOST_ALLOWLIST = new Set(hostList);
 
-console.log('proxy: HOST_ALLOWLIST=', hostList, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS, 'DEBUG_ALLOW_ALL=', envAllowAll);
+// Normalize allowlist entries and build helper structures for matching
+// - exactMatches: Set of exact hostnames
+// - suffixMatches: array of suffix strings that should match via endsWith
+const exactMatches = new Set();
+const suffixMatches = [];
+for (const entry of hostList) {
+  if (!entry) continue;
+  // allow entries like '*.example.com' or '.example.com' to mean suffix matching
+  if (entry.startsWith('*.')) {
+    suffixMatches.push(entry.slice(1)); // keep the leading '.' for endsWith checks
+  } else if (entry.startsWith('.')) {
+    suffixMatches.push(entry);
+  } else {
+    exactMatches.add(entry);
+  }
+}
+
+const HOST_ALLOWLIST = exactMatches;
+
+console.log('proxy: exactHosts=', Array.from(exactMatches), 'suffixHosts=', suffixMatches, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS, 'DEBUG_ALLOW_ALL=', envAllowAll);
 
 function stripHopByHop(headers) {
   const hop = ['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade'];
@@ -66,7 +84,21 @@ app.all('/proxy', async (req, res) => {
     let targetUrl;
     try { targetUrl = new URL(target); } catch (err) { return res.status(400).json({ error: 'Invalid URL' }); }
 
-  if (!ALLOW_ALL_HOSTS && !HOST_ALLOWLIST.has(targetUrl.hostname)) return res.status(403).json({ error: 'Host not allowed' });
+  if (!ALLOW_ALL_HOSTS) {
+    const hostname = targetUrl.hostname;
+    let allowed = false;
+    if (HOST_ALLOWLIST.has(hostname)) allowed = true;
+    // Check suffix-style entries (e.g., '.cloudfront.net' or '*.example.com')
+    if (!allowed) {
+      for (const suf of suffixMatches) {
+        if (hostname.endsWith(suf)) {
+          allowed = true;
+          break;
+        }
+      }
+    }
+    if (!allowed) return res.status(403).json({ error: 'Host not allowed' });
+  }
 
     // Optional API key enforcement
     if (process.env.PROXY_KEY && req.header('x-proxy-key') !== process.env.PROXY_KEY) {
