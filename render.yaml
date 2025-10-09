@@ -31,7 +31,7 @@ services:
     plan: free
     envVars:
       - key: HOST_ALLOWLIST
-        value: opds.example,cdn.example
+        value: opds.example,cdn.example,minotaur.dev.palaceproject.io
       - key: ALLOW_ORIGIN
         value: https://jamesenglish1028-my-ebook-reader.onrender.com
       # Do NOT include PROXY_KEY here; add it in Render dashboard as a secret for production
