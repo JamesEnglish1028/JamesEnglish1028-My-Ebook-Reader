@@ -87,7 +87,14 @@ app.all('/proxy', async (req, res) => {
   if (!ALLOW_ALL_HOSTS) {
     const hostname = targetUrl.hostname;
     let allowed = false;
+    // Exact match or allow subdomains when allowlist contains a base domain
     if (HOST_ALLOWLIST.has(hostname)) allowed = true;
+    if (!allowed) {
+      for (const entry of Array.from(HOST_ALLOWLIST)) {
+        if (hostname === entry) { allowed = true; break; }
+        if (hostname.endsWith('.' + entry)) { allowed = true; break; }
+      }
+    }
     // Check suffix-style entries (e.g., '.cloudfront.net' or '*.example.com')
     if (!allowed) {
       for (const suf of suffixMatches) {
@@ -123,7 +130,7 @@ app.all('/proxy', async (req, res) => {
     } catch (fetchErr) {
       console.error('fetch failed, attempting curl fallback', fetchErr && fetchErr.code ? { code: fetchErr.code } : fetchErr);
       // For TLS handshake errors (EPROTO) or other fetch failures, try using system curl as a fallback
-      if (fetchErr && (fetchErr.code === 'EPROTO' || fetchErr.code === 'ERR_SSL_PROTOCOL_ERROR' || fetchErr.code === 'ECONNRESET')) {
+  if (fetchErr && (fetchErr.code === 'EPROTO' || fetchErr.code === 'ERR_SSL_PROTOCOL_ERROR' || fetchErr.code === 'ECONNRESET' || fetchErr.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE')) {
         const { spawn } = require('child_process');
         console.log('Spawning curl fallback for', targetUrl.toString());
         // Set response headers early
