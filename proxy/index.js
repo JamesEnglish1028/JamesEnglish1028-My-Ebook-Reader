@@ -10,6 +10,8 @@ Security notes:
 const express = require('express');
 const fetch = require('node-fetch');
 const https = require('https');
+// Preferred ciphers to maximize compatibility with various CDNs/load-balancers
+const PREFERRED_CIPHERS = 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:HIGH:!aNULL:!eNULL:!MD5:!3DES';
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
@@ -80,7 +82,7 @@ app.all('/proxy', async (req, res) => {
     // If upstream is HTTPS, provide an agent that enforces TLS 1.2+ to avoid
     // handshake failures with older/strict CDNs/load-balancers.
     if (targetUrl.protocol === 'https:') {
-      fetchOpts.agent = new https.Agent({ keepAlive: true, minVersion: 'TLSv1.2' });
+      fetchOpts.agent = new https.Agent({ keepAlive: true, minVersion: 'TLSv1.2', ciphers: PREFERRED_CIPHERS, honorCipherOrder: true });
     }
 
     const upstream = await fetch(targetUrl.toString(), fetchOpts);
