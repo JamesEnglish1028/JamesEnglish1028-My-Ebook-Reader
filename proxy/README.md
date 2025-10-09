@@ -45,3 +45,25 @@ Security notes
 - Use `PROXY_KEY` or other auth in production.
 - Rate-limit and monitor usage.
 - Prefer deploying to Cloud Run / container platform for reliable streaming of large files.
+
+## Deploying to Render
+
+If you deploy this proxy to Render (https://render.com), here are the minimal settings that worked in this repository:
+
+- Service type: Web Service (Docker)
+- Dockerfile path: `proxy/Dockerfile`
+- Docker context: `.` (repo root)
+- Branch: `main`
+- Port: The `proxy` listens on the port from the `PORT` env var; Render will detect the running port from the container logs.
+- Health check path: `/ _health` (configure in Render so it can health-check the service)
+
+Environment variables to set in the Render dashboard (or as envVars in `render.yaml`):
+
+- `HOST_ALLOWLIST` - comma-separated allowed upstream hosts
+- `ALLOW_ORIGIN` - your app origin (e.g. `https://yourapp.example`)
+- `PROXY_KEY` - optional secret API key (add via Render's Secrets for security)
+
+Notes:
+
+- Use `dockerContext: .` and `dockerfilePath: proxy/Dockerfile` so Render's build has the `proxy/` folder in context. Don't rely on `npm ci` without a `package-lock.json` — the Dockerfile currently runs `npm install --production` to avoid that requirement.
+- After a successful deploy, set `VITE_OWN_PROXY_URL` in your client app to point to `https://<your-service>.onrender.com` so the client can prefer the owned proxy.
