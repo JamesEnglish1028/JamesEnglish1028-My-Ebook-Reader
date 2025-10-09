@@ -1,3 +1,39 @@
+# Exported Render blueprint for MeBooks proxy
+version: "1"
+services:
+- type: web
+  name: JamesEnglish1028-My-Ebook-Reader
+  runtime: docker
+  repo: https://github.com/JamesEnglish1028/JamesEnglish1028-My-Ebook-Reader
+  branch: main
+  plan: free
+  region: ohio
+  healthCheckPath: /_health
+  dockerContext: proxy
+  dockerfilePath: proxy/Dockerfile
+  autoDeployTrigger: commit
+  buildFilter:
+    paths:
+    - proxy/**
+    - proxy/Dockerfile
+  envVars:
+    - key: HOST_ALLOWLIST
+      value: opds.example,cdn.example
+    - key: ALLOW_ORIGIN
+      value: https://jamesenglish1028-my-ebook-reader.onrender.com
+  # Debug build command to aid in diagnosing build issues (safe to keep briefly)
+  buildCommand: |
+    echo "=== build debug start ==="
+    pwd || true
+    echo "--- repo root listing ---"
+    ls -la || true
+    echo "--- /opt/render/project/src listing ---"
+    ls -la /opt/render/project/src || true
+    echo "--- proxy listing ---"
+    ls -la proxy || true
+    echo "--- head proxy/Dockerfile ---"
+    head -n 50 proxy/Dockerfile || true
+    echo "=== build debug end ==="
 # Render service definition for MeBooks proxy (moved to repo root so Render will detect it)
 services:
   - type: web
