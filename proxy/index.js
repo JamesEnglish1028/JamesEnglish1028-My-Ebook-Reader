@@ -27,7 +27,7 @@ const envAllowAll = process.env.DEBUG_ALLOW_ALL === '1' || process.env.FORCE_ALL
 const ALLOW_ALL_HOSTS = envAllowAll || hostList.includes('*') || hostList.length === 0;
 const HOST_ALLOWLIST = new Set(hostList);
 
-console.log('proxy: HOST_ALLOWLIST=', hostList, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS, 'DEBUG_ALLOW_ALL=', envAllowAll, 'timestamp=', new Date().toISOString());
+console.log('proxy: HOST_ALLOWLIST=', hostList, 'ALLOW_ALL_HOSTS=', ALLOW_ALL_HOSTS, 'DEBUG_ALLOW_ALL=', envAllowAll);
 
 function stripHopByHop(headers) {
   const hop = ['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailers','transfer-encoding','upgrade'];
@@ -53,6 +53,10 @@ app.get('/_health', (req, res) => {
 
 app.all('/proxy', async (req, res) => {
   try {
+    // Ensure CORS headers are always present for browser clients
+    res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+
     const target = req.query.url;
     if (!target) return res.status(400).json({ error: 'Missing url parameter' });
 
@@ -81,6 +85,7 @@ app.all('/proxy', async (req, res) => {
       }
     });
 
+    // Ensure CORS headers remain present after copying upstream headers
     res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
 
@@ -93,6 +98,11 @@ app.all('/proxy', async (req, res) => {
     }
   } catch (err) {
     console.error('proxy error', err);
+    // Ensure CORS headers are present on error responses so browser clients see them
+    try {
+      res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } catch (e) { /* ignore header set failures */ }
     res.status(500).json({ error: 'Proxy error' });
   }
 });
