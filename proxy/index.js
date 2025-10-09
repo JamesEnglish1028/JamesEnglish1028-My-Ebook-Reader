@@ -9,6 +9,7 @@ Security notes:
 
 const express = require('express');
 const fetch = require('node-fetch');
+const https = require('https');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
@@ -76,6 +77,11 @@ app.all('/proxy', async (req, res) => {
       body: ['GET','HEAD','OPTIONS'].includes(req.method) ? undefined : req.body,
       redirect: 'manual',
     };
+    // If upstream is HTTPS, provide an agent that enforces TLS 1.2+ to avoid
+    // handshake failures with older/strict CDNs/load-balancers.
+    if (targetUrl.protocol === 'https:') {
+      fetchOpts.agent = new https.Agent({ keepAlive: true, minVersion: 'TLSv1.2' });
+    }
 
     const upstream = await fetch(targetUrl.toString(), fetchOpts);
     // Copy safe headers from upstream, excluding hop-by-hop
