@@ -1,11 +1,14 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
-import { proxiedUrl } from './utils';
+import { proxiedUrl, maybeProxyForCors } from './utils';
 
-export const getFormatFromMimeType = (mimeType: string): string | undefined => {
-    if (!mimeType) return 'EPUB'; // Default to EPUB if type is missing for an acquisition link
-    if (mimeType.includes('epub+zip')) return 'EPUB';
-    if (mimeType.includes('pdf')) return 'PDF';
-    return mimeType.split('/')[1]?.toUpperCase() || undefined;
+export const getFormatFromMimeType = (mimeType: string | undefined): string | undefined => {
+    if (!mimeType) return undefined;
+    // Remove any parameters following a semicolon (e.g. "application/atom+xml;type=entry;profile=opds-catalog")
+    const clean = mimeType.split(';')[0].trim().toLowerCase();
+    if (clean.includes('epub') || clean === 'application/epub+zip') return 'EPUB';
+    if (clean.includes('pdf') || clean === 'application/pdf') return 'PDF';
+    // For ambiguous/non-media types (atom, opds catalog entries, etc.) return undefined so UI doesn't show raw mime strings
+    return undefined;
 };
 
 export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
@@ -52,7 +55,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
           return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
       }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
 
-      const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
+    const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
 
       if (acquisitionLink) {
           const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
@@ -62,9 +65,36 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
           const coverImageHref = coverLink?.getAttribute('href');
           const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
           
-          const downloadUrlHref = acquisitionLink?.getAttribute('href');
-          const mimeType = acquisitionLink?.getAttribute('type') || '';
-          const format = getFormatFromMimeType(mimeType);
+                    const downloadUrlHref = acquisitionLink?.getAttribute('href');
+
+                    // Try to determine media type: prefer the link's type attribute; if that
+                    // is not a media type, inspect nested opds:indirectAcquisition elements
+                    // (some OPDS feeds place the real media type there).
+                    const mimeType = acquisitionLink?.getAttribute('type') || '';
+                    let format = getFormatFromMimeType(mimeType);
+
+                    if (!format) {
+                        // Recursively search for child elements named 'indirectAcquisition' to find a type
+                        const findIndirectType = (el: Element | null): string | undefined => {
+                            if (!el) return undefined;
+                            for (const child of Array.from(el.children)) {
+                                const local = (child.localName || child.nodeName || '').toLowerCase();
+                                if (local === 'indirectacquisition') {
+                                    const t = child.getAttribute('type');
+                                    if (t) return t;
+                                    const nested = findIndirectType(child);
+                                    if (nested) return nested;
+                                } else {
+                                    const nested = findIndirectType(child);
+                                    if (nested) return nested;
+                                }
+                            }
+                            return undefined;
+                        };
+
+                        const indirect = findIndirectType(acquisitionLink as Element);
+                        if (indirect) format = getFormatFromMimeType(indirect);
+                    }
           
           const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
           const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
@@ -240,9 +270,13 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 
 export const fetchCatalogContent = async (url: string, baseUrl: string): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
-        const proxyUrl = proxiedUrl(url);
+        // Try direct fetch first (CORS-capable). maybeProxyForCors will probe the URL
+        // and return either the original URL (if direct fetch should work) or a proxied URL.
+        const fetchUrl = await maybeProxyForCors(url);
         // FIX: Added specific Accept header to signal preference for OPDS formats.
-        const response = await fetch(proxyUrl, {
+        const response = await fetch(fetchUrl, {
+            method: 'GET',
+            mode: 'cors',
             headers: {
                 'Accept': 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5'
             }
