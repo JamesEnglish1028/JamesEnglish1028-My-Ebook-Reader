@@ -78,10 +78,10 @@ app.all('/proxy', async (req, res) => {
     };
 
     const upstream = await fetch(targetUrl.toString(), fetchOpts);
-
+    // Copy safe headers from upstream, excluding hop-by-hop
     upstream.headers.forEach((value, key) => {
       if (!['transfer-encoding','connection'].includes(key.toLowerCase())) {
-        res.setHeader(key, value);
+        try { res.setHeader(key, value); } catch (e) { /* ignore header set errors */ }
       }
     });
 
@@ -89,9 +89,42 @@ app.all('/proxy', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
 
+    // If upstream returned an error status, attempt to read the body and log it
+    if (upstream.status >= 400) {
+      let bodyText = null;
+      try {
+        bodyText = await upstream.text();
+      } catch (e) {
+        console.error('Failed to read upstream error body', e);
+      }
+      console.error('Upstream returned error', { url: targetUrl.toString(), status: upstream.status, headers: Object.fromEntries(upstream.headers.entries()), bodySnippet: bodyText ? bodyText.slice(0, 2000) : null });
+      // Forward the upstream status and body (if any) to the client
+      try {
+        res.status(upstream.status);
+        if (bodyText) return res.send(bodyText);
+        return res.json({ error: 'Upstream error', status: upstream.status });
+      } catch (e) {
+        console.error('Failed sending upstream error to client', e);
+        return res.status(502).json({ error: 'Proxy error' });
+      }
+    }
+
+    // Normal successful downstream: stream the body to the client with error handlers
     res.status(upstream.status);
     if (upstream.body) {
-      upstream.body.pipe(res);
+      upstream.body.on('error', (err) => {
+        console.error('Error while reading upstream body stream', err);
+        try { res.status(502).json({ error: 'Proxy streaming error' }); } catch (e) { /* ignore */ }
+      });
+      res.on('error', (err) => {
+        console.error('Error while writing response to client', err);
+      });
+      try {
+        upstream.body.pipe(res);
+      } catch (e) {
+        console.error('Pipe failed', e);
+        try { res.status(502).json({ error: 'Proxy pipe failed' }); } catch (e) { /* ignore */ }
+      }
     } else {
       const txt = await upstream.text();
       res.send(txt);
