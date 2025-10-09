@@ -86,6 +86,8 @@ export interface Catalog {
   id:string;
   name: string;
   url: string;
+  // 'auto' means let the client probe/guess; '1' forces OPDS 1 (Atom/XML); '2' forces OPDS 2 (JSON)
+  opdsVersion?: 'auto' | '1' | '2';
 }
 
 export interface CatalogRegistry {

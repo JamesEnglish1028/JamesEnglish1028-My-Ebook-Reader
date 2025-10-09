@@ -6,7 +6,7 @@ interface ManageCatalogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   catalogs: Catalog[];
-  onAddCatalog: (name: string, url: string) => void;
+        onAddCatalog: (name: string, url: string, opdsVersion: 'auto' | '1' | '2') => void;
   onDeleteCatalog: (id: string) => void;
   onUpdateCatalog: (id: string, newName: string) => void;
   registries: CatalogRegistry[];
@@ -29,6 +29,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+    const [opdsVersion, setOpdsVersion] = useState<'auto' | '1' | '2'>('auto');
   const [error, setError] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
@@ -51,7 +52,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
     setError('');
 
     if (activeTab === 'catalogs') {
-        onAddCatalog(name, url);
+        onAddCatalog(name, url, opdsVersion);
     } else {
         onAddRegistry(name, url);
     }
@@ -147,6 +148,14 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
                             className="w-full bg-slate-700 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                         />
                     </div>
+                        <div>
+                            <label htmlFor="opds-version" className="block text-sm font-medium text-slate-400 mb-1">OPDS Version</label>
+                            <select id="opds-version" value={opdsVersion} onChange={(e) => setOpdsVersion(e.target.value as any)} className="w-full bg-slate-700 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <option value="auto">Auto-detect (recommended)</option>
+                                <option value="1">OPDS 1 (Atom/XML)</option>
+                                <option value="2">OPDS 2 (JSON)</option>
+                            </select>
+                        </div>
                     {error && <p className="text-sm text-red-400">{error}</p>}
                     <button type="submit" className="w-full py-2 px-4 rounded-md bg-sky-500 hover:bg-sky-600 transition-colors font-bold text-sm">
                         Add {activeTab === 'catalogs' ? 'Catalog' : 'Registry'}
@@ -163,7 +172,9 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
                             <li key={item.id} className="bg-slate-700/50 p-2 rounded-md flex items-center justify-between gap-2">
                                 {editingItemId === item.id ? (
                                     <>
+                                        <label htmlFor={`edit-name-${item.id}`} className="sr-only">Edit name</label>
                                         <input
+                                            id={`edit-name-${item.id}`}
                                             type="text"
                                             value={editedName}
                                             onChange={(e) => setEditedName(e.target.value)}

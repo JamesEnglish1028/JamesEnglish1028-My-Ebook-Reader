@@ -134,8 +134,8 @@ const Library: React.FC<LibraryProps> = ({
     localStorage.setItem(key, JSON.stringify(data));
   }, []);
   
-  const handleAddCatalog = useCallback((name: string, url: string) => {
-    const newCatalog: Catalog = { id: new Date().toISOString(), name, url };
+  const handleAddCatalog = useCallback((name: string, url: string, opdsVersion: 'auto' | '1' | '2' = 'auto') => {
+    const newCatalog: Catalog = { id: new Date().toISOString(), name, url, opdsVersion };
     const currentCatalogs = getFromStorage('ebook-catalogs');
     const updatedCatalogs = [...currentCatalogs, newCatalog];
     saveToStorage('ebook-catalogs', updatedCatalogs);
@@ -206,7 +206,14 @@ const Library: React.FC<LibraryProps> = ({
     setCatalogNavLinks([]);
     setCatalogPagination(null);
 
-    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url);
+  // If the activeOpdsSource includes an opdsVersion preference, pass it through
+  const forcedVersion = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto';
+  // Diagnostic: log the forcedVersion so we can verify the UI selection propagates
+  // into the fetch path when users force OPDS1/OPDS2.
+  // This will appear in the browser console during manual reproduction.
+  // eslint-disable-next-line no-console
+  console.debug('[mebooks] fetchAndParseSource - forcedVersion:', forcedVersion, 'url:', url);
+  const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
     if (error) {
         setCatalogError(error);
     } else {
@@ -241,7 +248,14 @@ const Library: React.FC<LibraryProps> = ({
   }, [activeOpdsSource?.id, setActiveOpdsSource, setCatalogNavPath]);
 
   useEffect(() => {
-    setCatalogs(getFromStorage('ebook-catalogs'));
+    const loaded = getFromStorage('ebook-catalogs') || [];
+    let migrated = false;
+    const normalized = loaded.map((c: any) => {
+      if (!c.opdsVersion) { migrated = true; return { ...c, opdsVersion: 'auto' }; }
+      return c;
+    });
+    if (migrated) saveToStorage('ebook-catalogs', normalized);
+    setCatalogs(normalized);
     setRegistries(getFromStorage('ebook-reader-registries'));
   }, [getFromStorage]);
   
@@ -425,7 +439,11 @@ const Library: React.FC<LibraryProps> = ({
           });
 
           const baseUrl = activeOpdsSource?.url;
-          const { navLinks: newChildren, error } = await fetchCatalogContent(node.url, baseUrl || node.url);
+          const forcedVersion2 = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto';
+          // Diagnostic: log forcedVersion when expanding navigation nodes
+          // eslint-disable-next-line no-console
+          console.debug('[mebooks] fetchCatalogContent (nav children) - forcedVersion:', forcedVersion2, 'node:', node.url);
+          const { navLinks: newChildren, error } = await fetchCatalogContent(node.url, baseUrl || node.url, forcedVersion2 as any);
           
           if (error) {
             console.error(`Error fetching children for ${node.title}:`, error);

@@ -42,4 +42,17 @@ describe('resolveAcquisitionChain', () => {
     expect(calls).toContain('POST');
     expect(calls).toContain('GET');
   });
+
+  it('surfaces OPDS auth document on 401', async () => {
+    const authDoc = { title: 'Library card', description: 'Use your library card PIN', links: [{ href: 'https://minotaur.example/auth', rel: 'authenticate', title: 'Sign in' }] };
+    const calls: any[] = [];
+    (globalThis as any).fetch = vi.fn(async (_u: string, opts: any) => {
+      calls.push(opts?.method);
+      // Simulate POST then GET; responder returns 401 with auth doc on GET
+      if (opts?.method === 'POST') return { status: 405, headers: { get: () => null }, text: async () => '' };
+      return { status: 401, headers: { get: (k: string) => k.toLowerCase() === 'content-type' ? 'application/vnd.opds.authentication.v1.0+json' : null }, text: async () => JSON.stringify(authDoc) };
+    });
+
+    await expect(resolveAcquisitionChain('https://opds.example/borrow/401', null)).rejects.toMatchObject({ authDocument: authDoc });
+  });
 });

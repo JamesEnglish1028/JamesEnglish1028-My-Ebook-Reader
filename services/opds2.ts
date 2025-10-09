@@ -1,6 +1,118 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
 import { proxiedUrl } from './utils';
 
+// Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
+function uint8ToBinaryString(u8: Uint8Array): string {
+  const CHUNK = 0x8000;
+  let result = '';
+  for (let i = 0; i < u8.length; i += CHUNK) {
+    const slice = u8.subarray(i, i + CHUNK);
+    result += String.fromCharCode.apply(null, Array.prototype.slice.call(slice));
+  }
+  return result;
+}
+
+// Helper: read all bytes from a cloned response in a way that's tolerant of
+// browser implementations that may throw on response.arrayBuffer(). Try
+// arrayBuffer() first, then fall back to reading the stream with getReader().
+// Cache response bytes so we don't attempt to read the same stream multiple times
+const responseByteCache2: WeakMap<any, Uint8Array> = new WeakMap();
+
+async function readAllBytes(resp: Response | any): Promise<Uint8Array> {
+  try {
+    const cached = responseByteCache2.get(resp);
+    if (cached) return cached;
+  } catch (_) {}
+
+  try {
+    if (resp && typeof resp.clone === 'function') {
+      const c = resp.clone();
+      try {
+        const buf = await c.arrayBuffer();
+        const out = new Uint8Array(buf);
+        try { responseByteCache2.set(resp, out); } catch (_) {}
+        return out;
+      } catch (e) {
+        const reader = c.body && (c.body as any).getReader ? (c.body as any).getReader() : null;
+        if (!reader) throw e;
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            const u8 = value instanceof Uint8Array ? value : new Uint8Array(value);
+            chunks.push(u8);
+            total += u8.length;
+          }
+        }
+        const out = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          out.set(chunk, offset);
+          offset += chunk.length;
+        }
+        try { responseByteCache2.set(resp, out); } catch (_) {}
+        return out;
+      }
+    }
+
+    if (resp && typeof resp.arrayBuffer === 'function') {
+      const buf = await resp.arrayBuffer();
+      const out = new Uint8Array(buf);
+      try { responseByteCache2.set(resp, out); } catch (_) {}
+      return out;
+    }
+
+    if (resp && typeof resp.text === 'function') {
+      const txt = await resp.text();
+      let enc: Uint8Array;
+      if (typeof TextEncoder !== 'undefined') enc = new TextEncoder().encode(txt);
+      // @ts-ignore
+      else if (typeof Buffer !== 'undefined') enc = new Uint8Array(Buffer.from(txt, 'utf-8'));
+      else enc = new Uint8Array();
+      try { responseByteCache2.set(resp, enc); } catch (_) {}
+      return enc;
+    }
+
+    if (resp && resp.body) {
+      if (resp.body instanceof Uint8Array) {
+        try { responseByteCache2.set(resp, resp.body); } catch (_) {}
+        return resp.body;
+      }
+      // @ts-ignore
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(resp.body)) {
+        const out = new Uint8Array(resp.body);
+        try { responseByteCache2.set(resp, out); } catch (_) {}
+        return out;
+      }
+    }
+
+    return new Uint8Array();
+  } catch (e) {
+    throw e;
+  }
+}
+
+// Helper: read response body as text but gracefully handle decoding errors
+async function safeReadText(resp: Response): Promise<string> {
+  try {
+    const u8 = await readAllBytes(resp);
+    try { return new TextDecoder('utf-8', { fatal: false }).decode(u8); }
+    catch (e) {
+      try { return new TextDecoder('iso-8859-1', { fatal: false }).decode(u8); }
+      catch (e2) { return uint8ToBinaryString(u8); }
+    }
+  } catch (e) {
+    console.warn('safeReadText: fallback decode failed', e);
+    // Try best-effort text() if available
+    try {
+      if (resp && typeof resp.text === 'function') return await resp.text();
+    } catch (_) {}
+    return '';
+  }
+}
+
 type StoredCred = { host: string; username: string; password: string };
 
 const CRED_KEY = 'mebooks.opds.credentials';
@@ -274,7 +386,7 @@ export const fetchOpds2Feed = async (url: string, credentials?: { username: stri
   if (etag) setCachedEtag(url, etag);
 
   const contentType = resp.headers.get('Content-Type') || '';
-  const text = await resp.text();
+  const text = await safeReadText(resp);
   if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
     const json = JSON.parse(text);
     return { status: resp.status, ...(parseOpds2Json(json, url) as any) };
@@ -292,7 +404,7 @@ export const borrowOpds2Work = async (borrowHref: string, credentials?: { userna
   }
   const resp = await fetch(proxyUrl, { method: 'POST', headers });
   if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
+    const body = await safeReadText(resp).catch(() => '');
     throw new Error(`Borrow failed: ${resp.status} ${resp.statusText} ${body}`);
   }
   // Return the response JSON when available
@@ -376,7 +488,7 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     // If server demands authentication, surface the auth document when present.
     if (resp.status === 401 || resp.status === 403) {
       // Try to parse an OPDS authentication document
-      const contentText = await resp.text().catch(() => '');
+  const contentText = await safeReadText(resp).catch(() => '');
       let authDoc: any = null;
       try {
         if ((resp.headers.get && (resp.headers.get('Content-Type') || '').includes('application/vnd.opds.authentication.v1.0+json')) || contentText.trim().startsWith('{')) {
