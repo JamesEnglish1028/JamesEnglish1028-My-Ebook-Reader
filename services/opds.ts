@@ -439,14 +439,17 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             ? 'application/atom+xml;profile=opds-catalog, application/xml, text/xml, application/opds+json;q=0.8, application/json;q=0.6, */*;q=0.4'
             : 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5';
 
-        // FIX: Added specific Accept header to signal preference for OPDS formats.
+    // FIX: Added specific Accept header to signal preference for OPDS formats.
         // Diagnostic: log which URL we'll fetch so the browser console shows whether
         // a proxied URL or the direct URL is used.
         // eslint-disable-next-line no-console
         console.debug('[mebooks] fetchCatalogContent - fetchUrl:', fetchUrl, 'accept:', acceptHeader);
+    // Determine whether this is a direct fetch (so we can include credentials)
+    const isDirectFetch = fetchUrl === url;
         const response = await fetch(fetchUrl, {
             method: 'GET',
             mode: 'cors',
+            credentials: isDirectFetch ? 'include' : 'omit',
             headers: {
                 'Accept': acceptHeader
             }
@@ -463,10 +466,9 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
         // If the direct fetch returned a redirect (3xx) or the response lacks CORS
         // headers when we attempted a direct fetch, the browser will block reading
         // the body. In that case, retry the request via the configured proxy.
-        const isRedirect = response.status >= 300 && response.status < 400;
-        const hasCorsHeader = !!response.headers.get('Access-Control-Allow-Origin');
-        const usedDirect = fetchUrl === url;
-    if ((isRedirect || (usedDirect && !hasCorsHeader)) && proxiedUrl) {
+    const isRedirect = response.status >= 300 && response.status < 400;
+    const hasCorsHeader = !!response.headers.get('Access-Control-Allow-Origin');
+    if ((isRedirect || (isDirectFetch && !hasCorsHeader)) && proxiedUrl) {
             const proxyFetchUrl = proxiedUrl(url);
             const proxiedResp = await fetch(proxyFetchUrl, {
                 method: 'GET',
@@ -643,7 +645,38 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
 // OPDS1 acquisition resolver: POST/GET to borrow endpoints and parse XML
 export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: { username: string; password: string } | null, maxRedirects = 5): Promise<string | null> => {
     let attempts = 0;
-    let current = href;
+    // Known Palace-related media types that some feeds use for indirect acquisition
+    const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
+            // Keep the original href as the canonical base for resolving relative
+            // links returned by the server. We may fetch via a proxied URL (current)
+            // but any relative hrefs in responses should be resolved against the
+            // original upstream href, not the proxy URL.
+            const originalHref = href;
+            // For Palace-hosted servers, force the proxied URL (prefer owned proxy when configured)
+            let current: string;
+            try {
+                const hostname = (() => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } })();
+                const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+                if (isPalaceHost) {
+                    current = proxiedUrl(href);
+                } else {
+                    current = await maybeProxyForCors(href);
+                }
+            } catch (e) {
+                current = await maybeProxyForCors(href);
+            }
+        // If the probe selected the public proxy and credentials are provided,
+        // fail early with a helpful message so UI can prompt for setting an owned proxy.
+        try {
+            const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
+            if (usingPublicProxy && credentials) {
+                const err: any = new Error('Acquisition would use a public CORS proxy which may strip Authorization or block POST requests. Configure an owned proxy (VITE_OWN_PROXY_URL) to perform authenticated borrows.');
+                err.proxyUsed = true;
+                throw err;
+            }
+        } catch (e) {
+            throw e;
+        }
 
     const makeHeaders = (withCreds = false) => {
         const h: Record<string,string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
@@ -657,12 +690,15 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
         attempts++;
         let resp: Response | null = null;
         try {
+            // Include cookies for direct (non-proxied) fetches so provider-set
+            // session cookies are sent. Omit credentials for proxied requests.
+            const directFetch = typeof current === 'string' && current === originalHref;
             if (preferGetWhenCreds) {
-                resp = await fetch(current, { method: 'GET', headers: makeHeaders(true) });
-                if (resp.status === 405) resp = await fetch(current, { method: 'POST', headers: makeHeaders(true) });
+                resp = await fetch(current, { method: 'GET', headers: makeHeaders(true), credentials: directFetch ? 'include' : 'omit' });
+                if (resp.status === 405) resp = await fetch(current, { method: 'POST', headers: makeHeaders(true), credentials: directFetch ? 'include' : 'omit' });
             } else {
-                resp = await fetch(current, { method: 'POST', headers: makeHeaders(false) });
-                if (resp.status === 405) resp = await fetch(current, { method: 'GET', headers: makeHeaders(false) });
+                resp = await fetch(current, { method: 'POST', headers: makeHeaders(false), credentials: directFetch ? 'include' : 'omit' });
+                if (resp.status === 405) resp = await fetch(current, { method: 'GET', headers: makeHeaders(false), credentials: directFetch ? 'include' : 'omit' });
             }
         } catch (e) {
             throw e;
@@ -673,7 +709,7 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
         // Follow redirects via Location
         if (resp.status >= 300 && resp.status < 400) {
             const loc = (resp.headers && typeof resp.headers.get === 'function') ? (resp.headers.get('Location') || resp.headers.get('location')) : null;
-            if (loc) return new URL(loc, current).href;
+            if (loc) return new URL(loc, originalHref).href;
         }
 
         const ok = typeof resp.ok === 'boolean' ? resp.ok : (resp.status >= 200 && resp.status < 300);
@@ -701,7 +737,7 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
                     });
                     if (candidate) {
                         const hrefAttr = candidate.getAttribute('href')!;
-                        return new URL(hrefAttr, current).href;
+                        return new URL(hrefAttr, originalHref).href;
                     }
                 }
             } catch (e) {
@@ -710,9 +746,11 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
 
                         // Fallback: if content-type indicates binary, return current
                         const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
-                        if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
-                                return current;
-                        }
+            if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
+                // Return the canonical upstream URL rather than the proxy URL so
+                // callers can decide whether to proxy the download.
+                return originalHref;
+            }
 
                         // If we received an HTML response (often from a public proxy) and
                         // the current URL indicates it was proxied through a known public
@@ -730,6 +768,111 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
                         } catch (e) {
                             // ignore and continue
                         }
+        }
+
+        // If we attempted a direct fetch and received a 401/403 without
+        // Access-Control-Allow-Origin, browsers will block reading the body.
+        // If an owned proxy is configured, retry the same request via the
+        // owned proxy preserving Authorization so the proxy can add CORS
+        // headers and forward auth to the upstream. If no owned proxy is
+        // configured, surface an actionable error so the UI can instruct
+        // the user to configure one.
+        try {
+            const usedDirect = typeof current === 'string' && current === originalHref;
+            const statusIsAuth = resp.status === 401 || resp.status === 403;
+            const hasAcaOrigin = resp.headers && typeof resp.headers.get === 'function' && !!resp.headers.get('Access-Control-Allow-Origin');
+            if (usedDirect && statusIsAuth && !hasAcaOrigin) {
+                // Build a proxied URL candidate and determine if it's an owned proxy
+                const proxyCandidate = proxiedUrl(originalHref);
+                const usingPublicProxy = proxyCandidate && proxyCandidate.includes('corsproxy.io');
+                if (!proxyCandidate) {
+                    const err: any = new Error('Acquisition failed and no proxy is available. Configure an owned proxy via VITE_OWN_PROXY_URL to allow authenticated downloads from the browser.');
+                    err.proxyUsed = true;
+                    throw err;
+                }
+
+                if (usingPublicProxy) {
+                    // Public proxy would be used but it likely strips Authorization.
+                    const err: any = new Error('Acquisition would require using a public CORS proxy which may strip Authorization or block POSTs. Configure an owned proxy (VITE_OWN_PROXY_URL).');
+                    err.proxyUsed = true;
+                    throw err;
+                }
+
+                // Owned proxy exists — retry the request via the owned proxy with same auth headers
+                const makeHeadersForRetry = (withCreds = false) => {
+                    const h: Record<string,string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
+                    if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+                    return h;
+                };
+
+                // Choose method sequence as before
+                let proxyResp: Response | null = null;
+                try {
+                    if (preferGetWhenCreds) {
+                        proxyResp = await fetch(proxyCandidate, { method: 'GET', headers: makeHeadersForRetry(true) });
+                        if (proxyResp && proxyResp.status === 405) proxyResp = await fetch(proxyCandidate, { method: 'POST', headers: makeHeadersForRetry(true) });
+                    } else {
+                        proxyResp = await fetch(proxyCandidate, { method: 'POST', headers: makeHeadersForRetry(false) });
+                        if (proxyResp && proxyResp.status === 405) proxyResp = await fetch(proxyCandidate, { method: 'GET', headers: makeHeadersForRetry(false) });
+                    }
+                } catch (e) {
+                    // Network/proxy error — surface as proxyUsed so UI can guide user
+                    const err: any = new Error('Failed to contact owned proxy for authenticated acquisition. Check your proxy configuration.');
+                    err.proxyUsed = true;
+                    throw err;
+                }
+
+                if (!proxyResp) {
+                    const err: any = new Error('Proxy retry failed.');
+                    err.proxyUsed = true;
+                    throw err;
+                }
+
+                if (proxyResp.status >= 300 && proxyResp.status < 400) {
+                    const loc = (proxyResp.headers && typeof proxyResp.headers.get === 'function') ? (proxyResp.headers.get('Location') || proxyResp.headers.get('location')) : null;
+                    if (loc) return new URL(loc, originalHref).href;
+                }
+
+                const ok2 = typeof proxyResp.ok === 'boolean' ? proxyResp.ok : (proxyResp.status >= 200 && proxyResp.status < 300);
+                if (ok2) {
+                    const text2 = await safeReadText(proxyResp).catch(() => '');
+                    try {
+                        if (text2.trim().startsWith('<')) {
+                            const parser = new DOMParser();
+                            const xml = parser.parseFromString(text2, 'application/xml');
+                            const links = Array.from(xml.querySelectorAll('link')) as Element[];
+                            const candidate = links.find(l => {
+                                const rel = (l.getAttribute('rel') || '').toLowerCase();
+                                const type = (l.getAttribute('type') || '').toLowerCase();
+                                const hrefAttr = l.getAttribute('href');
+                                if (!hrefAttr) return false;
+                                if (rel.includes('acquisition') || rel.includes('borrow') || rel.includes('loan') || rel.includes('http://opds-spec.org/acquisition')) {
+                                    if (type && (type.includes('epub') || type.includes('pdf') || palaceTypes.some(t => type.includes(t)))) return true;
+                                    return true;
+                                }
+                                return false;
+                            });
+                            if (candidate) {
+                                const hrefAttr = candidate.getAttribute('href')!;
+                                return new URL(hrefAttr, originalHref).href;
+                            }
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+
+                    const ct2 = (proxyResp.headers && typeof proxyResp.headers.get === 'function') ? proxyResp.headers.get('Content-Type') || '' : '';
+                    if (ct2.includes('application/epub') || ct2.includes('application/pdf') || ct2.includes('application/octet-stream')) {
+                        return originalHref;
+                    }
+                }
+                // If proxy retry did not yield a usable acquisition, surface an error
+                const err: any = new Error('Authenticated acquisition failed even after retrying via owned proxy.');
+                err.proxyUsed = true;
+                throw err;
+            }
+        } catch (e) {
+            throw e;
         }
 
         if (resp.status === 401 || resp.status === 403) {

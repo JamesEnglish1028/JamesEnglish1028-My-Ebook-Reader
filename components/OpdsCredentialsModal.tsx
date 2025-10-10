@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { maybeProxyForCors } from '../services/utils';
 
 interface Props {
   isOpen: boolean;
@@ -10,9 +11,11 @@ interface Props {
   onOpenAuthLink?: (href: string) => void;
   // Called when the user clicks Retry after finishing provider login
   onRetry?: () => void;
+  // Optional URL to probe for direct access (prefer this over probing the auth link)
+  probeUrl?: string | null;
 }
 
-const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onClose, onSubmit, onOpenAuthLink, onRetry }) => {
+const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onClose, onSubmit, onOpenAuthLink, onRetry, probeUrl }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [save, setSave] = useState(false);
@@ -31,6 +34,25 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
     if (passHint) setPassword('');
   }, [isOpen]);
 
+  // Polling state: when user opens provider auth link we can periodically
+  // probe whether direct CORS access is now allowed (this is a best-effort
+  // indicator that the provider set a session cookie and the server is
+  // allowing credentialed requests). This is optional and will be skipped
+  // in test / non-browser environments.
+  const [isPolling, setIsPolling] = useState(false);
+  const [directAvailable, setDirectAvailable] = useState(false);
+  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      // cleanup on unmount
+      if (pollRef.current) {
+        try { window.clearInterval(pollRef.current); } catch (_) {}
+        pollRef.current = null;
+      }
+    };
+  }, []);
+
   if (!isOpen) return null;
 
   const realmFromAuth = authDocument?.realm || authDocument?.title || null;
@@ -46,6 +68,31 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
             <h3 className="text-lg font-semibold">{realmFromAuth ? `Login to ${realmFromAuth}` : 'Authentication required'}</h3>
             <p className="text-sm text-slate-300">This catalog at <span className="font-mono">{host}</span> requires credentials to access the requested content.</p>
           </div>
+
+        {/* Polling status and auto-retry */}
+        {isPolling && (
+          <div className="mb-3 text-sm text-slate-300">
+            Waiting for provider sign-in to complete... This may take a minute.
+          </div>
+        )}
+        {directAvailable && (
+          <div className="mb-3 text-sm text-emerald-300 flex items-center justify-between">
+            <span>Direct access appears to be available. You can retry the acquisition now.</span>
+            <div className="ml-4">
+              <button
+                onClick={() => {
+                  // stop polling and trigger retry
+                  if (pollRef.current) { try { window.clearInterval(pollRef.current); } catch (_) {} pollRef.current = null; }
+                  setIsPolling(false);
+                  if (typeof onRetry === 'function') onRetry();
+                }}
+                className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+              >
+                Retry now
+              </button>
+            </div>
+          </div>
+        )}
         </div>
         {description && <p className="text-sm text-slate-300 mb-4">{description}</p>}
 
@@ -69,11 +116,48 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
                 <div key={i} className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       // Open in new tab/window for the user to login
-                      try { window.open(l.href, '_blank', 'noopener'); } catch {}
+                      let win: Window | null = null;
+                      try { win = window.open(l.href, '_blank', 'noopener'); } catch (e) { win = null; }
                       if (typeof onOpenAuthLink === 'function') {
                         onOpenAuthLink(l.href);
+                      }
+
+                      // Start a lightweight poll to detect whether direct access
+                      // (CORS with credentials) is now available. Prefer probing the
+                      // acquisition/probe URL when available; fall back to the auth
+                      // link itself. This is best-effort and will not break if the
+                      // provider doesn't expose CORS.
+                      try {
+                        if (!win || typeof window === 'undefined' || typeof maybeProxyForCors !== 'function') return;
+                        setIsPolling(true);
+                        setDirectAvailable(false);
+                        let attempts = 0;
+                        const maxAttempts = 30; // ~60s if interval 2000ms
+                        const target = probeUrl || l.href;
+                        pollRef.current = window.setInterval(async () => {
+                          attempts += 1;
+                          try {
+                            // Probe the target URL; if maybeProxyForCors returns
+                            // the original URL (not proxied) it's an indicator that
+                            // the server is now permitting direct requests from the browser.
+                            const res = await maybeProxyForCors(target as string);
+                            if (res === target) {
+                              setDirectAvailable(true);
+                              setIsPolling(false);
+                              if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
+                            }
+                          } catch (e) {
+                            // ignore transient errors
+                          }
+                          if (attempts >= maxAttempts) {
+                            setIsPolling(false);
+                            if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
+                          }
+                        }, 2000);
+                      } catch (e) {
+                        // If polling cannot be started, silently ignore and let user click Retry
                       }
                     }}
                     className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white"

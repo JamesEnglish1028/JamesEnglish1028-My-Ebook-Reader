@@ -83,6 +83,24 @@ app.get('/_health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// Echo endpoint to help debugging deployed proxy header forwarding.
+// Protected by PROXY_KEY if configured; callers must send x-proxy-key header.
+app.all('/_proxy_headers_echo', (req, res) => {
+  if (process.env.PROXY_KEY && req.header('x-proxy-key') !== process.env.PROXY_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  // Mirror CORS headers so browser clients can read the response
+  const allowOrigin = req.headers.origin || process.env.ALLOW_ORIGIN || '*';
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
+
+  // Return the headers the proxy received for inspection
+  const incoming = {};
+  for (const [k, v] of Object.entries(req.headers || {})) incoming[k] = v;
+  return res.status(200).json({ receivedHeaders: incoming });
+});
+
 app.all('/proxy', async (req, res) => {
   try {
   // Ensure CORS headers are always present for browser clients. Mirror the
