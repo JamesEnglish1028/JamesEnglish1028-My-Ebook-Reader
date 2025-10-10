@@ -708,11 +708,28 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
                 // ignore parse errors
             }
 
-            // Fallback: if content-type indicates binary, return current
-            const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
-            if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
-                return current;
-            }
+                        // Fallback: if content-type indicates binary, return current
+                        const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
+                        if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
+                                return current;
+                        }
+
+                        // If we received an HTML response (often from a public proxy) and
+                        // the current URL indicates it was proxied through a known public
+                        // CORS proxy, surface a clearer error so the UI can show an actionable
+                        // toast suggesting to use an owned proxy.
+                        try {
+                            const responseText = text || await safeReadText(resp).catch(() => '');
+                            const usedProxy = typeof current === 'string' && (current.includes('corsproxy.io') || current.includes('/proxy?url='));
+                            if (usedProxy && (ct.includes('text/html') || (responseText && responseText.trim().startsWith('<')))) {
+                                const err: any = new Error('Acquisition failed via public CORS proxy. The proxy may block POST requests or strip Authorization headers. Configure an owned proxy (VITE_OWN_PROXY_URL) to preserve credentials and HTTP methods.');
+                                err.status = resp.status;
+                                err.proxyUsed = true;
+                                throw err;
+                            }
+                        } catch (e) {
+                            // ignore and continue
+                        }
         }
 
         if (resp.status === 401 || resp.status === 403) {
@@ -726,6 +743,7 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
             const err: any = new Error(`Acquisition requires authentication: ${resp.status} ${resp.statusText}`);
             err.status = resp.status;
             if (authDoc) err.authDocument = authDoc;
+            try { if (typeof current === 'string' && (current.includes('corsproxy.io') || current.includes('/proxy?url='))) err.proxyUsed = true; } catch (e) { /* ignore */ }
             throw err;
         }
 

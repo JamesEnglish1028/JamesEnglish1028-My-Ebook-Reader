@@ -406,11 +406,36 @@ export const borrowOpds2Work = async (borrowHref: string, credentials?: { userna
   const headers: Record<string,string> = { 'Accept': 'application/json, */*' };
   if (credentials) {
     headers['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+    // Warn when using a public CORS proxy that commonly strips Authorization headers
+    try {
+      if (proxyUrl && proxyUrl.includes('corsproxy.io')) {
+        // eslint-disable-next-line no-console
+        console.warn('[mebooks] Attempting to send Authorization through public CORS proxy (corsproxy.io). Public proxies often strip Authorization headers; consider configuring an owned proxy (VITE_OWN_PROXY_URL) to ensure credentials are forwarded.');
+      }
+    } catch (e) { /* ignore */ }
   }
-  const resp = await fetch(proxyUrl, { method: 'POST', headers });
+
+  // Try POST, but fall back to GET if server responds with 405 (method not allowed)
+  let resp = await fetch(proxyUrl, { method: 'POST', headers });
+  if (resp.status === 405) {
+    resp = await fetch(proxyUrl, { method: 'GET', headers });
+  }
   if (!resp.ok) {
     const body = await safeReadText(resp).catch(() => '');
-    throw new Error(`Borrow failed: ${resp.status} ${resp.statusText} ${body}`);
+    // Provide a helpful message when using a public proxy which commonly
+    // strips Authorization headers or blocks POST requests (e.g., corsproxy.io)
+    let message = `Borrow failed: ${resp.status} ${resp.statusText}`;
+    if (body) message += ` ${body}`;
+    try {
+      if (proxyUrl && proxyUrl.includes('corsproxy.io')) {
+        message += ' — Note: this request went through the public CORS proxy (corsproxy.io). Public proxies often block POST requests or strip Authorization headers required for authenticated borrows. Configure an owned proxy by setting VITE_OWN_PROXY_URL (in your dev env) or use a proxy that preserves Authorization headers.';
+      }
+    } catch (e) { /* ignore */ }
+    const err: any = new Error(message);
+    // Attach some metadata so UI can detect proxy-specific errors if desired
+    err.status = resp.status;
+    err.proxyUsed = proxyUrl && proxyUrl.includes('corsproxy.io');
+    throw err;
   }
   // Return the response JSON when available
   const ct = resp.headers.get('Content-Type') || '';

@@ -2,6 +2,16 @@ import { ReaderSettings, Bookmark, Citation, SearchResult } from '../types';
 
 const STORAGE_PREFIX = 'ebook-reader';
 
+const safeParse = <T>(value: string | null, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch (e) {
+    console.warn('Failed to parse JSON from storage, using fallback', e);
+    return fallback;
+  }
+};
+
 // --- Settings ---
 const defaultSettings: ReaderSettings = {
   fontSize: 100,
@@ -17,11 +27,11 @@ const defaultSettings: ReaderSettings = {
   },
 };
 
-export const getStorageKey = (type: string, bookId: number | string) => `${STORAGE_PREFIX}-${type}-${bookId}`;
+export const getStorageKey = (type: string, bookId: number | string) => `${STORAGE_PREFIX}-${type}-${String(bookId)}`;
 
 export const getReaderSettings = (): ReaderSettings => {
-    const savedSettings = localStorage.getItem(getStorageKey('settings', 'global'));
-    const parsedSettings = savedSettings ? JSON.parse(savedSettings) : {};
+  const savedSettings = localStorage.getItem(getStorageKey('settings', 'global'));
+  const parsedSettings = safeParse<Record<string, any>>(savedSettings, {});
     return {
       ...defaultSettings,
       ...parsedSettings,
@@ -38,8 +48,8 @@ export const saveReaderSettings = (settings: ReaderSettings) => {
 
 // --- Bookmarks ---
 export const getBookmarksForBook = (bookId: number): Bookmark[] => {
-    const saved = localStorage.getItem(getStorageKey('bookmarks', bookId));
-    return saved ? JSON.parse(saved) : [];
+  const saved = localStorage.getItem(getStorageKey('bookmarks', bookId));
+  return safeParse<Bookmark[]>(saved, []);
 };
 
 export const saveBookmarksForBook = (bookId: number, bookmarks: Bookmark[]) => {
@@ -48,8 +58,8 @@ export const saveBookmarksForBook = (bookId: number, bookmarks: Bookmark[]) => {
 
 // --- Citations ---
 export const getCitationsForBook = (bookId: number): Citation[] => {
-    const saved = localStorage.getItem(getStorageKey('citations', bookId));
-    return saved ? JSON.parse(saved) : [];
+  const saved = localStorage.getItem(getStorageKey('citations', bookId));
+  return safeParse<Citation[]>(saved, []);
 };
 
 export const saveCitationsForBook = (bookId: number, citations: Citation[]) => {
@@ -58,7 +68,7 @@ export const saveCitationsForBook = (bookId: number, citations: Citation[]) => {
 
 // --- Position ---
 export const getLastPositionForBook = (bookId: number): string | null => {
-    return localStorage.getItem(getStorageKey('pos', bookId));
+  return localStorage.getItem(getStorageKey('pos', bookId));
 };
 
 export const saveLastPositionForBook = (bookId: number, cfi: string) => {
@@ -67,7 +77,7 @@ export const saveLastPositionForBook = (bookId: number, cfi: string) => {
 
 // --- Speech Position ---
 export const getLastSpokenPositionForBook = (bookId: number): string | null => {
-    return localStorage.getItem(getStorageKey('speech-pos', bookId));
+  return localStorage.getItem(getStorageKey('speech-pos', bookId));
 };
 
 export const saveLastSpokenPositionForBook = (bookId: number, cfi: string) => {
@@ -169,7 +179,7 @@ export const buildTocFromSpine = (book: any): Array<{ id: string; href: string; 
 export const getPdfViewStateForBook = (bookId: number) => {
   try {
     const saved = localStorage.getItem(getStorageKey('pdfview', bookId));
-    return saved ? JSON.parse(saved) : { zoomPercent: 100, fitMode: 'page' };
+    return safeParse<{ zoomPercent: number; fitMode: string }>(saved, { zoomPercent: 100, fitMode: 'page' });
   } catch (e) {
     console.warn('Failed to read pdf view state', e);
     return { zoomPercent: 100, fitMode: 'page' };
@@ -188,7 +198,7 @@ export const savePdfViewStateForBook = (bookId: number, state: { zoomPercent: nu
 export const getEpubViewStateForBook = (bookId: number) => {
   try {
     const saved = localStorage.getItem(getStorageKey('epubview', bookId));
-    return saved ? JSON.parse(saved) : {};
+    return safeParse<Record<string, any>>(saved, {});
   } catch (e) {
     console.warn('Failed to read epub view state', e);
     return {};
