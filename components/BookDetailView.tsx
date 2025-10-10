@@ -146,12 +146,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
             } catch (err: any) {
                 // If the resolver throws an error with an authDocument, surface the
                 // credentials modal and allow the user to supply credentials.
-                if (err && err.authDocument) {
+        if (err && err.authDocument) {
                     setCredHost((catalogBook as any).providerName || (new URL(catalogBook.downloadUrl).host));
                     setCredAuthDoc(err.authDocument);
                     setCredModalOpen(true);
                 } else {
-                    setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
+          setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
+          // If this error indicates a public proxy was used and likely stripped Authorization
+          if (err && err.proxyUsed) {
+            try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch {}
+          }
                 }
             }
             setPendingCatalogBook(null);
@@ -191,6 +195,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
       }
     } catch (err: any) {
       setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition with credentials.' });
+      if (err && err.proxyUsed) {
+        try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch {}
+      }
     }
   };
 
@@ -221,6 +228,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         setCredModalOpen(true);
       } else {
         setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
+        if (err && err.proxyUsed) {
+          try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch {}
+        }
       }
     }
   };
