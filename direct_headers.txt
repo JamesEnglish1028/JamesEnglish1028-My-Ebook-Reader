@@ -1,0 +1,15 @@
+HTTP/2 200 
+content-type: application/opds+json
+content-length: 1421140
+date: Thu, 09 Oct 2025 01:37:41 GMT
+server: nginx/1.18.0 (Ubuntu)
+expires: Thu, 09 Oct 2025 01:47:41 GMT
+cache-control: public, no-transform, max-age=600, s-maxage=300
+access-control-allow-origin: https://patron-acad.staging.palaceproject.io
+access-control-allow-credentials: true
+x-cache: Hit from cloudfront
+via: 1.1 bf4deffb26a744d2f90bfb71c1b673b2.cloudfront.net (CloudFront)
+x-amz-cf-pop: JFK52-P5
+x-amz-cf-id: JOEO50izVcR92NT8e8Z9OlEww0lmdo9_1bZyDD8AmAw-51MZctyKPA==
+age: 255
+
