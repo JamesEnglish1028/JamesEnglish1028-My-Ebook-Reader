@@ -20,11 +20,14 @@ import ErrorBoundary from './components/ErrorBoundary';
 const PdfReaderView = lazy(() => import('./components/PdfReaderView'));
 import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl, maybeProxyForCors } from './services/utils';
 import OpdsCredentialsModal from './components/OpdsCredentialsModal';
+import NetworkDebugModal from './components/NetworkDebugModal';
 import ToastStack from './components/toast/ToastStack';
+import { useToast } from './components/toast/ToastContext';
 import { resolveAcquisitionChain, findCredentialForUrl, saveOpdsCredential } from './services/opds2';
 
 
 const AppInner: React.FC = () => {
+  const toast = useToast();
   const [currentView, setCurrentView] = useState<'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [coverAnimationData, setCoverAnimationData] = useState<CoverAnimationData | null>(null);
@@ -286,7 +289,7 @@ const AppInner: React.FC = () => {
       if (storedCred) {
         downloadHeaders['Authorization'] = `Basic ${btoa(`${storedCred.username}:${storedCred.password}`)}`;
       }
-      const response = await fetch(proxyUrl, { headers: downloadHeaders });
+  const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === finalUrl ? 'include' : 'omit' });
       if (!response.ok) {
         const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
         let errorMessage = `Download failed. The server responded with an error (${statusInfo}). The book might not be available at this address.`;
@@ -332,7 +335,7 @@ const AppInner: React.FC = () => {
   const downloadHeaders: Record<string,string> = {};
   // Use the credentials the user just supplied for the download
   if (username && password) downloadHeaders['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
-  const response = await fetch(proxyUrl, { headers: downloadHeaders });
+  const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === resolved ? 'include' : 'omit' });
         if (!response.ok) {
           throw new Error(`Download failed: ${response.status}`);
         }
@@ -354,6 +357,7 @@ const AppInner: React.FC = () => {
 
   // Track last auth link opened (for telemetry/testing) and provide a retry action
   const [lastAuthLinkOpened, setLastAuthLinkOpened] = useState<string | null>(null);
+  const [showNetworkDebug, setShowNetworkDebug] = useState(false);
 
   const handleOpenAuthLink = useCallback((href: string) => {
     setLastAuthLinkOpened(href);
@@ -368,13 +372,24 @@ const AppInner: React.FC = () => {
       const resolved = await resolveAcquisitionChain(credentialPrompt.pendingHref, null);
       if (!resolved) throw new Error('Failed to resolve after login');
       const proxyUrl = await maybeProxyForCors(resolved);
-      const response = await fetch(proxyUrl);
+      // If the probe chose the public CORS proxy, abort and instruct the user
+      // to configure an owned proxy. Public proxies (e.g., corsproxy.io) often
+      // strip cookies or Authorization and will prevent successful post-login
+      // downloads from Palace servers.
+      if (typeof proxyUrl === 'string' && proxyUrl.includes('corsproxy.io')) {
+        try { toast.pushToast('The retry would use a public CORS proxy which commonly strips authentication. Configure an owned proxy via VITE_OWN_PROXY_URL and retry.', 12000); } catch(_) {}
+        throw new Error('Retry aborted: public CORS proxy would be used and may block authenticated downloads.');
+      }
+  const response = await fetch(proxyUrl, { credentials: proxyUrl === resolved ? 'include' : 'omit' });
       if (!response.ok) throw new Error(`Download failed: ${response.status}`);
       const bookData = await response.arrayBuffer();
       await processAndSaveBook(bookData, credentialPrompt.pendingBook.title, credentialPrompt.pendingBook.author, 'catalog', credentialPrompt.pendingCatalogName, credentialPrompt.pendingBook.providerId, credentialPrompt.pendingBook.format, credentialPrompt.pendingBook.coverImage);
       setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
     } catch (e) {
       console.error('Retry after provider login failed', e);
+      if ((e as any)?.proxyUsed) {
+        try { toast.pushToast('Retry after login failed because the request used a public CORS proxy that may strip authentication. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves credentials.', 10000); } catch(_) {}
+      }
       setImportStatus({ isLoading: false, message: '', error: e instanceof Error ? e.message : 'Retry failed' });
     }
   }, [credentialPrompt, processAndSaveBook]);
@@ -563,7 +578,15 @@ const AppInner: React.FC = () => {
         onSubmit={handleCredentialSubmit}
         onOpenAuthLink={handleOpenAuthLink}
         onRetry={handleRetryAfterProviderLogin}
+        probeUrl={credentialPrompt.pendingHref}
       />
+      <NetworkDebugModal isOpen={showNetworkDebug} onClose={() => setShowNetworkDebug(false)} />
+      {/** Debug floating button (visible only in debug mode) */}
+      {typeof window !== 'undefined' && (window as any).__MEBOOKS_DEBUG__ && (
+        <div style={{ position: 'fixed', right: 12, bottom: 12, zIndex: 60 }}>
+          <button onClick={() => setShowNetworkDebug(true)} className="px-3 py-2 bg-yellow-400 rounded shadow">Network Debug</button>
+        </div>
+      )}
     </div>
   );
 };

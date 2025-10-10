@@ -1,5 +1,5 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
-import { proxiedUrl } from './utils';
+import { proxiedUrl, maybeProxyForCors } from './utils';
 import credentialsService from './credentials';
 
 // Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
@@ -451,7 +451,52 @@ export const borrowOpds2Work = async (borrowHref: string, credentials?: { userna
 // a 405 (method not allowed) to support servers that expect GETs.
 export const resolveAcquisitionChain = async (href: string, credentials?: { username: string; password: string } | null, maxRedirects = 5): Promise<string | null> => {
   let attempts = 0;
-  let current = proxiedUrl(href);
+  // Keep original href for canonical link resolution; fetch may occur via
+  // a proxied URL (current) but returned relative links should resolve
+  // against the original upstream href.
+  const originalHref = href;
+  // Choose whether to fetch directly or via proxy. Use maybeProxyForCors so
+  // the browser can perform interactive provider logins and send cookies when
+  // appropriate. However, if credentials are supplied and the probe selects
+  // a public proxy, fail early (public proxies often strip Authorization).
+  let current = await maybeProxyForCors(href);
+  try {
+    const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
+    if (usingPublicProxy && credentials) {
+      const err: any = new Error('Acquisition would use a public CORS proxy which may strip Authorization or block POST requests. Configure an owned proxy (VITE_OWN_PROXY_URL) to perform authenticated borrows.');
+      err.proxyUsed = true;
+      throw err;
+    }
+  } catch (e) {
+    throw e;
+  }
+  // If the chosen fetch URL indicates we're using the public CORS proxy and
+  // credentials are present, error early to avoid sending Authorization through
+  // a proxy that may strip it.
+  try {
+    const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
+    if (usingPublicProxy && credentials) {
+      const err: any = new Error('Acquisition would use a public CORS proxy which may strip Authorization or block POST requests. Configure an owned proxy (VITE_OWN_PROXY_URL) to perform authenticated borrows.');
+      err.proxyUsed = true;
+      throw err;
+    }
+  } catch (e) {
+    throw e;
+  }
+  // If the chosen fetch URL indicates we're using the public CORS proxy and
+  // credentials are present (or we prefer GET when creds are present), fail
+  // early with a clear error recommending an owned proxy.
+  try {
+    const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
+    if (usingPublicProxy && credentials) {
+      const err: any = new Error('Acquisition would use a public CORS proxy which may strip Authorization or block POST requests. Configure an owned proxy (VITE_OWN_PROXY_URL) to perform authenticated borrows.');
+      err.proxyUsed = true;
+      throw err;
+    }
+  } catch (e) {
+    // rethrow to surface to caller
+    throw e;
+  }
   const makeHeaders = (withCreds = false) => {
     const h: Record<string,string> = { 'Accept': 'application/json, text/json, */*' };
     if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
@@ -486,35 +531,35 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     if (!resp) return null;
 
     // Treat 3xx + Location as final content URL
-    if (resp.status >= 300 && resp.status < 400) {
+        if (resp.status >= 300 && resp.status < 400) {
       const loc = (resp.headers && typeof resp.headers.get === 'function') ? (resp.headers.get('Location') || resp.headers.get('location')) : null;
       if (loc) {
-        return new URL(loc, current).href;
+        return new URL(loc, originalHref).href;
       }
     }
 
     const ok = typeof resp.ok === 'boolean' ? resp.ok : (resp.status >= 200 && resp.status < 300);
     const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
 
-    if (ok) {
+  if (ok) {
       // OPDS2 servers should return JSON or a Location redirect. Do not
       // attempt to parse XML here; XML acquisition docs belong to OPDS1 and
       // are handled by the OPDS1 resolver. If an OPDS2 endpoint returns XML
       // it is treated as an unsupported response.
-      if (ct.includes('application/json') || ct.includes('text/json') || ct.includes('application/opds+json')) {
+        if (ct.includes('application/json') || ct.includes('text/json') || ct.includes('application/opds+json')) {
         const j = await resp.json().catch(() => null);
         const candidate = j?.url || j?.location || j?.href || j?.contentLocation;
-        if (typeof candidate === 'string' && candidate.length > 0) return new URL(candidate, current).href;
+        if (typeof candidate === 'string' && candidate.length > 0) return new URL(candidate, originalHref).href;
         if (Array.isArray(j?.links)) {
           const contentLink = j.links.find((l: any) => l?.href && (l.rel === 'content' || l.rel === 'self' || String(l.rel).includes('acquisition')));
           if (contentLink?.href) return new URL(contentLink.href, current).href;
         }
       }
       const loc = resp.headers.get('Location') || resp.headers.get('location');
-      if (loc) return new URL(loc, current).href;
+      if (loc) return new URL(loc, originalHref).href;
 
       if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
-        return current;
+        return originalHref;
       }
     }
 
@@ -531,9 +576,10 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
         authDoc = null;
       }
 
-      const err = new Error(`Acquisition requires authentication: ${resp.status} ${resp.statusText}`);
-      (err as any).status = resp.status;
-      if (authDoc) (err as any).authDocument = authDoc;
+      const err: any = new Error(`Acquisition requires authentication: ${resp.status} ${resp.statusText}`);
+      err.status = resp.status;
+      if (authDoc) err.authDocument = authDoc;
+      try { if (typeof current === 'string' && (current.includes('corsproxy.io') || current.includes('/proxy?url='))) err.proxyUsed = true; } catch (e) { /* ignore */ }
       throw err;
     }
 

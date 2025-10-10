@@ -465,7 +465,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
       />
   {/* ToastStack provided at app root; individual components push toasts via useToast().pushToast */}
 
-      <OpdsCredentialsModal isOpen={credModalOpen} host={credHost} authDocument={credAuthDoc} onClose={() => setCredModalOpen(false)} onSubmit={handleCredSubmit} onOpenAuthLink={handleOpenAuthLink} onRetry={handleRetry} />
+      <OpdsCredentialsModal isOpen={credModalOpen} host={credHost} authDocument={credAuthDoc} onClose={() => setCredModalOpen(false)} onSubmit={handleCredSubmit} onOpenAuthLink={handleOpenAuthLink} onRetry={handleRetry} probeUrl={pendingCatalogBook?.downloadUrl} />
     </div>
   );
 };

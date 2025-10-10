@@ -1,0 +1,13 @@
+# Example wrangler.toml for Cloudflare Worker deployment
+name = "mebooks-proxy-worker"
+main = "./cloudflare-worker-example.js"
+compatibility_date = "2025-10-10"
+
+# Replace these with your account-specific values
+account_id = "xxxxxxxxxxxxxxxxxxxx"
+workers_dev = true
+# If you have a route (optional), uncomment and replace
+# route = "https://your-domain.example/_proxy/*"
+
+[vars]
+# PROXY_KEY = "your-secret-key"

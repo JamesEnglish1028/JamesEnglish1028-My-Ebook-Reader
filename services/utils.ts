@@ -177,7 +177,21 @@ export const maybeProxyForCors = async (url: string): Promise<string> => {
     // with an OK (2xx) and the Access-Control-Allow-Origin header permits our origin,
     // we can attempt the full request directly. Treat redirects (3xx) or non-matching
     // CORS headers as reasons to use the proxy.
-    const resp = await fetch(url, { method: 'HEAD', mode: 'cors', redirect: 'manual' });
+    // Include credentials so that provider login cookies are sent with the
+    // probe. This allows maybeProxyForCors to detect when a user has just
+    // authenticated at the provider and direct fetches (with cookies) may
+    // succeed even if unauthenticated probes would not.
+    let resp = await fetch(url, { method: 'HEAD', mode: 'cors', redirect: 'manual', credentials: 'include' });
+    // Some servers don't support HEAD and respond 405. In that case, try a
+    // lightweight GET probe with credentials included to better detect CORS
+    // allowance when cookies are present.
+    if (resp && resp.status === 405) {
+      try {
+        resp = await fetch(url, { method: 'GET', mode: 'cors', redirect: 'manual', credentials: 'include' });
+      } catch (e) {
+        // keep original resp if GET fails
+      }
+    }
     if (!resp) return proxiedUrl(url);
 
     // If the server returned a redirect, don't attempt to fetch directly — use proxy.
