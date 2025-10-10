@@ -18,3 +18,15 @@ try {
 
 // jsdom is the default for Vitest in many setups but ensure globals are present.
 // If any global polyfills are needed (DOMParser, etc) they can be added here.
+
+// Provide an in-memory IndexedDB implementation for tests (fake-indexeddb)
+try {
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	const { indexedDB: fakeIndexedDB, IDBKeyRange } = require('fake-indexeddb');
+	// @ts-ignore
+	global.indexedDB = fakeIndexedDB;
+	// @ts-ignore
+	global.IDBKeyRange = IDBKeyRange;
+} catch (e) {
+	// If fake-indexeddb isn't available, tests that rely on indexedDB will fail.
+}
