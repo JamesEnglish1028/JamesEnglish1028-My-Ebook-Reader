@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useRef, ReactNode } from 'react';
+import { useToast } from './toast/ToastContext';
 import ConfirmModal from './ConfirmModal';
 
 type ConfirmOptions = {
@@ -22,8 +23,7 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [opts, setOpts] = useState<ConfirmOptions>({ message: '' });
   const resolverRef = useRef<(v: boolean) => void>(() => {});
   const undoTimerRef = useRef<number | null>(null);
-  const [undoVisible, setUndoVisible] = useState(false);
-  const [undoLabel, setUndoLabel] = useState<string>('Undo');
+  const toast = useToast();
 
   const confirm: ConfirmFn = (options) => {
     const normalized: ConfirmOptions = typeof options === 'string' ? { message: options } : options;
@@ -42,21 +42,24 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
   const handleConfirm = () => {
     setOpen(false);
     resolverRef.current(true);
-    // if an undo callback is provided, call it and show undo toast
+    // if an undo callback is provided, call it and show undo toast (via provider)
     if (opts && typeof opts.undoCallback === 'function') {
       try {
-        // Call callback but don't await by default; show undo UI
         const maybePromise = opts.undoCallback();
-        // show undo toast
-        setUndoVisible(true);
-        setUndoLabel('Undo');
         const duration = opts.undoDurationMs ?? 6000;
-        if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-        undoTimerRef.current = window.setTimeout(() => {
-          setUndoVisible(false);
-          undoTimerRef.current = null;
-        }, duration) as unknown as number;
-        // swallow promise
+        // push a toast with an action labeled 'Undo' that will call the callback
+        toast.pushToast('Action performed', duration, 'Undo', async () => {
+          try {
+            if (maybePromise && typeof (maybePromise as any).then === 'function') {
+              await maybePromise;
+            } else {
+              // If the callback isn't a promise, just invoke it again (best-effort)
+              await (opts.undoCallback as () => any)();
+            }
+          } catch (e) {
+            console.error('Undo action failed', e);
+          }
+        });
         if (maybePromise && typeof (maybePromise as any).then === 'function') {
           (maybePromise as Promise<void>).catch(() => { /* ignore */ });
         }
@@ -67,12 +70,7 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const handleUndo = async () => {
-    // hide toast and clear timer
-    setUndoVisible(false);
-    if (undoTimerRef.current) {
-      window.clearTimeout(undoTimerRef.current);
-      undoTimerRef.current = null;
-    }
+    // kept for compatibility; invoking the undo callback directly
     try {
       if (opts && typeof opts.undoCallback === 'function') {
         await opts.undoCallback();
@@ -95,15 +93,7 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
         onClose={handleClose}
         onConfirm={handleConfirm}
       />
-      {/* Undo toast */}
-      {undoVisible && (
-        <div className="fixed bottom-6 right-6 z-60">
-          <div className="bg-slate-900 text-white rounded-md shadow-lg px-4 py-2 flex items-center gap-4">
-            <div className="text-sm">Action performed</div>
-            <button onClick={handleUndo} className="text-sky-300 underline text-sm">{undoLabel}</button>
-          </div>
-        </div>
-      )}
+      {/* Undo handled by toast provider */}
     </ConfirmContext.Provider>
   );
 };

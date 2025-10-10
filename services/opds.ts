@@ -255,7 +255,8 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   publicationDate: publicationDate || undefined, 
                   providerId, 
                   subjects: subjects.length > 0 ? subjects : undefined,
-                  format
+                  format,
+                  acquisitionMediaType: mimeType || undefined
               });
           }
       } else if (subsectionLink) {
@@ -367,7 +368,8 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     publicationDate, 
                     providerId, 
                     subjects: subjects.length > 0 ? subjects : undefined,
-                    format
+                    format,
+                    acquisitionMediaType: mimeType || undefined
                 });
             }
         });
@@ -636,4 +638,99 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
 
         return { books: [], navLinks: [], pagination: {}, error: message };
     }
+};
+
+// OPDS1 acquisition resolver: POST/GET to borrow endpoints and parse XML
+export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: { username: string; password: string } | null, maxRedirects = 5): Promise<string | null> => {
+    let attempts = 0;
+    let current = href;
+
+    const makeHeaders = (withCreds = false) => {
+        const h: Record<string,string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
+        if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+        return h;
+    };
+
+    const preferGetWhenCreds = !!credentials;
+
+    while (attempts < maxRedirects && current) {
+        attempts++;
+        let resp: Response | null = null;
+        try {
+            if (preferGetWhenCreds) {
+                resp = await fetch(current, { method: 'GET', headers: makeHeaders(true) });
+                if (resp.status === 405) resp = await fetch(current, { method: 'POST', headers: makeHeaders(true) });
+            } else {
+                resp = await fetch(current, { method: 'POST', headers: makeHeaders(false) });
+                if (resp.status === 405) resp = await fetch(current, { method: 'GET', headers: makeHeaders(false) });
+            }
+        } catch (e) {
+            throw e;
+        }
+
+        if (!resp) return null;
+
+        // Follow redirects via Location
+        if (resp.status >= 300 && resp.status < 400) {
+            const loc = (resp.headers && typeof resp.headers.get === 'function') ? (resp.headers.get('Location') || resp.headers.get('location')) : null;
+            if (loc) return new URL(loc, current).href;
+        }
+
+        const ok = typeof resp.ok === 'boolean' ? resp.ok : (resp.status >= 200 && resp.status < 300);
+
+        if (ok) {
+            const text = await safeReadText(resp).catch(() => '');
+            // Parse XML for <link> elements that indicate acquisition/content
+            try {
+                if (text.trim().startsWith('<')) {
+                    const parser = new DOMParser();
+                    const xml = parser.parseFromString(text, 'application/xml');
+                    const links = Array.from(xml.querySelectorAll('link')) as Element[];
+                    // prefer explicit acquisition links with known media types
+                    const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
+                    const candidate = links.find(l => {
+                        const rel = (l.getAttribute('rel') || '').toLowerCase();
+                        const type = (l.getAttribute('type') || '').toLowerCase();
+                        const hrefAttr = l.getAttribute('href');
+                        if (!hrefAttr) return false;
+                        if (rel.includes('acquisition') || rel.includes('borrow') || rel.includes('loan') || rel.includes('http://opds-spec.org/acquisition')) {
+                            if (type && (type.includes('epub') || type.includes('pdf') || palaceTypes.some(t => type.includes(t)))) return true;
+                            return true;
+                        }
+                        return false;
+                    });
+                    if (candidate) {
+                        const hrefAttr = candidate.getAttribute('href')!;
+                        return new URL(hrefAttr, current).href;
+                    }
+                }
+            } catch (e) {
+                // ignore parse errors
+            }
+
+            // Fallback: if content-type indicates binary, return current
+            const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
+            if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
+                return current;
+            }
+        }
+
+        if (resp.status === 401 || resp.status === 403) {
+            const text = await safeReadText(resp).catch(() => '');
+            let authDoc: any = null;
+            try {
+                const ct = resp.headers.get('Content-Type') || '';
+                if (ct.includes('application/vnd.opds.authentication.v1.0+json') || text.trim().startsWith('{')) authDoc = JSON.parse(text);
+            } catch (e) { authDoc = null; }
+
+            const err: any = new Error(`Acquisition requires authentication: ${resp.status} ${resp.statusText}`);
+            err.status = resp.status;
+            if (authDoc) err.authDocument = authDoc;
+            throw err;
+        }
+
+        break;
+    }
+
+    return null;
 };

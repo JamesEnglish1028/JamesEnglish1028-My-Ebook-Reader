@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { ConfirmProvider } from './components/ConfirmContext';
+import { ToastProvider } from './components/toast/ToastContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -13,9 +14,11 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <AuthProvider>
-      <ConfirmProvider>
-        <App />
-      </ConfirmProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
+      </ToastProvider>
     </AuthProvider>
   </React.StrictMode>
 );

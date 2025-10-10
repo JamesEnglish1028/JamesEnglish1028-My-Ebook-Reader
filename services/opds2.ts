@@ -1,5 +1,6 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
 import { proxiedUrl } from './utils';
+import credentialsService from './credentials';
 
 // Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
 function uint8ToBinaryString(u8: Uint8Array): string {
@@ -114,42 +115,46 @@ async function safeReadText(resp: Response): Promise<string> {
 }
 
 type StoredCred = { host: string; username: string; password: string };
-
-const CRED_KEY = 'mebooks.opds.credentials';
 const ETAG_PREFIX = 'mebooks.opds.etag.';
 
 function getHostFromUrl(url: string) {
   try { return new URL(url).host; } catch { return url; }
 }
 
-export function getStoredOpdsCredentials(): StoredCred[] {
+// Use IndexedDB-backed credentials service. Provide wrapper functions used
+// elsewhere in the app for backward compatibility.
+let _migrationTriggered = false;
+
+export async function migrateLegacyCredentials() {
+  if (_migrationTriggered) return;
+  _migrationTriggered = true;
   try {
-    const raw = localStorage.getItem(CRED_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as StoredCred[];
+    await credentialsService.migrateFromLocalStorage();
+  } catch (e) { /* ignore */ }
+}
+
+export async function getStoredOpdsCredentials(): Promise<StoredCred[]> {
+  try {
+    await migrateLegacyCredentials();
+    return await credentialsService.getAllCredentials();
   } catch (e) { return []; }
 }
 
 export function saveOpdsCredential(host: string, username: string, password: string) {
-  const list = getStoredOpdsCredentials();
-  const existing = list.find(c => c.host === host);
-  if (existing) {
-    existing.username = username;
-    existing.password = password;
-  } else {
-    list.push({ host, username, password });
-  }
-  localStorage.setItem(CRED_KEY, JSON.stringify(list));
+  // fire-and-forget
+  try { credentialsService.saveCredential(host, username, password); } catch (e) { console.warn('saveOpdsCredential failed', e); }
 }
 
 export function deleteOpdsCredential(host: string) {
-  const list = getStoredOpdsCredentials().filter(c => c.host !== host);
-  localStorage.setItem(CRED_KEY, JSON.stringify(list));
+  try { credentialsService.deleteCredential(host); } catch (e) { console.warn('deleteOpdsCredential failed', e); }
 }
 
-export function findCredentialForUrl(url: string) {
-  const host = getHostFromUrl(url);
-  return getStoredOpdsCredentials().find(c => c.host === host);
+export async function findCredentialForUrl(url: string) {
+  try {
+    await migrateLegacyCredentials();
+    const host = getHostFromUrl(url);
+    return await credentialsService.findCredential(host);
+  } catch (e) { return undefined; }
 }
 
 function etagKeyFor(url: string) {
@@ -467,7 +472,11 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
 
     if (ok) {
-      if (ct.includes('application/json') || ct.includes('text/json')) {
+      // OPDS2 servers should return JSON or a Location redirect. Do not
+      // attempt to parse XML here; XML acquisition docs belong to OPDS1 and
+      // are handled by the OPDS1 resolver. If an OPDS2 endpoint returns XML
+      // it is treated as an unsupported response.
+      if (ct.includes('application/json') || ct.includes('text/json') || ct.includes('application/opds+json')) {
         const j = await resp.json().catch(() => null);
         const candidate = j?.url || j?.location || j?.href || j?.contentLocation;
         if (typeof candidate === 'string' && candidate.length > 0) return new URL(candidate, current).href;
@@ -476,7 +485,6 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
           if (contentLink?.href) return new URL(contentLink.href, current).href;
         }
       }
-
       const loc = resp.headers.get('Location') || resp.headers.get('location');
       if (loc) return new URL(loc, current).href;
 

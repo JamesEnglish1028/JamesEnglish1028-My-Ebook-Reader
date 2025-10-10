@@ -20,6 +20,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 const PdfReaderView = lazy(() => import('./components/PdfReaderView'));
 import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl, maybeProxyForCors } from './services/utils';
 import OpdsCredentialsModal from './components/OpdsCredentialsModal';
+import ToastStack from './components/toast/ToastStack';
 import { resolveAcquisitionChain, findCredentialForUrl, saveOpdsCredential } from './services/opds2';
 
 
@@ -265,7 +266,7 @@ const AppInner: React.FC = () => {
       let finalUrl = book.downloadUrl;
       try {
         // try to resolve; will throw on 401/403 so we can prompt
-        const cred = findCredentialForUrl(book.downloadUrl);
+        const cred = await findCredentialForUrl(book.downloadUrl);
         const resolved = await resolveAcquisitionChain(book.downloadUrl, cred ? { username: cred.username, password: cred.password } : null);
         if (resolved) finalUrl = resolved;
       } catch (e: any) {
@@ -280,7 +281,7 @@ const AppInner: React.FC = () => {
       }
 
   const proxyUrl = await maybeProxyForCors(finalUrl);
-      const storedCred = findCredentialForUrl(book.downloadUrl);
+      const storedCred = await findCredentialForUrl(book.downloadUrl);
       const downloadHeaders: Record<string,string> = {};
       if (storedCred) {
         downloadHeaders['Authorization'] = `Basic ${btoa(`${storedCred.username}:${storedCred.password}`)}`;
@@ -323,7 +324,7 @@ const AppInner: React.FC = () => {
       const resolved = await resolveAcquisitionChain(href, { username, password });
       if (resolved && credentialPrompt.pendingBook) {
         // Optionally save credential
-        if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
+  if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
         // Proceed to import using resolved URL
         setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
         setImportStatus({ isLoading: true, message: `Downloading ${credentialPrompt.pendingBook.title}...`, error: null });

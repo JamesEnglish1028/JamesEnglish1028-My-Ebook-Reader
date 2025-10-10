@@ -107,6 +107,8 @@ export interface CatalogBook {
   providerId?: string;
   subjects?: string[];
   format?: 'EPUB' | 'PDF' | string;
+  // Raw acquisition media type from the catalog/link (e.g. application/pdf+lcp, application/adobe+epub)
+  acquisitionMediaType?: string;
 }
 
 export interface CatalogNavigationLink {

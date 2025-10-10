@@ -5,8 +5,12 @@ import { BookMetadata, CatalogBook, CoverAnimationData, BookRecord } from '../ty
 import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
 import Spinner from './Spinner';
 import DuplicateBookModal from './DuplicateBookModal';
+import OpdsCredentialsModal from './OpdsCredentialsModal';
+import { resolveAcquisitionChainOpds1 } from '../services/opds';
+import { saveOpdsCredential, findCredentialForUrl } from '../services/opds2';
 import { db } from '../services/db';
 import { proxiedUrl } from '../services/utils';
+import { useToast } from './toast/ToastContext';
 
 interface BookDetailViewProps {
   book: BookMetadata | CatalogBook;
@@ -64,6 +68,11 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [duplicateBook, setDuplicateBook] = useState<BookRecord | null>(null);
   const [existingBook, setExistingBook] = useState<BookRecord | null>(null);
+  const [credModalOpen, setCredModalOpen] = useState(false);
+  const [credHost, setCredHost] = useState<string | null>(null);
+  const [credAuthDoc, setCredAuthDoc] = useState<any | undefined>(undefined);
+  const [pendingCatalogBook, setPendingCatalogBook] = useState<CatalogBook | null>(null);
+  const toast = useToast();
 
   const libraryBook = isLibraryBook(book) ? book : null;
   const catalogBook = !isLibraryBook(book) ? book : null;
@@ -94,11 +103,125 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
   const handleAddToBookshelf = async () => {
     if (catalogBook) {
+        // If the catalog looks like a Palace/OPDS1 host and the acquisition
+        // appears to be a Palace/LCP style type, attempt to resolve the
+        // acquisition chain (may require authentication). If auth is needed,
+        // show the credentials modal and let the user retry.
+        const acqType = (catalogBook as any).acquisitionMediaType || '';
+        const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
+        const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
+
+        if (isPalace) {
+            setImportStatus({ isLoading: true, message: 'Resolving acquisition...', error: null });
+            setPendingCatalogBook(catalogBook);
+      try {
+  // First, try any stored credential for this host automatically
+  const stored = await findCredentialForUrl(catalogBook.downloadUrl);
+        let finalHref = null;
+        if (stored) {
+          try {
+            finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, { username: stored.username, password: stored.password });
+            // Inform the user a stored credential was used
+            try { toast.pushToast('Using saved credentials', 3000); } catch {}
+          } catch (e) {
+            // Stored credentials failed; we'll fall back to an unauthenticated attempt below
+            finalHref = null;
+          }
+        }
+
+        if (!finalHref) {
+          finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, null);
+        }
+                if (finalHref) {
+                    // Convert into a CatalogBook-like object for import flow
+                    const clone = { ...catalogBook, downloadUrl: finalHref } as CatalogBook;
+                    const result = await onImportFromCatalog(clone, catalogName);
+                    if (!result.success && result.bookRecord && result.existingBook) {
+                        setDuplicateBook(result.bookRecord);
+                        setExistingBook(result.existingBook);
+                    }
+                } else {
+                    setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
+                }
+            } catch (err: any) {
+                // If the resolver throws an error with an authDocument, surface the
+                // credentials modal and allow the user to supply credentials.
+                if (err && err.authDocument) {
+                    setCredHost((catalogBook as any).providerName || (new URL(catalogBook.downloadUrl).host));
+                    setCredAuthDoc(err.authDocument);
+                    setCredModalOpen(true);
+                } else {
+                    setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
+                }
+            }
+            setPendingCatalogBook(null);
+            return;
+        }
+
         const result = await onImportFromCatalog(catalogBook, catalogName);
         if (!result.success && result.bookRecord && result.existingBook) {
             setDuplicateBook(result.bookRecord);
             setExistingBook(result.existingBook);
         }
+    }
+  };
+
+  // Handler when user submits credentials from the modal
+  const handleCredSubmit = async (username: string, password: string, save: boolean) => {
+    setCredModalOpen(false);
+    if (!pendingCatalogBook) {
+      // No pending book; nothing to retry
+      return;
+    }
+    setImportStatus({ isLoading: true, message: 'Retrying acquisition with credentials...', error: null });
+    try {
+      const creds = { username, password };
+      // Optionally persist
+      if (save && credHost) saveOpdsCredential(credHost, username, password);
+      const finalHref = await resolveAcquisitionChainOpds1(pendingCatalogBook.downloadUrl, creds as any);
+      if (finalHref) {
+        const clone = { ...pendingCatalogBook, downloadUrl: finalHref } as CatalogBook;
+        const result = await onImportFromCatalog(clone, catalogName);
+        if (!result.success && result.bookRecord && result.existingBook) {
+            setDuplicateBook(result.bookRecord);
+            setExistingBook(result.existingBook);
+        }
+      } else {
+        setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link with provided credentials.' });
+      }
+    } catch (err: any) {
+      setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition with credentials.' });
+    }
+  };
+
+  const handleOpenAuthLink = (href: string) => {
+    // Open provider auth link in a new tab/window; user can sign in and then click Retry
+    try { window.open(href, '_blank', 'noopener'); } catch {}
+  };
+
+  const handleRetry = async () => {
+    // Retry without credentials (use stored credentials if available) or prompt modal
+    if (!pendingCatalogBook) return;
+    setImportStatus({ isLoading: true, message: 'Retrying acquisition...', error: null });
+    try {
+      const finalHref = await resolveAcquisitionChainOpds1(pendingCatalogBook.downloadUrl, null);
+      if (finalHref) {
+        const clone = { ...pendingCatalogBook, downloadUrl: finalHref } as CatalogBook;
+        const result = await onImportFromCatalog(clone, catalogName);
+        if (!result.success && result.bookRecord && result.existingBook) {
+            setDuplicateBook(result.bookRecord);
+            setExistingBook(result.existingBook);
+        }
+      } else {
+        setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
+      }
+    } catch (err: any) {
+      if (err && err.authDocument) {
+        setCredAuthDoc(err.authDocument);
+        setCredModalOpen(true);
+      } else {
+        setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
+      }
     }
   };
 
@@ -189,12 +312,22 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                         <BookIcon className="w-6 h-6 mr-2" />
                         Read Book
                     </button>
-                ) : (
-                    <button onClick={handleAddToBookshelf} disabled={importStatus.isLoading || (!!format && format !== 'EPUB')} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                        <DownloadIcon className="w-6 h-6 mr-2" />
-                        {!!format && format !== 'EPUB' ? `Cannot Import ${format}` : 'Add to Bookshelf'}
-                    </button>
-                )}
+        ) : (
+          (() => {
+            // If acquisitionMediaType indicates Palace/DRM or LCP-style acquisition,
+            // the UX should surface that the book must be opened in the Palace App.
+            const acqType = (catalogBook && (catalogBook as any).acquisitionMediaType) || undefined;
+            const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
+            const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
+            const disabled = importStatus.isLoading || (!!format && format !== 'EPUB');
+            return (
+              <button onClick={handleAddToBookshelf} disabled={disabled} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                <DownloadIcon className="w-6 h-6 mr-2" />
+                {isPalace ? 'Read in Palace App' : (!!format && format !== 'EPUB' ? `Cannot Import ${format}` : 'Add to Bookshelf')}
+              </button>
+            );
+          })()
+        )}
             </div>
         </aside>
 
@@ -320,6 +453,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         onAddAnyway={handleAddAnyway}
         bookTitle={duplicateBook?.title || ''}
       />
+  {/* ToastStack provided at app root; individual components push toasts via useToast().pushToast */}
+
+      <OpdsCredentialsModal isOpen={credModalOpen} host={credHost} authDocument={credAuthDoc} onClose={() => setCredModalOpen(false)} onSubmit={handleCredSubmit} onOpenAuthLink={handleOpenAuthLink} onRetry={handleRetry} />
     </div>
   );
 };
