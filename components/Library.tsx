@@ -1,14 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { db } from '../services/db';
-import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry } from '../types';
+import { BookMetadata, BookRecord, CoverAnimationData, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry, Collection, CollectionGroup, Category, CategoryLane, CategorizationMode, AudienceMode, FictionMode, MediaMode, CollectionMode } from '../types';
 import { UploadIcon, GlobeIcon, ChevronDownIcon, ChevronRightIcon, LeftArrowIcon, RightArrowIcon, FolderIcon, FolderOpenIcon, TrashIcon, AdjustmentsVerticalIcon, SettingsIcon, PlusIcon, CheckIcon, MeBooksBookIcon } from './icons';
 import Spinner from './Spinner';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import DuplicateBookModal from './DuplicateBookModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { Logo } from './Logo';
-import { fetchCatalogContent } from '../services/opds';
+import { fetchCatalogContent, groupBooksByMode, filterBooksByAudience, getAvailableAudiences, filterBooksByFiction, getAvailableFictionModes, filterBooksByMedia, getAvailableMediaModes, getAvailableCollections, getAvailableCategories } from '../services/opds';
 import { proxiedUrl } from '../services/utils';
+import { CollectionLane } from './CollectionLane';
+import { UncategorizedLane } from './UncategorizedLane';
+import { CategoryLaneComponent } from './CategoryLane';
+import { CollectionNavigation } from './CollectionNavigation';
 
 interface LibraryProps {
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
@@ -55,8 +59,25 @@ const Library: React.FC<LibraryProps> = ({
   const [registries, setRegistries] = useState<CatalogRegistry[]>([]);
 
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
+  const [originalCatalogBooks, setOriginalCatalogBooks] = useState<CatalogBook[]>([]); // Unfiltered books for availability checks
   const [catalogNavLinks, setCatalogNavLinks] = useState<CatalogNavigationLink[]>([]);
   const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>(null);
+  
+  // Collection-based organization state  
+  const [catalogCollections, setCatalogCollections] = useState<CollectionGroup[]>([]);
+  const [uncategorizedBooks, setUncategorizedBooks] = useState<CatalogBook[]>([]);
+  const [showCollectionView, setShowCollectionView] = useState(false);
+  
+  // Category-based organization state (with smooth transitions)
+  const [categoryLanes, setCategoryLanes] = useState<CategoryLane[]>([]);
+  const [collectionLinks, setCollectionLinks] = useState<Collection[]>([]);
+  const [showCategoryView, setShowCategoryView] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [categorizationMode, setCategorizationMode] = useState<CategorizationMode>('subject');
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('all');
+  const [fictionMode, setFictionMode] = useState<FictionMode>('all');
+  const [mediaMode, setMediaMode] = useState<MediaMode>('all');
+  const [collectionMode, setCollectionMode] = useState<CollectionMode>('all');
 
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -69,6 +90,7 @@ const Library: React.FC<LibraryProps> = ({
   const [bookToDelete, setBookToDelete] = useState<BookMetadata | null>(null);
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('ebook-sort-order') || 'added-desc');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const [isAudienceDropdownOpen, setIsAudienceDropdownOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
 
@@ -203,17 +225,18 @@ const Library: React.FC<LibraryProps> = ({
     setIsCatalogLoading(true);
     setCatalogError(null);
     setCatalogBooks([]);
+    setOriginalCatalogBooks([]);
     setCatalogNavLinks([]);
     setCatalogPagination(null);
 
-  // If the activeOpdsSource includes an opdsVersion preference, pass it through
-  const forcedVersion = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto';
-  // Diagnostic: log the forcedVersion so we can verify the UI selection propagates
-  // into the fetch path when users force OPDS1/OPDS2.
-  // This will appear in the browser console during manual reproduction.
-  // eslint-disable-next-line no-console
-  console.debug('[mebooks] fetchAndParseSource - forcedVersion:', forcedVersion, 'url:', url);
-  const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
+    // If the activeOpdsSource includes an opdsVersion preference, pass it through
+    // Force Palace hosts to use OPDS 1 to get collection navigation links
+    const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
+    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+    
+    const forcedVersion = isPalaceHost ? '1' : ((activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto');
+    const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
+    
     if (error) {
         setCatalogError(error);
     } else {
@@ -228,19 +251,75 @@ const Library: React.FC<LibraryProps> = ({
             finalNavLinks = navLinks.filter(nav => !paginationUrls.includes(nav.url));
         }
         
-        setCatalogBooks(books);
+        // Check for category-based organization first (preferred)
+        const hasCategories = books.some(book => book.categories && book.categories.length > 0);
+        const hasSubjects = books.some(book => book.subjects && book.subjects.length > 0);
+        const hasCollections = books.some(book => book.collections && book.collections.length > 0);
+        
+        // Apply filtering chain: audience -> fiction -> media
+        const audienceFilteredBooks = filterBooksByAudience(books, audienceMode);
+        const fictionFilteredBooks = filterBooksByFiction(audienceFilteredBooks, fictionMode);
+        const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
+        
+        // Use the selected categorization mode
+        if (categorizationMode === 'flat') {
+            // Force flat view - no categorization
+            setCatalogCollections([]);
+            setCategoryLanes([]);
+            setCollectionLinks([]);
+            setUncategorizedBooks([]);
+            setShowCollectionView(false);
+            setShowCategoryView(false);
+            setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
+        } else if (categorizationMode === 'subject' && hasSubjects) {
+            // Use subjects-based categorization
+            const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, pagination, categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode);
+            setCategoryLanes(lanes);
+            setCollectionLinks(collLinks);
+            setUncategorizedBooks(uncategorized);
+            setShowCategoryView(true);
+            setShowCollectionView(false);
+        } else {
+            // No viable categorization - show flat view
+            setCatalogCollections([]);
+            setCategoryLanes([]);
+            setCollectionLinks([]);
+            setUncategorizedBooks([]);
+            setShowCollectionView(false);
+            setShowCategoryView(false);
+            setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
+        }
+        
+        // Set catalogBooks for all non-flat modes (flat mode sets it directly)
+        if (categorizationMode !== 'flat') {
+            setCatalogBooks(finalFilteredBooks);
+        }
+        setOriginalCatalogBooks(books); // Store unfiltered books for availability checks
         setCatalogNavLinks(finalNavLinks);
         setCatalogPagination(pagination);
     }
     setIsCatalogLoading(false);
-  }, []);
+  }, [categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode]);
   
   const handleSelectSource = useCallback((source: 'library' | Catalog | CatalogRegistry) => {
     setIsCatalogDropdownOpen(false);
     if (source === 'library') {
       setActiveOpdsSource(null);
       setCatalogNavPath([]);
+      // Reset filters when going back to local library
+      setCategorizationMode('subject');
+      setAudienceMode('all');
+      setFictionMode('all');
+      setMediaMode('all');
+      setCollectionMode('all');
     } else if (activeOpdsSource?.id !== source.id) {
+        // Reset filters when switching to a different catalog source
+        setCategorizationMode('subject');
+        setAudienceMode('all');
+        setFictionMode('all');
+        setMediaMode('all');
+        setCollectionMode('all');
+        
         setActiveOpdsSource(source);
         // When a new source is selected, reset the navigation path to its root.
         setCatalogNavPath([{ name: source.name, url: source.url }]);
@@ -302,10 +381,20 @@ const Library: React.FC<LibraryProps> = ({
   };
 
   const handleNavLinkClick = (link: {title: string, url: string}) => {
+    // Reset filters when navigating to a new catalog section
+    setCategorizationMode('subject');
+    setAudienceMode('all');
+    setFictionMode('all');
+    setMediaMode('all');
     setCatalogNavPath(prev => [...prev, { name: link.title, url: link.url }]);
   };
 
   const handleBreadcrumbClick = (index: number) => {
+    // Reset filters when navigating via breadcrumbs
+    setCategorizationMode('subject');
+    setAudienceMode('all');
+    setFictionMode('all');
+    setMediaMode('all');
     setCatalogNavPath(prev => prev.slice(0, index + 1));
   };
 
@@ -404,6 +493,37 @@ const Library: React.FC<LibraryProps> = ({
   const handleCatalogBookClick = (book: CatalogBook) => {
       onShowBookDetail(book, 'catalog', activeOpdsSource?.name);
   };
+
+  // Collection navigation with smooth transitions
+  const handleToggleCategoryView = useCallback(async () => {
+      setIsTransitioning(true);
+      await new Promise(resolve => setTimeout(resolve, 150));
+      setShowCategoryView(!showCategoryView);
+      setIsTransitioning(false);
+  }, [showCategoryView]);
+
+  const handleToggleCollectionView = useCallback(async () => {
+      setIsTransitioning(true);
+      await new Promise(resolve => setTimeout(resolve, 150));
+      setShowCollectionView(!showCollectionView);
+      setIsTransitioning(false);
+  }, [showCollectionView]);
+
+  const handleCollectionClick = useCallback(async (collection: Collection) => {
+      if (activeOpdsSource) {
+          // Reset filters when navigating to a new collection to avoid conflicts
+          setCategorizationMode('subject'); // Reset to default
+          setAudienceMode('all'); // Reset to show all audiences
+          setFictionMode('all'); // Reset to show all fiction types
+          setMediaMode('all'); // Reset to show all media types
+          
+          // Navigate to the collection's catalog by updating the navigation path
+          const newNavPath = [...catalogNavPath, { name: collection.title, url: collection.href }];
+          setCatalogNavPath(newNavPath);
+          // Fetch and parse the collection content
+          await fetchAndParseSource(collection.href, activeOpdsSource.url);
+      }
+  }, [activeOpdsSource, catalogNavPath, setCatalogNavPath, fetchAndParseSource]);
 
   const handleToggleNode = useCallback(async (nodeUrl: string) => {
     const findAndUpdateNode = async (nodes: CatalogNavigationLink[]): Promise<CatalogNavigationLink[]> => {
@@ -601,41 +721,111 @@ const Library: React.FC<LibraryProps> = ({
                 
                 {catalogBooks.length > 0 && (
                     <>
-                        {catalogNavLinks.length > 0 && <h2 className="text-lg font-semibold text-slate-300 mb-4">Books</h2>}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                            {catalogBooks.map((book, index) => (
-                                <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group relative">
-                                    <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
-                                        {book.coverImage ? (
-                                        <img
-                                            src={book.coverImage}
-                                            alt={book.title}
-                                            className="w-full h-full object-cover"
-                                            loading="lazy"
-                                            onError={(e) => {
-                                              const img = e.currentTarget as HTMLImageElement;
-                                              // Prevent infinite retry loop by clearing handler first
-                                              img.onerror = null as any;
-                                              img.src = proxiedUrl(book.coverImage as string);
-                                            }}
-                                        />
-                                        ) : (
-                                        <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
-                                            <span className="font-semibold">{book.title}</span>
-                                        </div>
+                        <div className="flex items-center justify-between mb-4">
+                            {catalogNavLinks.length > 0 && <h2 className="text-lg font-semibold text-slate-300">Books</h2>}
+                            <div className="flex gap-2">
+                                {/* Show collection navigation when collections exist in any form */}
+                                {(catalogCollections.length > 0 || collectionLinks.length > 0) && (
+                                    <div className="flex gap-2">
+                                        {catalogCollections.length > 0 && (
+                                            <button
+                                                onClick={handleToggleCollectionView}
+                                                disabled={isTransitioning}
+                                                className="text-sm text-sky-400 hover:text-sky-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {showCollectionView ? 'Show All Books' : 'Group by Collections'}
+                                            </button>
                                         )}
-                                    </div>
-                                    <div className="mt-2 space-y-1">
-                                        <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
-                                        <p className="text-xs text-slate-400 truncate">{book.author}</p>
-                                        {book.format && (
-                                            <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
-                                                {book.format}
+                                        {collectionLinks.length > 0 && showCategoryView && (
+                                            <span className="text-sm text-slate-400">
+                                                Collections available below ↓
                                             </span>
                                         )}
                                     </div>
+                                )}
+                            </div>
+                        </div>
+
+                        
+                        {/* Dynamic Content Area with Smooth Transitions */}
+                        <div className={`transition-all duration-500 ease-in-out ${isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
+                            {/* Category-based lanes (preferred) */}
+                            {showCategoryView && categoryLanes.length > 0 ? (
+                                <div className="space-y-6 animate-fadeIn">
+                                    {categoryLanes.map((categoryLane, laneIndex) => (
+                                        <CategoryLaneComponent
+                                            key={`${categoryLane.category.label}-${laneIndex}`}
+                                            categoryLane={categoryLane}
+                                            onBookClick={handleCatalogBookClick}
+                                        />
+                                    ))}
+                                    
+                                    {uncategorizedBooks.length > 0 && (
+                                        <UncategorizedLane
+                                            books={uncategorizedBooks}
+                                            onBookClick={handleCatalogBookClick}
+                                        />
+                                    )}
                                 </div>
-                            ))}
+                            ) : showCollectionView && catalogCollections.length > 0 ? (
+                                <div className="space-y-6 animate-fadeIn">
+                                    {catalogCollections.map((collectionGroup, groupIndex) => (
+                                        <CollectionLane
+                                            key={`${collectionGroup.collection.title}-${groupIndex}`}
+                                            collection={collectionGroup.collection}
+                                            books={collectionGroup.books}
+                                            onBookClick={handleCatalogBookClick}
+                                            onCollectionClick={handleCollectionClick}
+                                        />
+                                    ))}
+                                    
+                                    {uncategorizedBooks.length > 0 && (
+                                        <UncategorizedLane
+                                            books={uncategorizedBooks}
+                                            onBookClick={handleCatalogBookClick}
+                                        />
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 animate-fadeIn">
+                                    {catalogBooks.map((book, index) => (
+                                        <div key={`${book.downloadUrl}-${index}`} onClick={() => handleCatalogBookClick(book)} className="cursor-pointer group relative">
+                                            <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300">
+                                                {book.coverImage ? (
+                                                <img
+                                                    src={book.coverImage}
+                                                    alt={book.title}
+                                                    className="w-full h-full object-cover"
+                                                    loading="lazy"
+                                                    onError={(e) => {
+                                                      const img = e.currentTarget as HTMLImageElement;
+                                                      img.onerror = null as any;
+                                                      img.src = proxiedUrl(book.coverImage as string);
+                                                    }}
+                                                />
+                                                ) : (
+                                                <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
+                                                    <span className="font-semibold">{book.title}</span>
+                                                </div>
+                                                )}
+                                            </div>
+                                            <div className="mt-2 space-y-1">
+                                                <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
+                                                <p className="text-xs text-slate-400 truncate">{book.author}</p>
+                                                {book.format && (
+                                                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                                                        book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                                                        book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                                                        'bg-sky-500'
+                                                    }`}>
+                                                        {book.format}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
@@ -702,7 +892,11 @@ const Library: React.FC<LibraryProps> = ({
                   <div className="mt-2 space-y-1">
                     <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
                     <p className="text-xs text-slate-400 truncate">{book.author}</p>
-                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
+                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                        (book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                        (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                        'bg-sky-500'
+                    }`}>
                         {book.format || 'EPUB'}
                     </span>
                   </div>
@@ -728,6 +922,106 @@ const Library: React.FC<LibraryProps> = ({
     { key: 'pubdate-desc', label: 'Publication Date (Newest)' },
     { key: 'pubdate-asc', label: 'Publication Date (Oldest)' },
   ];
+
+  // Check available data for categorization options (using original unfiltered books)
+  // Use useMemo to ensure this only runs when originalCatalogBooks changes
+  const { hasAvailableCategories, hasAvailableSubjects, hasAvailableCollections, availableAudiences, availableFictionModes, availableMediaModes, availableCollections, availableGenreCategories } = useMemo(() => {
+    const hasCategories = originalCatalogBooks.some(book => book.categories && book.categories.length > 0);
+    const hasSubjects = originalCatalogBooks.some(book => book.subjects && book.subjects.length > 0);
+    
+    const audiences = getAvailableAudiences(originalCatalogBooks);
+    const fictionModes = getAvailableFictionModes(originalCatalogBooks);
+    const mediaModes = getAvailableMediaModes(originalCatalogBooks);
+    const collections = getAvailableCollections(originalCatalogBooks, catalogNavLinks);
+    const genreCategories = getAvailableCategories(originalCatalogBooks, catalogNavLinks);
+    
+    // Check if collections are available either from books or navigation links
+    const hasCollections = collections.length > 0;
+    
+    return {
+      hasAvailableCategories: hasCategories,
+      hasAvailableSubjects: hasSubjects,
+      hasAvailableCollections: hasCollections,
+      availableAudiences: audiences,
+      availableFictionModes: fictionModes,
+      availableMediaModes: mediaModes,
+      availableCollections: collections,
+      availableGenreCategories: genreCategories
+    };
+  }, [originalCatalogBooks, catalogNavLinks]);
+
+  const audienceOptions = [
+    { key: 'all' as AudienceMode, label: 'All Ages', available: true },
+    { key: 'adult' as AudienceMode, label: 'Adult', available: availableAudiences.includes('adult') },
+    { key: 'young-adult' as AudienceMode, label: 'Young Adult', available: availableAudiences.includes('young-adult') },
+    { key: 'children' as AudienceMode, label: 'Children', available: availableAudiences.includes('children') },
+  ];
+
+  const fictionOptions = [
+    { key: 'all' as FictionMode, label: 'All Types', available: true },
+    { key: 'fiction' as FictionMode, label: 'Fiction', available: availableFictionModes.includes('fiction') },
+    { key: 'non-fiction' as FictionMode, label: 'Non-Fiction', available: availableFictionModes.includes('non-fiction') },
+  ];
+
+  const mediaOptions = [
+    { key: 'all' as MediaMode, label: 'All Media', available: true },
+    { key: 'ebook' as MediaMode, label: 'E-Books', available: availableMediaModes.includes('ebook') },
+    { key: 'audiobook' as MediaMode, label: 'Audiobooks', available: availableMediaModes.includes('audiobook') },
+  ];
+
+  const handleCategorizationChange = (mode: CategorizationMode) => {
+    setCategorizationMode(mode);
+    
+    // If we have an active OPDS source, re-fetch to apply the new categorization
+    if (activeOpdsSource && catalogNavPath.length > 0) {
+      const currentPath = catalogNavPath[catalogNavPath.length - 1];
+      fetchAndParseSource(currentPath.url, activeOpdsSource.url);
+    }
+  };
+
+  const handleAudienceChange = (mode: AudienceMode) => {
+    setAudienceMode(mode);
+    
+    // Audience filtering is client-side only, no need to re-fetch
+    // The useMemo will automatically re-run when audienceMode changes
+  };
+
+  const handleFictionChange = (mode: FictionMode) => {
+    setFictionMode(mode);
+    
+    // Fiction filtering is client-side only, no need to re-fetch
+    // The useMemo will automatically re-run when fictionMode changes
+  };
+
+  const handleMediaChange = (mode: MediaMode) => {
+    setMediaMode(mode);
+    
+    // Media filtering is client-side only, no need to re-fetch
+    // The useMemo will automatically re-run when mediaMode changes
+  };
+
+  const handleCollectionChange = (mode: CollectionMode) => {
+    if (mode === 'all') {
+      setCollectionMode(mode);
+      return;
+    }
+    
+    // Check if this collection corresponds to a navigation link
+    const collectionNavLink = catalogNavLinks.find(link => 
+      (link.rel === 'collection' || link.rel === 'subsection') && link.title === mode
+    );
+    
+    if (collectionNavLink) {
+      // Navigate to the collection's feed
+      if (activeOpdsSource) {
+        setCatalogNavPath(prev => [...prev, { name: collectionNavLink.title, url: collectionNavLink.url }]);
+        fetchAndParseSource(collectionNavLink.url, activeOpdsSource.url);
+      }
+    } else {
+      // It's a book-level collection, just filter
+      setCollectionMode(mode);
+    }
+  };
 
   const currentTitle = activeOpdsSource ? activeOpdsSource.name : 'My Library';
   const isBrowsingOpds = !!activeOpdsSource;
@@ -805,6 +1099,30 @@ const Library: React.FC<LibraryProps> = ({
                     )}
                 </div>
             )}
+            
+            {/* Categorization Mode Toggle - Only show for OPDS catalogs */}
+            {isBrowsingOpds && hasAvailableSubjects && (
+                <div className="flex items-center space-x-3">
+                    <span className="text-sm text-slate-300 font-medium">View:</span>
+                    <button
+                        onClick={() => setCategorizationMode(categorizationMode === 'subject' ? 'flat' : 'subject')}
+                        aria-label={`Switch to ${categorizationMode === 'subject' ? 'flat view' : 'category view'}`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
+                            categorizationMode === 'subject' ? 'bg-emerald-600' : 'bg-slate-600'
+                        }`}
+                    >
+                        <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                categorizationMode === 'subject' ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                        />
+                    </button>
+                    <span className="text-sm text-slate-300">
+                        {categorizationMode === 'subject' ? 'By Category' : 'All Books (Flat)'}
+                    </span>
+                </div>
+            )}
+
             <label htmlFor="epub-upload" className={`cursor-pointer bg-sky-500 hover:bg-sky-600 text-white font-bold p-2 sm:py-2 sm:px-4 rounded-lg inline-flex items-center transition-colors duration-200 ${importStatus.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <UploadIcon className="w-5 h-5 sm:mr-2" />
               <span className="hidden sm:inline">Import Book</span>
@@ -886,7 +1204,7 @@ const Library: React.FC<LibraryProps> = ({
       </header>
 
       {isBrowsingOpds && catalogNavPath.length > 0 && (
-          <nav aria-label="breadcrumb" className="flex items-center text-sm text-slate-400 mb-6 flex-wrap">
+          <nav aria-label="breadcrumb" className="flex items-center text-sm text-slate-400 mb-4 flex-wrap">
               {catalogNavPath.map((item, index) => (
                   <React.Fragment key={index}>
                       <button 
@@ -899,6 +1217,115 @@ const Library: React.FC<LibraryProps> = ({
                   </React.Fragment>
               ))}
           </nav>
+      )}
+
+      {/* Category Navigation - for genre-based filtering when browsing OPDS */}
+      {isBrowsingOpds && (availableGenreCategories.length > 0 || availableAudiences.length > 1 || availableFictionModes.length > 1) && (
+          <div className="bg-slate-800/50 rounded-lg p-4 mb-6">
+              {availableGenreCategories.length > 0 && (
+                  <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-slate-300 mb-3">Browse by Category</h3>
+                      <div className="flex flex-wrap gap-2">
+                          <button
+                              onClick={() => {/* Navigate to all books */}}
+                              className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md text-sm transition-colors"
+                          >
+                              All Books
+                          </button>
+                          {availableGenreCategories.map(category => (
+                              <button
+                                  key={category}
+                                  onClick={() => {
+                                      // Navigate to category-specific feed
+                                      const categoryNavLink = catalogNavLinks.find(link => 
+                                          (link.rel === 'collection' || link.rel === 'subsection') && 
+                                          link.title === category &&
+                                          link.url.includes('/groups/')
+                                      );
+                                      
+                                      if (categoryNavLink && activeOpdsSource) {
+                                          setCatalogNavPath(prev => [...prev, { name: categoryNavLink.title, url: categoryNavLink.url }]);
+                                          fetchAndParseSource(categoryNavLink.url, activeOpdsSource.url);
+                                      }
+                                  }}
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm transition-colors"
+                              >
+                                  {category}
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+              )}
+              
+              {/* Filters Row */}
+              <div className="flex flex-wrap gap-4 items-center">
+                  {/* Audience Filter */}
+                  {availableAudiences.length > 1 && (
+                      <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-400">Audience:</span>
+                          <div className="flex gap-1">
+                              {audienceOptions.filter(option => option.available).map(option => (
+                                  <button
+                                      key={option.key}
+                                      onClick={() => handleAudienceChange(option.key)}
+                                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                          audienceMode === option.key 
+                                              ? 'bg-blue-600 text-white' 
+                                              : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                      }`}
+                                  >
+                                      {option.label.replace('All Ages', 'All')}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+                  
+                  {/* Fiction Filter */}
+                  {availableFictionModes.length > 1 && (
+                      <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-400">Type:</span>
+                          <div className="flex gap-1">
+                              {fictionOptions.filter(option => option.available).map(option => (
+                                  <button
+                                      key={option.key}
+                                      onClick={() => handleFictionChange(option.key)}
+                                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                          fictionMode === option.key 
+                                              ? 'bg-purple-600 text-white' 
+                                              : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                      }`}
+                                  >
+                                      {option.label.replace('All Types', 'All')}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+                  
+                  {/* Format Filter */}
+                  {isBrowsingOpds && availableMediaModes.length > 1 && (
+                      <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-400">Format:</span>
+                          <div className="flex gap-1">
+                              {mediaOptions.filter(option => option.available).map(option => (
+                                  <button
+                                      key={option.key}
+                                      onClick={() => handleMediaChange(option.key)}
+                                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                          mediaMode === option.key 
+                                              ? 'bg-indigo-600 text-white' 
+                                              : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                      }`}
+                                  >
+                                      {option.label.replace('All Media', 'All')}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+              </div>
+          </div>
       )}
 
       {(importStatus.isLoading || importStatus.error || importStatus.message === 'Import successful!') && (
@@ -927,7 +1354,59 @@ const Library: React.FC<LibraryProps> = ({
         </div>
       )}
       
-      {renderCurrentView()}
+      {/* Main Content Area with Sidebar Layout */}
+      {isBrowsingOpds && availableCollections.length > 0 ? (
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Collections Sidebar */}
+          <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
+            <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
+              <h3 className="text-lg font-semibold text-white mb-4">Collections</h3>
+              <nav className="space-y-2">
+                <button
+                  onClick={() => handleCollectionChange('all')}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    (collectionMode === 'all' && catalogNavPath.length <= 1) || (!collectionMode || collectionMode === 'all')
+                      ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500' 
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
+                  }`}
+                >
+                  All Books
+                </button>
+                {availableCollections.map((collection, index) => {
+                  // Check multiple conditions for active state
+                  const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
+                  const isActiveByMode = collectionMode === collection;
+                  const isActive = isActiveByPath || isActiveByMode;
+                  
+                  return (
+                    <button
+                      key={`${collection}-${index}`}
+                      onClick={() => handleCollectionChange(collection as CollectionMode)}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border-2 ${
+                        isActive 
+                          ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500' 
+                          : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
+                      }`}
+                    >
+                      <span className={isActive ? '📁' : '📂'}>
+                        {isActive ? '📁' : '📂'}
+                      </span>
+                      {collection}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </aside>
+          
+          {/* Main Content */}
+          <main className="flex-1 min-w-0 order-1 lg:order-2">
+            {renderCurrentView()}
+          </main>
+        </div>
+      ) : (
+        renderCurrentView()
+      )}
 
       <ManageCatalogsModal
         isOpen={isManageCatalogsOpen}

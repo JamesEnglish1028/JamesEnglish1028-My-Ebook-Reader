@@ -96,6 +96,28 @@ export interface CatalogRegistry {
   url: string;
 }
 
+export interface Collection {
+  title: string;
+  href: string;
+  description?: string;
+}
+
+export interface Series {
+  name: string;
+  position?: number;
+}
+
+export interface Category {
+  scheme: string;
+  term: string;
+  label: string;
+}
+
+export interface CategoryLane {
+  category: Category;
+  books: CatalogBook[];
+}
+
 export interface CatalogBook {
   title: string;
   author: string;
@@ -109,6 +131,14 @@ export interface CatalogBook {
   format?: 'EPUB' | 'PDF' | string;
   // Raw acquisition media type from the catalog/link (e.g. application/pdf+lcp, application/adobe+epub)
   acquisitionMediaType?: string;
+  // Media type from schema:additionalType (e.g. http://schema.org/EBook, http://bib.schema.org/Audiobook)
+  mediaType?: string;
+  // OPDS 1: Navigation links to collection feeds (rel="collection")
+  collections?: Collection[];
+  // OPDS 2: Series membership metadata (belongsTo)
+  series?: Series;
+  // Category information for Palace.io OPDS1 feeds  
+  categories?: Category[];
 }
 
 export interface CatalogNavigationLink {
@@ -130,6 +160,38 @@ export interface CatalogPagination {
   prev?: string;
   first?: string;
   last?: string;
+}
+
+export type CategorizationMode = 'subject' | 'flat';
+
+export type AudienceMode = 'all' | 'adult' | 'young-adult' | 'children';
+
+export type FictionMode = 'all' | 'fiction' | 'non-fiction';
+
+export type MediaMode = 'all' | 'ebook' | 'audiobook';
+
+export type CollectionMode = 'all' | string; // 'all' or specific collection name
+
+export interface CollectionGroup {
+  collection: Collection;
+  books: CatalogBook[];
+}
+
+export interface CatalogWithCollections {
+  books: CatalogBook[];
+  navLinks: CatalogNavigationLink[];
+  pagination: CatalogPagination;
+  collections: CollectionGroup[];
+  uncategorizedBooks: CatalogBook[];
+}
+
+export interface CatalogWithCategories {
+  books: CatalogBook[];
+  navLinks: CatalogNavigationLink[];
+  pagination: CatalogPagination;
+  categoryLanes: CategoryLane[];
+  collectionLinks: Collection[];
+  uncategorizedBooks: CatalogBook[];
 }
 
 export interface GoogleUser {

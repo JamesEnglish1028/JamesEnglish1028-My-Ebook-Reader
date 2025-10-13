@@ -1,4 +1,4 @@
-import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
+import { CatalogBook, CatalogNavigationLink, CatalogPagination, Category, CategorizationMode, AudienceMode, FictionMode, MediaMode, CollectionMode, CatalogWithCategories, CatalogWithCollections, CollectionGroup, Series, Collection, CategoryLane } from '../types';
 import { proxiedUrl, maybeProxyForCors } from './utils';
 // NOTE: prefer a static import for `maybeProxyForCors` instead of a dynamic import
 // because static imports keep bundling deterministic and avoid creating a
@@ -145,10 +145,16 @@ export const getFormatFromMimeType = (mimeType: string | undefined): string | un
     const clean = mimeType.split(';')[0].trim().toLowerCase();
     if (clean.includes('epub') || clean === 'application/epub+zip') return 'EPUB';
     if (clean.includes('pdf') || clean === 'application/pdf') return 'PDF';
+    if (clean.includes('audiobook') || clean === 'http://bib.schema.org/audiobook') return 'AUDIOBOOK';
     // For ambiguous/non-media types (atom, opds catalog entries, etc.) return undefined so UI doesn't show raw mime strings
     return undefined;
 };
 
+/**
+ * Parses OPDS 1 XML feeds into a standardized format.
+ * Handles audiobook detection via schema:additionalType attributes.
+ * Supports Palace Project collection links and indirect acquisition chains.
+ */
 export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
@@ -170,6 +176,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     const navLinks: CatalogNavigationLink[] = [];
     const pagination: CatalogPagination = {};
     
+    // Extract pagination links from feed-level link elements
     const feedLinks = Array.from(xmlDoc.querySelectorAll('feed > link'));
     feedLinks.forEach(link => {
         const rel = link.getAttribute('rel');
@@ -187,6 +194,13 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
       const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
       const allLinks = Array.from(entry.querySelectorAll('link'));
       
+      // Check for schema:additionalType to detect audiobooks - this is how Palace Project
+      // marks audiobooks in their OPDS 1 feeds since they use schema.org vocabulary
+      const schemaType = entry.getAttribute('schema:additionalType');
+      const isAudiobook = schemaType === 'http://bib.schema.org/Audiobook' || 
+                         schemaType === 'http://schema.org/Audiobook';
+      
+      // Find acquisition links for downloadable books - prefer specific media types
       const acquisitionLink = allLinks.find(link => {
           const rel = link.getAttribute('rel') || '';
           const type = link.getAttribute('type') || '';
@@ -205,14 +219,17 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
           
                     const downloadUrlHref = acquisitionLink?.getAttribute('href');
 
-                    // Try to determine media type: prefer the link's type attribute; if that
-                    // is not a media type, inspect nested opds:indirectAcquisition elements
-                    // (some OPDS feeds place the real media type there).
+                    // Determine media type for book format detection
                     const mimeType = acquisitionLink?.getAttribute('type') || '';
                     let format = getFormatFromMimeType(mimeType);
 
-                    if (!format) {
+                    // For audiobooks, override format based on schema:additionalType
+                    // This ensures Palace Project audiobooks are properly identified
+                    if (isAudiobook) {
+                        format = 'AUDIOBOOK';
+                    } else if (!format) {
                         // Recursively search for child elements named 'indirectAcquisition' to find a type
+                        // Some OPDS feeds use this for DRM-protected content or complex acquisition flows
                         const findIndirectType = (el: Element | null): string | undefined => {
                             if (!el) return undefined;
                             for (const child of Array.from(el.children)) {
@@ -243,8 +260,31 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
               .map(cat => cat.getAttribute('term')?.trim())
               .filter((term): term is string => !!term);
 
+          // Parse collection links - used for Palace Project navigation
+          // Collections are rel="collection" links that point to curated book sets
+          const collectionLinks = Array.from(entry.querySelectorAll('link[rel="collection"]'));
+          const collections = collectionLinks.map(link => {
+              const href = link.getAttribute('href');
+              const title = link.getAttribute('title');
+              if (href && title) {
+                  return {
+                      title: title.trim(),
+                      href: new URL(href, baseUrl).href
+                  };
+              }
+              return null;
+          }).filter((collection): collection is { title: string; href: string } => collection !== null);
+
           if(downloadUrlHref) {
               const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
+              
+              // Determine the correct acquisitionMediaType for proper format detection
+              // For audiobooks, use the schema type; otherwise use the link's mime type
+              let finalMediaType = mimeType;
+              if (isAudiobook) {
+                  finalMediaType = 'http://bib.schema.org/Audiobook';
+              }
+              
               books.push({ 
                   title, 
                   author, 
@@ -256,7 +296,8 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   providerId, 
                   subjects: subjects.length > 0 ? subjects : undefined,
                   format,
-                  acquisitionMediaType: mimeType || undefined
+                  acquisitionMediaType: finalMediaType || undefined,
+                  collections: collections.length > 0 ? collections : undefined
               });
           }
       } else if (subsectionLink) {
@@ -358,6 +399,18 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     }).filter((s): s is string => !!s);
                 }
 
+                // Parse OPDS 2 series information from belongsTo
+                let series: Series | undefined = undefined;
+                if (metadata.belongsTo) {
+                    const belongsTo = metadata.belongsTo;
+                    if (belongsTo.name) {
+                        series = {
+                            name: belongsTo.name.trim(),
+                            position: typeof belongsTo.position === 'number' ? belongsTo.position : undefined
+                        };
+                    }
+                }
+
                 books.push({ 
                     title, 
                     author, 
@@ -368,6 +421,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     publicationDate, 
                     providerId, 
                     subjects: subjects.length > 0 ? subjects : undefined,
+                    series,
                     format,
                     acquisitionMediaType: mimeType || undefined
                 });
@@ -433,10 +487,9 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             fetchUrl = await maybeProxyForCors(url);
         }
         // Choose Accept header based on forcedVersion so servers return the expected format
-        // For Palace-hosted servers we prefer XML/Atom regardless of the forcedVersion
-        // because many palace endpoints respond better to XML-first Accept headers.
+        // For Palace-hosted servers we strongly prefer XML/Atom and avoid JSON to get collection navigation links
         const acceptHeader = isPalaceHost || forcedVersion === '1'
-            ? 'application/atom+xml;profile=opds-catalog, application/xml, text/xml, application/opds+json;q=0.8, application/json;q=0.6, */*;q=0.4'
+            ? 'application/atom+xml;profile=opds-catalog, application/xml, text/xml, */*'
             : 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5';
 
     // FIX: Added specific Accept header to signal preference for OPDS formats.
@@ -533,7 +586,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                 } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
                     return parseOpds1Xml(responseText, baseUrl);
                 } else {
-                    if (forcedVersion !== '1' && responseText.trim().startsWith('{')) {
+                    // Allow JSON parsing for Palace hosts even when forcedVersion=1, in case the server ignores our XML preference
+                    if ((forcedVersion !== '1' || isPalaceHost) && responseText.trim().startsWith('{')) {
                         try {
                             const jsonData = JSON.parse(responseText);
                             return parseOpds2Json(jsonData, baseUrl);
@@ -598,6 +652,17 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                 const jsonData = JSON.parse(responseText);
                 return parseOpds2Json(jsonData, baseUrl);
             } catch (e) {
+                // Some Palace endpoints return Atom XML but incorrectly set Content-Type
+                // to application/json; if the body looks like XML, try parsing as XML.
+                if (responseText && responseText.trim().startsWith('<')) {
+                    try {
+                        // eslint-disable-next-line no-console
+                        console.debug('[mebooks] direct response body appears to be XML despite JSON Content-Type; attempting XML parse');
+                        return parseOpds1Xml(responseText, baseUrl);
+                    } catch (xmlErr) {
+                        // fall through to original error
+                    }
+                }
                 const b64 = await captureFirstBytes(response).catch(() => '');
                 // eslint-disable-next-line no-console
                 console.warn('[mebooks] Failed to JSON.parse response; first bytes (base64):', b64);
@@ -894,4 +959,711 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
     }
 
     return null;
+};
+
+// Media Type Filtering Functions
+export const filterBooksByAudience = (books: CatalogBook[], audienceMode: AudienceMode): CatalogBook[] => {
+    if (audienceMode === 'all') {
+        return books;
+    }
+    
+    return books.filter(book => {
+        // Check categories for audience information
+        if (book.categories && book.categories.length > 0) {
+            const audienceCategories = book.categories.filter(cat => 
+                cat.scheme.includes('audience') || cat.scheme.includes('target-age')
+            );
+            
+            if (audienceCategories.length > 0) {
+                const hasTargetAudience = audienceCategories.some(cat => {
+                    const label = cat.label.toLowerCase();
+                    const term = cat.term.toLowerCase();
+                    
+                    switch (audienceMode) {
+                        case 'adult':
+                            return label.includes('adult') && !label.includes('young') || 
+                                   term.includes('adult') && !term.includes('young') ||
+                                   label.includes('18+') || term.includes('18+');
+                        case 'young-adult':
+                            return label.includes('young adult') || label.includes('teen') || 
+                                   term.includes('young-adult') || term.includes('teen') ||
+                                   label.includes('ya') || term.includes('ya');
+                        case 'children':
+                            return label.includes('children') || label.includes('child') || 
+                                   label.includes('juvenile') || label.includes('kids') ||
+                                   term.includes('children') || term.includes('child') ||
+                                   term.includes('juvenile') || term.includes('kids');
+                        default:
+                            return false;
+                    }
+                });
+                
+                return hasTargetAudience;
+            }
+        }
+        
+        // Check subjects for audience information
+        if (book.subjects && book.subjects.length > 0) {
+            const hasTargetAudience = book.subjects.some(subject => {
+                const subjectLower = subject.toLowerCase();
+                
+                switch (audienceMode) {
+                    case 'adult':
+                        return subjectLower.includes('adult') && !subjectLower.includes('young');
+                    case 'young-adult':
+                        return subjectLower.includes('young adult') || subjectLower.includes('teen') ||
+                               subjectLower.includes('ya');
+                    case 'children':
+                        return subjectLower.includes('children') || subjectLower.includes('child') ||
+                               subjectLower.includes('juvenile') || subjectLower.includes('kids');
+                    default:
+                        return false;
+                }
+            });
+            
+            if (hasTargetAudience) {
+                return true;
+            }
+        }
+        
+        // If no audience information found, include in 'adult' by default
+        return audienceMode === 'adult';
+    });
+};
+
+export const getAvailableAudiences = (books: CatalogBook[]): AudienceMode[] => {
+    const audiences: Set<AudienceMode> = new Set(['all']); // Always include 'all'
+    
+    books.forEach(book => {
+        // Check categories for audience information
+        if (book.categories && book.categories.length > 0) {
+            book.categories.forEach(cat => {
+                if (cat.scheme.includes('audience') || cat.scheme.includes('target-age')) {
+                    const label = cat.label.toLowerCase();
+                    const term = cat.term.toLowerCase();
+                    
+                    if ((label.includes('adult') && !label.includes('young')) || 
+                        (term.includes('adult') && !term.includes('young')) ||
+                        label.includes('18+') || term.includes('18+')) {
+                        audiences.add('adult');
+                    }
+                    if (label.includes('young adult') || label.includes('teen') || 
+                        term.includes('young-adult') || term.includes('teen') ||
+                        label.includes('ya') || term.includes('ya')) {
+                        audiences.add('young-adult');
+                    }
+                    if (label.includes('children') || label.includes('child') || 
+                        label.includes('juvenile') || label.includes('kids') ||
+                        term.includes('children') || term.includes('child') ||
+                        term.includes('juvenile') || term.includes('kids')) {
+                        audiences.add('children');
+                    }
+                }
+            });
+        }
+        
+        // Check subjects for audience information
+        if (book.subjects && book.subjects.length > 0) {
+            book.subjects.forEach(subject => {
+                const subjectLower = subject.toLowerCase();
+                
+                if (subjectLower.includes('adult') && !subjectLower.includes('young')) {
+                    audiences.add('adult');
+                }
+                if (subjectLower.includes('young adult') || subjectLower.includes('teen') ||
+                    subjectLower.includes('ya')) {
+                    audiences.add('young-adult');
+                }
+                if (subjectLower.includes('children') || subjectLower.includes('child') ||
+                    subjectLower.includes('juvenile') || subjectLower.includes('kids')) {
+                    audiences.add('children');
+                }
+            });
+        }
+    });
+    
+    return Array.from(audiences);
+};
+
+export const filterBooksByFiction = (books: CatalogBook[], fictionMode: FictionMode): CatalogBook[] => {
+    if (fictionMode === 'all') {
+        return books;
+    }
+    
+    return books.filter(book => {
+        // Check categories for fiction classification
+        if (book.categories && book.categories.length > 0) {
+            const fictionCategories = book.categories.filter(cat => 
+                cat.scheme.includes('fiction') || cat.scheme.includes('genre') || cat.scheme.includes('bisac')
+            );
+            
+            if (fictionCategories.length > 0) {
+                const isFiction = fictionCategories.some(cat => {
+                    const label = cat.label.toLowerCase();
+                    const term = cat.term.toLowerCase();
+                    
+                    // Check for explicit fiction markers
+                    if (label.includes('fiction') || term.includes('fiction')) {
+                        return !label.includes('non-fiction') && !term.includes('non-fiction');
+                    }
+                    
+                    // Check for non-fiction markers
+                    if (label.includes('non-fiction') || term.includes('non-fiction') ||
+                        label.includes('nonfiction') || term.includes('nonfiction')) {
+                        return false;
+                    }
+                    
+                    // Check for genre indicators that suggest fiction
+                    const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
+                                          'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                    const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
+                                             'self-help', 'health', 'business', 'politics', 'economics'];
+                    
+                    const hasFictionGenre = fictionGenres.some(genre => 
+                        label.includes(genre) || term.includes(genre)
+                    );
+                    const hasNonFictionGenre = nonFictionGenres.some(genre => 
+                        label.includes(genre) || term.includes(genre)
+                    );
+                    
+                    if (hasNonFictionGenre) return false;
+                    if (hasFictionGenre) return true;
+                    
+                    return null; // Unclear from this category
+                });
+                
+                if (isFiction !== null) {
+                    return fictionMode === 'fiction' ? isFiction : !isFiction;
+                }
+            }
+        }
+        
+        // Check subjects for fiction classification
+        if (book.subjects && book.subjects.length > 0) {
+            const fictionKeywords = book.subjects.some(subject => {
+                const subjectLower = subject.toLowerCase();
+                
+                // Explicit fiction/non-fiction markers
+                if (subjectLower.includes('fiction') && !subjectLower.includes('non-fiction')) {
+                    return true;
+                }
+                if (subjectLower.includes('non-fiction') || subjectLower.includes('nonfiction')) {
+                    return false;
+                }
+                
+                // Genre-based classification
+                const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
+                                      'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
+                                         'self-help', 'health', 'business', 'politics', 'economics'];
+                
+                const hasNonFictionGenre = nonFictionGenres.some(genre => subjectLower.includes(genre));
+                if (hasNonFictionGenre) return false;
+                
+                const hasFictionGenre = fictionGenres.some(genre => subjectLower.includes(genre));
+                if (hasFictionGenre) return true;
+                
+                return null;
+            });
+            
+            if (fictionKeywords !== null) {
+                return fictionMode === 'fiction' ? fictionKeywords : !fictionKeywords;
+            }
+        }
+        
+        // If no clear fiction classification, include in both categories by default
+        return true;
+    });
+};
+
+export const getAvailableFictionModes = (books: CatalogBook[]): FictionMode[] => {
+    const modes: Set<FictionMode> = new Set(['all']); // Always include 'all'
+    
+    let hasFiction = false;
+    let hasNonFiction = false;
+    
+    books.forEach(book => {
+        // Check categories for fiction classification
+        if (book.categories && book.categories.length > 0) {
+            book.categories.forEach(cat => {
+                if (cat.scheme.includes('fiction') || cat.scheme.includes('genre') || cat.scheme.includes('bisac')) {
+                    const label = cat.label.toLowerCase();
+                    const term = cat.term.toLowerCase();
+                    
+                    if ((label.includes('fiction') && !label.includes('non-fiction')) || 
+                        (term.includes('fiction') && !term.includes('non-fiction'))) {
+                        hasFiction = true;
+                    }
+                    if (label.includes('non-fiction') || term.includes('non-fiction') ||
+                        label.includes('nonfiction') || term.includes('nonfiction')) {
+                        hasNonFiction = true;
+                    }
+                    
+                    // Genre-based inference
+                    const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
+                                          'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                    const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
+                                             'self-help', 'health', 'business', 'politics', 'economics'];
+                    
+                    const hasFictionGenre = fictionGenres.some(genre => 
+                        label.includes(genre) || term.includes(genre)
+                    );
+                    const hasNonFictionGenre = nonFictionGenres.some(genre => 
+                        label.includes(genre) || term.includes(genre)
+                    );
+                    
+                    if (hasFictionGenre) hasFiction = true;
+                    if (hasNonFictionGenre) hasNonFiction = true;
+                }
+            });
+        }
+        
+        // Check subjects for fiction classification
+        if (book.subjects && book.subjects.length > 0) {
+            book.subjects.forEach(subject => {
+                const subjectLower = subject.toLowerCase();
+                
+                if (subjectLower.includes('fiction') && !subjectLower.includes('non-fiction')) {
+                    hasFiction = true;
+                }
+                if (subjectLower.includes('non-fiction') || subjectLower.includes('nonfiction')) {
+                    hasNonFiction = true;
+                }
+                
+                // Genre-based inference
+                const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
+                                      'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
+                                         'self-help', 'health', 'business', 'politics', 'economics'];
+                
+                const hasFictionGenre = fictionGenres.some(genre => subjectLower.includes(genre));
+                const hasNonFictionGenre = nonFictionGenres.some(genre => subjectLower.includes(genre));
+                
+                if (hasFictionGenre) hasFiction = true;
+                if (hasNonFictionGenre) hasNonFiction = true;
+            });
+        }
+    });
+    
+    if (hasFiction) modes.add('fiction');
+    if (hasNonFiction) modes.add('non-fiction');
+    
+    return Array.from(modes);
+};
+
+export const filterBooksByMedia = (books: CatalogBook[], mediaMode: MediaMode): CatalogBook[] => {
+    if (mediaMode === 'all') {
+        return books;
+    }
+    
+    return books.filter(book => {
+        // Check both mediaType and acquisitionMediaType for compatibility
+        const mediaType = (book.mediaType || book.acquisitionMediaType)?.toLowerCase();
+        const format = book.format?.toUpperCase();
+        
+        if (mediaMode === 'ebook') {
+            // Match ebooks by media type, format, or default
+            return mediaType?.includes('bib.schema.org/book') ||
+                   mediaType?.includes('schema.org/ebook') || 
+                   mediaType?.includes('ebook') ||
+                   format === 'EPUB' ||
+                   format === 'PDF' ||
+                   (!mediaType && format !== 'AUDIOBOOK'); // Default to ebook if no media type and not audiobook
+        } else if (mediaMode === 'audiobook') {
+            // Match audiobooks by media type or format
+            return mediaType?.includes('bib.schema.org/audiobook') ||
+                   mediaType?.includes('audiobook') ||
+                   format === 'AUDIOBOOK';
+        }
+        
+        return false;
+    });
+};
+
+export const getAvailableMediaModes = (books: CatalogBook[]): MediaMode[] => {
+    const modes: Set<MediaMode> = new Set(['all']); // Always include 'all'
+    
+    books.forEach((book) => {
+        // Check both mediaType and acquisitionMediaType for compatibility
+        const mediaType = book.mediaType || book.acquisitionMediaType;
+        const mediaTypeLower = mediaType?.toLowerCase();
+        const format = book.format?.toUpperCase();
+        
+        // Check for audiobooks - either by media type or format
+        if (mediaTypeLower?.includes('bib.schema.org/audiobook') || 
+            mediaTypeLower?.includes('audiobook') ||
+            mediaType === 'http://bib.schema.org/Audiobook' ||
+            format === 'AUDIOBOOK') {
+            modes.add('audiobook');
+        }
+        
+        // Check for ebooks - by media type, format, or default
+        if (mediaTypeLower?.includes('bib.schema.org/book') || 
+            mediaTypeLower?.includes('schema.org/ebook') || 
+            mediaTypeLower?.includes('ebook') || 
+            mediaType === 'http://bib.schema.org/Book' ||
+            mediaType === 'http://schema.org/EBook' ||
+            format === 'EPUB' ||
+            format === 'PDF' ||
+            (!mediaType && format !== 'AUDIOBOOK')) {
+            modes.add('ebook');
+        }
+    });
+    
+    const result = Array.from(modes);
+    return result;
+};
+
+export const filterBooksByCollection = (books: CatalogBook[], collectionMode: CollectionMode, navLinks: CatalogNavigationLink[] = []): CatalogBook[] => {
+    if (collectionMode === 'all') return books;
+    
+    // Check if this collection exists as a navigation link
+    const collectionNavLink = navLinks.find(link => 
+        (link.rel === 'collection' || link.rel === 'subsection') && link.title === collectionMode
+    );
+    
+    // If it's a navigation-based collection, we should navigate rather than filter
+    // For now, just return the books as-is, since navigation will be handled at the component level
+    if (collectionNavLink) {
+        return books;
+    }
+    
+    // Filter books that have this collection in their metadata
+    return books.filter(book => {
+        return book.collections?.some(collection => collection.title === collectionMode);
+    });
+};
+
+export const getAvailableCategories = (books: CatalogBook[], navLinks: CatalogNavigationLink[] = []): string[] => {
+    const categories = new Set<string>();
+    
+    // Extract categories from individual books  
+    books.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                // Only include categories (groups) - exclude true collections (feeds)
+                const isCategory = collection.href.includes('/groups/') || 
+                                  collection.title.toLowerCase() === 'fiction' ||
+                                  collection.title.toLowerCase() === 'nonfiction' ||
+                                  collection.title.toLowerCase().includes('young adult') ||
+                                  collection.title.toLowerCase().includes('children');
+                
+                if (isCategory) {
+                    categories.add(collection.title);
+                }
+            });
+        }
+    });
+    
+    // Extract categories from navigation links
+    navLinks.forEach(link => {
+        if (link.rel === 'collection' || link.rel === 'subsection') {
+            // Only include categories (groups)
+            const isCategory = link.url.includes('/groups/') || 
+                              link.title.toLowerCase() === 'fiction' ||
+                              link.title.toLowerCase() === 'nonfiction' ||
+                              link.title.toLowerCase().includes('young adult') ||
+                              link.title.toLowerCase().includes('children');
+            
+            if (isCategory) {
+                categories.add(link.title);
+            }
+        }
+    });
+    
+    return Array.from(categories).sort();
+};
+
+export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogNavigationLink[] = []): string[] => {
+    const collections = new Set<string>();
+    
+    // Extract collections from individual books, filtering out categories
+    books.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                // Filter out categories (groups) - only include true collections (feeds)
+                const isCategory = collection.href.includes('/groups/') || 
+                                  collection.title.toLowerCase() === 'fiction' ||
+                                  collection.title.toLowerCase() === 'nonfiction' ||
+                                  collection.title.toLowerCase().includes('young adult') ||
+                                  collection.title.toLowerCase().includes('children');
+                
+                if (!isCategory) {
+                    collections.add(collection.title);
+                }
+            });
+        }
+    });
+    
+    // Extract collections from navigation links BUT exclude category groupings  
+    // In Palace OPDS: /feed/ URLs are collections, /groups/ URLs are categories
+    navLinks.forEach(link => {
+        if (link.rel === 'collection' || link.rel === 'subsection') {
+            // Distinguish between collections and categories based on URL pattern
+            const isCategory = link.url.includes('/groups/') || 
+                              link.title.toLowerCase() === 'fiction' ||
+                              link.title.toLowerCase() === 'nonfiction' ||
+                              link.title.toLowerCase().includes('young adult') ||
+                              link.title.toLowerCase().includes('children');
+            
+            if (!isCategory) {
+                collections.add(link.title);
+            }
+        }
+    });
+    
+    return Array.from(collections).sort();
+};export const groupBooksByMode = (books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, mode: CategorizationMode, audienceMode: AudienceMode = 'all', fictionMode: FictionMode = 'all', mediaMode: MediaMode = 'all', collectionMode: CollectionMode = 'all'): CatalogWithCategories => {
+    // Apply all filters first
+    let filteredBooks = books;
+    if (mediaMode !== 'all') {
+        filteredBooks = filterBooksByMedia(filteredBooks, mediaMode);
+    }
+    
+    if (fictionMode !== 'all') {
+        filteredBooks = filterBooksByFiction(filteredBooks, fictionMode);
+    }
+    
+    if (audienceMode !== 'all') {
+        filteredBooks = filterBooksByAudience(filteredBooks, audienceMode);
+    }
+    
+    if (collectionMode !== 'all') {
+        filteredBooks = filterBooksByCollection(filteredBooks, collectionMode, navLinks);
+    }
+
+    const categoryMap = new Map<string, { category: Category, books: CatalogBook[] }>();
+    const collectionLinksSet = new Set<string>();
+    const uncategorizedBooks: CatalogBook[] = [];
+
+    filteredBooks.forEach(book => {
+        let hasCategory = false;
+        
+        if (mode === 'subject' && book.subjects && book.subjects.length > 0) {
+            // Use subjects as categories
+            book.subjects.forEach(subject => {
+                // Create a synthetic category from the subject
+                const syntheticCategory: Category = {
+                    scheme: 'http://palace.io/subjects',
+                    term: subject.toLowerCase().replace(/\s+/g, '-'),
+                    label: subject
+                };
+                
+                const key = `${syntheticCategory.scheme}|${syntheticCategory.label}`;
+                if (!categoryMap.has(key)) {
+                    categoryMap.set(key, {
+                        category: syntheticCategory,
+                        books: []
+                    });
+                }
+                categoryMap.get(key)!.books.push(book);
+                hasCategory = true;
+            });
+        }
+        
+        // Extract collection links for navigation (from original books, not filtered)
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                collectionLinksSet.add(JSON.stringify(collection));
+            });
+        }
+        
+        if (!hasCategory) {
+            uncategorizedBooks.push(book);
+        }
+    });
+
+    // Use original books for collection link extraction (not filtered)
+    books.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                collectionLinksSet.add(JSON.stringify(collection));
+            });
+        }
+    });
+
+    const categoryLanes = Array.from(categoryMap.values()).map(categoryGroup => {
+        // Sort books within each category lane
+        let sortedBooks = categoryGroup.books;
+        
+        // For series, sort by position if available
+        if (categoryGroup.category.scheme === 'http://opds-spec.org/series') {
+            sortedBooks = [...categoryGroup.books].sort((a, b) => {
+                const aPos = a.series?.position || 0;
+                const bPos = b.series?.position || 0;
+                return aPos - bPos;
+            });
+        }
+        
+        return {
+            ...categoryGroup,
+            books: sortedBooks
+        };
+    });
+    const collectionLinks = Array.from(collectionLinksSet).map(json => JSON.parse(json));
+    
+    return {
+        books: filteredBooks,
+        navLinks,
+        pagination,
+        categoryLanes,
+        collectionLinks,
+        uncategorizedBooks
+    };
+};
+
+export const extractCollectionNavigation = (books: CatalogBook[]): Collection[] => {
+    // Extract unique collection navigation links from OPDS 1 books
+    const collectionMap = new Map<string, Collection>();
+    
+    books.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                // Use href as the unique key since titles might not be unique
+                if (!collectionMap.has(collection.href)) {
+                    collectionMap.set(collection.href, collection);
+                }
+            });
+        }
+    });
+    
+    return Array.from(collectionMap.values());
+};
+
+// Keep the old function for backward compatibility, but make it work with OPDS 1 collections
+export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination): CatalogWithCollections => {
+    // Simple implementation that groups books by their collection property
+    const collectionMap = new Map<string, CatalogBook[]>();
+    const uncategorizedBooks: CatalogBook[] = [];
+    
+    books.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                const key = collection.title;
+                if (!collectionMap.has(key)) {
+                    collectionMap.set(key, []);
+                }
+                collectionMap.get(key)!.push(book);
+            });
+        } else {
+            uncategorizedBooks.push(book);
+        }
+    });
+    
+    const collections: CollectionGroup[] = Array.from(collectionMap.entries()).map(([title, books]) => ({
+        collection: {
+            title: title,
+            href: books[0]?.collections?.find(c => c.title === title)?.href || undefined
+        },
+        books
+    }));
+    
+    return {
+        books,
+        navLinks,
+        pagination,
+        collections,
+        uncategorizedBooks
+    };
+};
+
+export const groupBooksByCategories = (books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination): CatalogWithCategories => {
+    // Group books by their formal categories
+    const categoryMap = new Map<string, { category: Category, books: CatalogBook[] }>();
+    const uncategorizedBooks: CatalogBook[] = [];
+    
+    books.forEach(book => {
+        let hasCategory = false;
+        
+        if (book.categories && book.categories.length > 0) {
+            book.categories.forEach(category => {
+                const key = `${category.scheme}|${category.label}`;
+                if (!categoryMap.has(key)) {
+                    categoryMap.set(key, {
+                        category,
+                        books: []
+                    });
+                }
+                categoryMap.get(key)!.books.push(book);
+                hasCategory = true;
+            });
+        }
+        
+        if (!hasCategory) {
+            uncategorizedBooks.push(book);
+        }
+    });
+    
+    const categoryLanes = Array.from(categoryMap.values());
+    
+    return {
+        books,
+        navLinks,
+        pagination,
+        categoryLanes,
+        collectionLinks: [],
+        uncategorizedBooks
+    };
+};
+
+export const filterRedundantCategories = (categoryLanes: { category: Category, books: CatalogBook[] }[]): { category: Category, books: CatalogBook[] }[] => {
+    // Simple implementation that removes categories with very few books
+    return categoryLanes.filter(lane => lane.books.length >= 2);
+};
+
+export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination): CatalogWithCategories => {
+    // Alternative implementation that treats collections as category lanes
+    const collectionMap = new Map<string, CatalogBook[]>();
+    const uncategorizedBooks: CatalogBook[] = [];
+    
+    books.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+            book.collections.forEach(collection => {
+                const key = collection.title;
+                if (!collectionMap.has(key)) {
+                    collectionMap.set(key, []);
+                }
+                collectionMap.get(key)!.push(book);
+            });
+        } else {
+            uncategorizedBooks.push(book);
+        }
+    });
+    
+    const categoryLanes = Array.from(collectionMap.entries()).map(([title, books]) => {
+        // Find the first book with collections to get the href for the term
+        const firstBookWithCollections = books.find(book => book.collections && book.collections.length > 0);
+        const collection = firstBookWithCollections?.collections?.find(c => c.title === title);
+        const term = collection?.href || title.toLowerCase().replace(/\s+/g, '-');
+        
+        return {
+            category: {
+                scheme: 'http://opds-spec.org/collection',
+                term,
+                label: title
+            },
+            books
+        };
+    });
+    
+    // Extract collection links from books
+    const collectionLinksMap = new Map<string, { title: string; href: string }>();
+    books.forEach(book => {
+        if (book.collections) {
+            book.collections.forEach(collection => {
+                collectionLinksMap.set(collection.title, collection);
+            });
+        }
+    });
+    
+    const collectionLinks = Array.from(collectionLinksMap.values());
+    
+    return {
+        books,
+        navLinks,
+        pagination,
+        categoryLanes,
+        collectionLinks,
+        uncategorizedBooks
+    };
 };

@@ -186,6 +186,12 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         if (rels.includes('previous')) pagination.prev = fullUrl;
         if (rels.includes('first')) pagination.first = fullUrl;
         if (rels.includes('last')) pagination.last = fullUrl;
+        
+        // Extract navigation links with collection, subsection, or other navigation relations
+        if (link.title && (rels.includes('collection') || rels.includes('subsection') || 
+                          rels.includes('section') || rels.includes('related'))) {
+          navLinks.push({ title: link.title, url: fullUrl, rel: rels[0] || '' });
+        }
       }
     });
   }
@@ -301,14 +307,22 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
 
       // Find acquisition links and pick the most appropriate one.
       const acquisitions: Array<{ href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }> = [];
+      const collections: Array<{ title: string; href: string }> = [];
+      
       links.forEach((l: any) => {
         if (!l || !l.href) return;
         const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
+        
         // If rel contains 'acquisition' or opds acquisition URIs, treat as acquisition link
         const isAcq = rels.some((r: string) => r.includes('acquisition') || r === 'http://opds-spec.org/acquisition/borrow' || r === 'http://opds-spec.org/acquisition/loan');
         if (isAcq) {
           const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
           acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
+        }
+        
+        // Extract collection links from individual books
+        if (l.title && rels.includes('collection')) {
+          collections.push({ title: l.title, href: new URL(l.href, baseUrl).href });
         }
       });
 
@@ -347,6 +361,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
           publicationDate: publicationDate || undefined,
           providerId: providerId || undefined,
           subjects: subjects || undefined,
+          collections: collections.length > 0 ? collections : undefined,
           format: format || undefined
         };
         books.push(book);
