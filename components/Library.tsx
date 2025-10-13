@@ -436,7 +436,20 @@ const Library: React.FC<LibraryProps> = ({
     setAudienceMode('all');
     setFictionMode('all');
     setMediaMode('all');
-    setCatalogNavPath(prev => prev.slice(0, index + 1));
+    
+    // Update navigation path
+    const newPath = catalogNavPath.slice(0, index + 1);
+    setCatalogNavPath(newPath);
+    
+    // Update collection mode to sync with breadcrumb navigation
+    if (newPath.length <= 1) {
+      // Back to root - show all collections
+      setCollectionMode('all');
+    } else {
+      // Inside a collection - set collection mode to current navigation item
+      const currentCollection = newPath[newPath.length - 1].name;
+      setCollectionMode(currentCollection as CollectionMode);
+    }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1067,6 +1080,11 @@ const Library: React.FC<LibraryProps> = ({
   const handleCollectionChange = (mode: CollectionMode) => {
     if (mode === 'all') {
       setCollectionMode(mode);
+      // If we're deep in navigation, go back to root when selecting "All Books"
+      if (catalogNavPath.length > 1 && activeOpdsSource) {
+        setCatalogNavPath([{ name: activeOpdsSource.name, url: activeOpdsSource.url }]);
+        fetchAndParseSource(activeOpdsSource.url, activeOpdsSource.url);
+      }
       return;
     }
     
@@ -1076,10 +1094,11 @@ const Library: React.FC<LibraryProps> = ({
     );
     
     if (collectionNavLink) {
-      // Navigate to the collection's feed
+      // Navigate to the collection's feed and update collection mode for sidebar sync
       if (activeOpdsSource) {
         const newPath = [...catalogNavPath, { name: collectionNavLink.title, url: collectionNavLink.url }];
         setCatalogNavPath(newPath);
+        setCollectionMode(mode); // Update collection mode to sync sidebar state
         fetchAndParseSource(collectionNavLink.url, activeOpdsSource.url);
       }
     } else {
@@ -1434,7 +1453,8 @@ const Library: React.FC<LibraryProps> = ({
                   <button
                     onClick={() => handleCollectionChange('all')}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                      (collectionMode === 'all' && catalogNavPath.length <= 1) || (!collectionMode || collectionMode === 'all')
+                      // Active if at root level and collectionMode is 'all', or no specific collection selected
+                      (catalogNavPath.length <= 1 && (collectionMode === 'all' || !collectionMode))
                         ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500' 
                         : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
                     }`}
@@ -1442,9 +1462,11 @@ const Library: React.FC<LibraryProps> = ({
                     All Books
                   </button>
                   {(availableCollections.length > 0 ? availableCollections : rootLevelCollections).map((collection, index) => {
-                    // Check multiple conditions for active state
+                    // Collection is active if:
+                    // 1. We're navigating deeper AND current navigation item matches this collection
+                    // 2. OR collectionMode matches this collection (for client-side filtering)
                     const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
-                    const isActiveByMode = collectionMode === collection;
+                    const isActiveByMode = catalogNavPath.length <= 1 && collectionMode === collection;
                     const isActive = isActiveByPath || isActiveByMode;
                     
                     return (
