@@ -530,12 +530,12 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 
 export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVersion: 'auto' | '1' | '2' = 'auto'): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
-        // Some providers (notably Palace / palace.io and related hosts) operate
+        // Some providers (notably Palace Project / palace.io, palaceproject.io, and thepalaceproject.org hosts) operate
         // primarily for native clients and don't expose CORS consistently. For
         // those hosts we should force requests through our owned proxy so the
         // browser won't be blocked. Detect palace-like hosts and skip the probe.
     const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
-    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
 
     // Diagnostic: log host classification so we can confirm palace hosts are being
     // forced through the owned proxy and that the fetchUrl matches expectations.
@@ -783,11 +783,11 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
             // but any relative hrefs in responses should be resolved against the
             // original upstream href, not the proxy URL.
             const originalHref = href;
-            // For Palace-hosted servers, force the proxied URL (prefer owned proxy when configured)
+            // For Palace Project servers (palace.io, palaceproject.io, thepalaceproject.org), force the proxied URL (prefer owned proxy when configured)
             let current: string;
             try {
                 const hostname = (() => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } })();
-                const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+                const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
                 if (isPalaceHost) {
                     current = proxiedUrl(href);
                 } else {
