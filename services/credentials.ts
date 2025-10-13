@@ -1,3 +1,5 @@
+import { logger } from './logger';
+
 const DB_NAME = 'MeBooksCredentialsDB';
 const STORE_NAME = 'credentials';
 const DB_VERSION = 1;
@@ -29,7 +31,7 @@ export async function saveCredential(host: string, username: string, password: s
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.warn('saveCredential failed', e);
+    logger.warn('saveCredential failed', e);
   }
 }
 
@@ -44,7 +46,7 @@ export async function getAllCredentials(): Promise<Cred[]> {
       req.onerror = () => reject(req.error);
     });
   } catch (e) {
-    console.warn('getAllCredentials failed', e);
+    logger.warn('getAllCredentials failed', e);
     return [];
   }
 }
@@ -60,7 +62,7 @@ export async function findCredential(host: string): Promise<Cred | undefined> {
       req.onerror = () => reject(req.error);
     });
   } catch (e) {
-    console.warn('findCredential failed', e);
+    logger.warn('findCredential failed', e);
     return undefined;
   }
 }
@@ -76,7 +78,7 @@ export async function deleteCredential(host: string) {
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.warn('deleteCredential failed', e);
+    logger.warn('deleteCredential failed', e);
   }
 }
 
@@ -99,7 +101,7 @@ export async function migrateFromLocalStorage(localKey = 'mebooks.opds.credentia
     // Optionally remove legacy localStorage to avoid duplication
     try { localStorage.removeItem(localKey); } catch (e) {}
   } catch (e) {
-    console.warn('migrateFromLocalStorage failed', e);
+    logger.warn('migrateFromLocalStorage failed', e);
   }
 }
 

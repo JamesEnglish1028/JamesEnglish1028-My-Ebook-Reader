@@ -9,6 +9,7 @@ import DeleteConfirmationModal from './DeleteConfirmationModal';
 import { Logo } from './Logo';
 import { fetchCatalogContent, groupBooksByMode, filterBooksByAudience, getAvailableAudiences, filterBooksByFiction, getAvailableFictionModes, filterBooksByMedia, getAvailableMediaModes, getAvailableCollections, getAvailableCategories } from '../services/opds';
 import { proxiedUrl } from '../services/utils';
+import { logger } from '../services/logger';
 import { CollectionLane } from './CollectionLane';
 import { UncategorizedLane } from './UncategorizedLane';
 import { CategoryLaneComponent } from './CategoryLane';
@@ -106,7 +107,7 @@ const Library: React.FC<LibraryProps> = ({
       const booksData = await db.getBooksMetadata();
       setBooks(booksData);
     } catch (error) {
-      console.error("Failed to fetch books:", error);
+      logger.error("Failed to fetch books:", error);
     } finally {
       setIsLoading(false);
     }
@@ -152,7 +153,7 @@ const Library: React.FC<LibraryProps> = ({
     return saved ? JSON.parse(saved) : [];
   }, []);
 
-  const saveToStorage = useCallback((key: string, data: any[]) => {
+  const saveToStorage = useCallback((key: string, data: unknown[]) => {
     localStorage.setItem(key, JSON.stringify(data));
   }, []);
   
@@ -446,7 +447,7 @@ const Library: React.FC<LibraryProps> = ({
         fetchBooks();
       }
     } catch (error) {
-      console.error("Error replacing book:", error);
+      logger.error("Error replacing book:", error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
     }
   }, [duplicateBook, existingBook, activeOpdsSource, fetchBooks, setImportStatus]);
@@ -468,7 +469,7 @@ const Library: React.FC<LibraryProps> = ({
         fetchBooks();
       }
     } catch (error) {
-      console.error("Error adding duplicate book:", error);
+      logger.error("Error adding duplicate book:", error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
     }
   }, [duplicateBook, activeOpdsSource, fetchBooks, setImportStatus]);
@@ -483,7 +484,7 @@ const Library: React.FC<LibraryProps> = ({
     if (book.id) {
         const fullBookMetadata = await db.getBookMetadata(book.id);
         if (!fullBookMetadata) {
-            console.error("Could not find book details for ID:", book.id);
+            logger.error("Could not find book details for ID:", book.id);
             return;
         }
         onShowBookDetail(fullBookMetadata, 'library');
@@ -561,12 +562,11 @@ const Library: React.FC<LibraryProps> = ({
           const baseUrl = activeOpdsSource?.url;
           const forcedVersion2 = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto';
           // Diagnostic: log forcedVersion when expanding navigation nodes
-          // eslint-disable-next-line no-console
-          console.debug('[mebooks] fetchCatalogContent (nav children) - forcedVersion:', forcedVersion2, 'node:', node.url);
+          logger.debug('[mebooks] fetchCatalogContent (nav children) - forcedVersion:', forcedVersion2, 'node:', node.url);
           const { navLinks: newChildren, error } = await fetchCatalogContent(node.url, baseUrl || node.url, forcedVersion2 as any);
           
           if (error) {
-            console.error(`Error fetching children for ${node.title}:`, error);
+            logger.error(`Error fetching children for ${node.title}:`, error);
             newNodes[i] = { ...node, isLoading: false, _hasFetchedChildren: true, _canExpand: false };
           } else {
             const canExpand = newChildren.length > 0;
@@ -604,7 +604,7 @@ const Library: React.FC<LibraryProps> = ({
       await db.deleteBook(bookToDelete.id);
       setBooks(prevBooks => prevBooks.filter(b => b.id !== bookToDelete.id));
     } catch (error) {
-      console.error("Failed to delete book:", error);
+      logger.error("Failed to delete book:", error);
     } finally {
       setBookToDelete(null);
     }

@@ -203,6 +203,33 @@ export interface GoogleUser {
   picture: string;
 }
 
+// Authentication document structure from OPDS servers
+export interface AuthDocument {
+  type?: string;
+  title?: string;
+  description?: string;
+  links?: Array<{
+    rel?: string;
+    href?: string;
+    type?: string;
+  }>;
+  authentication?: Array<{
+    type?: string;
+    description?: string;
+    inputs?: Record<string, unknown>;
+  }>;
+}
+
+// Credential prompt state interface
+export interface CredentialPrompt {
+  isOpen: boolean;
+  host: string | null;
+  pendingHref?: string | null;
+  pendingBook?: CatalogBook | null;
+  pendingCatalogName?: string;
+  authDocument?: AuthDocument | null;
+}
+
 // Structure for the library.json file stored in Google Drive
 export interface SyncPayload {
   library: Omit<BookRecord, 'epubData'>[];

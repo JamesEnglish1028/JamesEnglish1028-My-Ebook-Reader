@@ -306,9 +306,11 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
     if (savePageTimeoutRef.current) {
       clearTimeout(savePageTimeoutRef.current);
     }
+    // Capture the ID at the time of scheduling to prevent race conditions
+    const bookId = bookData.id;
     savePageTimeoutRef.current = window.setTimeout(() => {
       try {
-        saveLastPositionForBook(bookData.id, `page:${currentPage}`);
+        saveLastPositionForBook(bookId, `page:${currentPage}`);
       } catch (e) {
         console.warn('Failed to save last PDF position', e);
       }

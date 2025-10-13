@@ -33,8 +33,8 @@ describe('resolveAcquisitionChain', () => {
     const calls: any[] = [];
     (globalThis as any).fetch = vi.fn(async (_u: string, opts: any) => {
       calls.push(opts?.method);
-      if (opts?.method === 'POST') return { status: 405, headers: { get: () => null }, text: async () => '' };
-      return { status: 200, headers: { get: () => 'application/json' }, json: async () => ({ href: '/final/book.epub' }) };
+      if (opts?.method === 'POST') return { status: 405, headers: { get: (): string | null => null }, text: async () => '' };
+      return { status: 200, headers: { get: (): string => 'application/json' }, json: async () => ({ href: '/final/book.epub' }) };
     });
 
     const res = await resolveAcquisitionChain('https://opds.example/borrow/3', null);

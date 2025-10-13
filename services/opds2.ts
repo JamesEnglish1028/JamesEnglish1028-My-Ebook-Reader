@@ -1,6 +1,7 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
 import { proxiedUrl, maybeProxyForCors } from './utils';
 import credentialsService from './credentials';
+import { logger } from './logger';
 
 // Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
 function uint8ToBinaryString(u8: Uint8Array): string {
@@ -105,7 +106,7 @@ async function safeReadText(resp: Response): Promise<string> {
       catch (e2) { return uint8ToBinaryString(u8); }
     }
   } catch (e) {
-    console.warn('safeReadText: fallback decode failed', e);
+    logger.warn('safeReadText: fallback decode failed', e);
     // Try best-effort text() if available
     try {
       if (resp && typeof resp.text === 'function') return await resp.text();
@@ -142,11 +143,11 @@ export async function getStoredOpdsCredentials(): Promise<StoredCred[]> {
 
 export function saveOpdsCredential(host: string, username: string, password: string) {
   // fire-and-forget
-  try { credentialsService.saveCredential(host, username, password); } catch (e) { console.warn('saveOpdsCredential failed', e); }
+  try { credentialsService.saveCredential(host, username, password); } catch (e) { logger.warn('saveOpdsCredential failed', e); }
 }
 
 export function deleteOpdsCredential(host: string) {
-  try { credentialsService.deleteCredential(host); } catch (e) { console.warn('deleteOpdsCredential failed', e); }
+  try { credentialsService.deleteCredential(host); } catch (e) { logger.warn('deleteOpdsCredential failed', e); }
 }
 
 export async function findCredentialForUrl(url: string) {
@@ -424,8 +425,7 @@ export const borrowOpds2Work = async (borrowHref: string, credentials?: { userna
     // Warn when using a public CORS proxy that commonly strips Authorization headers
     try {
       if (proxyUrl && proxyUrl.includes('corsproxy.io')) {
-        // eslint-disable-next-line no-console
-        console.warn('[mebooks] Attempting to send Authorization through public CORS proxy (corsproxy.io). Public proxies often strip Authorization headers; consider configuring an owned proxy (VITE_OWN_PROXY_URL) to ensure credentials are forwarded.');
+        logger.warn('[mebooks] Attempting to send Authorization through public CORS proxy (corsproxy.io). Public proxies often strip Authorization headers; consider configuring an owned proxy (VITE_OWN_PROXY_URL) to ensure credentials are forwarded.');
       }
     } catch (e) { /* ignore */ }
   }

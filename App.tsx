@@ -8,7 +8,8 @@ import { useConfirm } from './components/ConfirmContext';
 import ReaderView from './components/ReaderView';
 import BookDetailView from './components/BookDetailView';
 import { db } from './services/db';
-import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog, Bookmark, Citation, ReaderSettings, SyncPayload, CatalogRegistry } from './types';
+import { logger } from './services/logger';
+import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog, Bookmark, Citation, ReaderSettings, SyncPayload, CatalogRegistry, CredentialPrompt } from './types';
 import SplashScreen from './components/SplashScreen';
 import SettingsModal from './components/SettingsModal';
 import { useAuth } from './contexts/AuthContext';
@@ -58,7 +59,7 @@ const AppInner: React.FC = () => {
     error: null,
   });
 
-  const [credentialPrompt, setCredentialPrompt] = useState<{ isOpen: boolean; host: string | null; pendingHref?: string | null; pendingBook?: CatalogBook | null; pendingCatalogName?: string | undefined; authDocument?: any | null }>(
+  const [credentialPrompt, setCredentialPrompt] = useState<CredentialPrompt>(
     { isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined, authDocument: null }
   );
 
@@ -95,7 +96,7 @@ const AppInner: React.FC = () => {
             setCurrentView('reader');
           }
         } catch (e) {
-          console.warn('Auto-open failed', e);
+          logger.warn('Auto-open failed', e);
         }
       })();
     }
@@ -181,7 +182,7 @@ const AppInner: React.FC = () => {
             setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
             return { success: true };
         } catch (error) {
-            console.error("Error saving PDF:", error);
+            logger.error("Error saving PDF:", error);
             let errorMessage = "Failed to save the PDF file to the library.";
             if (error instanceof Error) {
                 errorMessage = error.message;
@@ -246,7 +247,7 @@ const AppInner: React.FC = () => {
         return { success: true };
 
     } catch (error) {
-        console.error("Error processing EPUB:", error);
+        logger.error("Error processing EPUB:", error);
         let errorMessage = "Failed to import the EPUB file. It might be corrupted or in an unsupported format.";
         if (error instanceof Error && error.message.includes('File is not a zip')) {
           errorMessage = "The provided file is not a valid EPUB (it's not a zip archive). Please try a different file.";
@@ -304,7 +305,7 @@ const AppInner: React.FC = () => {
       const bookData = await response.arrayBuffer();
       return await processAndSaveBook(bookData, book.title, book.author, 'catalog', catalogName, book.providerId, book.format, book.coverImage);
     } catch (error) {
-      console.error("Error importing from catalog:", error);
+      logger.error("Error importing from catalog:", error);
       let message = "Download failed. The file may no longer be available or there was a network issue.";
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
           message = "Download failed due to a network error. This could be due to your internet connection or the public CORS proxy being temporarily down.";
@@ -349,7 +350,7 @@ const AppInner: React.FC = () => {
           }
       }
     } catch (error) {
-      console.error('Credential resolve/import failed', error);
+      logger.error('Credential resolve/import failed', error);
       setImportStatus({ isLoading: false, message: '', error: error instanceof Error ? error.message : 'Failed to authenticate and download the book.' });
       setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
     }
@@ -386,7 +387,7 @@ const AppInner: React.FC = () => {
       await processAndSaveBook(bookData, credentialPrompt.pendingBook.title, credentialPrompt.pendingBook.author, 'catalog', credentialPrompt.pendingCatalogName, credentialPrompt.pendingBook.providerId, credentialPrompt.pendingBook.format, credentialPrompt.pendingBook.coverImage);
       setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
     } catch (e) {
-      console.error('Retry after provider login failed', e);
+      logger.error('Retry after provider login failed', e);
       if ((e as any)?.proxyUsed) {
         try { toast.pushToast('Retry after login failed because the request used a public CORS proxy that may strip authentication. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves credentials.', 10000); } catch(_) {}
       }
@@ -431,7 +432,7 @@ const AppInner: React.FC = () => {
         localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
         setSyncStatus({ state: 'success', message: 'Library successfully uploaded!' });
     } catch (error) {
-        console.error('Upload failed:', error);
+        logger.error('Upload failed:', error);
         setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
     }
   };
@@ -487,7 +488,7 @@ const AppInner: React.FC = () => {
         setTimeout(() => window.location.reload(), 2000);
 
     } catch (error) {
-        console.error('Download failed:', error);
+        logger.error('Download failed:', error);
         setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
     }
   };
@@ -583,7 +584,7 @@ const AppInner: React.FC = () => {
       <NetworkDebugModal isOpen={showNetworkDebug} onClose={() => setShowNetworkDebug(false)} />
       {/** Debug floating button (visible only in debug mode) */}
       {typeof window !== 'undefined' && (window as any).__MEBOOKS_DEBUG__ && (
-        <div style={{ position: 'fixed', right: 12, bottom: 12, zIndex: 60 }}>
+        <div className="fixed right-3 bottom-3 z-[60]">
           <button onClick={() => setShowNetworkDebug(true)} className="px-3 py-2 bg-yellow-400 rounded shadow">Network Debug</button>
         </div>
       )}
@@ -621,9 +622,9 @@ const DebugDbRoute: React.FC = () => {
     (async () => {
       try {
         const all = await db.getAllBooks();
-        console.log('DEBUG DB: all books', all);
+        logger.debug('All books loaded from database', all);
       } catch (e) {
-        console.error('DEBUG DB: error', e);
+        logger.error('Error loading books from database', e);
       }
     })();
   }, []);

@@ -1,4 +1,5 @@
 import { BookRecord, BookMetadata } from '../types';
+import { logger } from './logger';
 
 const DB_NAME = 'EbookReaderDB';
 const STORE_NAME = 'books';
@@ -16,8 +17,8 @@ const init = (): Promise<IDBDatabase> => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
-      console.error('IndexedDB error:', request.error);
-      reject('Error opening database');
+      logger.error('IndexedDB error:', request.error);
+      reject(request.error);
     };
 
     request.onsuccess = () => {
@@ -67,7 +68,7 @@ const saveBook = async (book: BookRecord): Promise<number> => {
     };
 
     request.onerror = () => {
-      console.error('Error saving book:', request.error);
+      logger.error('Error saving book:', request.error);
       reject('Error saving book');
     };
   });
@@ -93,7 +94,7 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
     };
 
     request.onerror = () => {
-      console.error('Error getting books:', request.error);
+      logger.error('Error getting books:', request.error);
       reject('Error getting books');
     };
   });
@@ -111,7 +112,7 @@ const getAllBooks = async (): Promise<BookRecord[]> => {
     };
 
     request.onerror = () => {
-      console.error('Error getting all books:', request.error);
+      logger.error('Error getting all books:', request.error);
       reject('Error getting all books');
     };
   });
@@ -129,7 +130,7 @@ const getBook = async (id: number): Promise<BookRecord | undefined> => {
     };
 
     request.onerror = () => {
-      console.error('Error getting book:', request.error);
+      logger.error('Error getting book:', request.error);
       reject('Error getting book');
     };
   });
@@ -153,7 +154,7 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
     };
 
     request.onerror = () => {
-      console.error('Error getting book metadata:', request.error);
+      logger.error('Error getting book metadata:', request.error);
       reject('Error getting book metadata');
     };
   });
@@ -180,11 +181,11 @@ const findBookByIdentifier = async (identifier: string): Promise<BookRecord | nu
                     resolve((request.result as BookRecord) || null);
                 };
                 request.onerror = () => {
-                    console.error(`Error finding book by ${indexName}:`, request.error);
+                    logger.error(`Error finding book by ${indexName}:`, request.error);
                     reject(`Error finding book by ${indexName}`);
                 };
             } catch (e) {
-                console.error(`Error initiating search on index ${indexName}:`, e);
+                logger.error(`Error initiating search on index ${indexName}:`, e);
                 resolve(null);
             }
         });
@@ -212,7 +213,7 @@ const deleteBook = async (id: number): Promise<void> => {
     };
 
     request.onerror = () => {
-      console.error('Error deleting book:', request.error);
+      logger.error('Error deleting book:', request.error);
       reject('Error deleting book');
     };
   });
@@ -230,7 +231,7 @@ const clearAllBooks = async (): Promise<void> => {
     };
 
     request.onerror = () => {
-      console.error('Error clearing books:', request.error);
+      logger.error('Error clearing books:', request.error);
       reject('Error clearing books');
     };
   });

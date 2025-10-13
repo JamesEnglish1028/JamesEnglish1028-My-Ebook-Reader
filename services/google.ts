@@ -1,4 +1,5 @@
 import { SyncPayload, BookRecord } from '../types';
+import { logger } from './logger';
 
 // IMPORTANT: Replace with your actual Google Client ID from the Google Cloud Console.
 const GOOGLE_CLIENT_ID = '93993206222-19e48jq3thrh262a7kbq239j9212kdea.apps.googleusercontent.com';
@@ -56,7 +57,7 @@ export const initGoogleClient = (callback: (resp: any) => void): Promise<any> =>
                 resolve(tokenClient);
             });
         } catch(error) {
-            console.error("Error during Google Client initialization:", error);
+            logger.error("Error during Google Client initialization:", error);
             reject(error);
         }
     });
@@ -64,7 +65,7 @@ export const initGoogleClient = (callback: (resp: any) => void): Promise<any> =>
 
 export const revokeToken = (token: string) => {
     window.google.accounts.oauth2.revoke(token, () => {
-        console.log('Access token revoked.');
+        logger.info('Access token revoked.');
     });
 };
 

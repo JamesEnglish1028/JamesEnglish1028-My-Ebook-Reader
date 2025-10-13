@@ -22,7 +22,7 @@ const Tooltip: React.FC<Props> = ({ children, label, placement = 'top' }) => {
       {children}
       <div
         role="tooltip"
-        aria-hidden={visible ? 'false' : 'true'}
+        aria-hidden={!visible}
         className={`pointer-events-none z-50 absolute whitespace-nowrap bg-slate-800 text-white text-xs rounded px-2 py-1 transition-all duration-200 transform ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}` +
           (placement === 'top' ? ' -bottom-9 left-1/2 -translate-x-1/2' : '')
         }

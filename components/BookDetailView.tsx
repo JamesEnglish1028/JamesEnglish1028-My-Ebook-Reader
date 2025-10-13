@@ -1,9 +1,24 @@
 
 
 import React, { useState, useCallback } from 'react';
-import { BookMetadata, CatalogBook, CoverAnimationData, BookRecord } from '../types';
+import { BookMetadata, CatalogBook, CoverAnimationData, BookRecord, AuthDocument } from '../types';
 import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
 import Spinner from './Spinner';
+
+// Simple HTML sanitizer for OPDS descriptions - allows safe formatting tags but removes dangerous attributes and scripts
+const sanitizeHtml = (html: string): string => {
+  // Allow basic formatting tags but strip dangerous attributes and elements
+  return html
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags  
+    .replace(/<object[^>]*>.*?<\/object>/gi, '') // Remove object tags
+    .replace(/<embed[^>]*>/gi, '') // Remove embed tags
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers (onclick, onload, etc.)
+    .replace(/javascript:/gi, '') // Remove javascript: URLs
+    .replace(/data:/gi, '') // Remove data: URLs
+    .replace(/<([^>]+)\s+style\s*=\s*["'][^"']*["']/gi, '<$1') // Remove style attributes (optional - can be kept if needed)
+    .trim();
+};
 import DuplicateBookModal from './DuplicateBookModal';
 import OpdsCredentialsModal from './OpdsCredentialsModal';
 import { resolveAcquisitionChainOpds1 } from '../services/opds';
@@ -70,14 +85,15 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
   const [existingBook, setExistingBook] = useState<BookRecord | null>(null);
   const [credModalOpen, setCredModalOpen] = useState(false);
   const [credHost, setCredHost] = useState<string | null>(null);
-  const [credAuthDoc, setCredAuthDoc] = useState<any | undefined>(undefined);
+  const [credAuthDoc, setCredAuthDoc] = useState<AuthDocument | undefined>(undefined);
   const [pendingCatalogBook, setPendingCatalogBook] = useState<CatalogBook | null>(null);
   const toast = useToast();
 
   const libraryBook = isLibraryBook(book) ? book : null;
   const catalogBook = !isLibraryBook(book) ? book : null;
 
-  const description = 'description' in book ? book.description : catalogBook?.summary;
+  const rawDescription = 'description' in book ? book.description : catalogBook?.summary;
+  const description = rawDescription ? sanitizeHtml(rawDescription) : '';
   const isLongDescription = description && description.length > 400;
   // Use direct cover image URL in the browser first; fall back to proxy on error.
   const coverImage = book.coverImage ? book.coverImage : null;

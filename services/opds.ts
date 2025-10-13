@@ -1,5 +1,6 @@
 import { CatalogBook, CatalogNavigationLink, CatalogPagination, Category, CategorizationMode, AudienceMode, FictionMode, MediaMode, CollectionMode, CatalogWithCategories, CatalogWithCollections, CollectionGroup, Series, Collection, CategoryLane } from '../types';
 import { proxiedUrl, maybeProxyForCors } from './utils';
+import { logger } from './logger';
 // NOTE: prefer a static import for `maybeProxyForCors` instead of a dynamic import
 // because static imports keep bundling deterministic and avoid creating a
 // separate dynamic chunk for a small utility module. This prevents Vite from
@@ -462,7 +463,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                         if (typeof s === 'string') return s.trim();
                         if (s?.name) return s.name.trim();
                         return null;
-                    }).filter((s): s is string => !!s);
+                    }).filter((s: unknown): s is string => !!s && typeof s === 'string');
                 }
 
                 // Parse OPDS 2 series information from belongsTo
@@ -537,10 +538,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
     const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
     const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
 
-    // Diagnostic: log host classification so we can confirm palace hosts are being
-    // forced through the owned proxy and that the fetchUrl matches expectations.
-    // eslint-disable-next-line no-console
-    console.debug('[mebooks] fetchCatalogContent - hostname:', hostname, 'isPalaceHost:', isPalaceHost, 'forcedVersion:', forcedVersion);
+    // Log host classification to confirm palace hosts are being forced through owned proxy
+    logger.debug('fetchCatalogContent host classification', { hostname, isPalaceHost, forcedVersion });
 
         let fetchUrl: string;
         if (isPalaceHost) {
@@ -559,10 +558,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             : 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5';
 
     // FIX: Added specific Accept header to signal preference for OPDS formats.
-        // Diagnostic: log which URL we'll fetch so the browser console shows whether
-        // a proxied URL or the direct URL is used.
-        // eslint-disable-next-line no-console
-        console.debug('[mebooks] fetchCatalogContent - fetchUrl:', fetchUrl, 'accept:', acceptHeader);
+        // Log fetch URL to show whether proxied or direct URL is used
+        logger.debug('fetchCatalogContent fetch details', { fetchUrl, acceptHeader });
     // Determine whether this is a direct fetch (so we can include credentials)
     const isDirectFetch = fetchUrl === url;
         const response = await fetch(fetchUrl, {
@@ -1632,7 +1629,7 @@ export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogN
     const collections: CollectionGroup[] = Array.from(collectionMap.entries()).map(([title, books]) => ({
         collection: {
             title: title,
-            href: books[0]?.collections?.find(c => c.title === title)?.href || undefined
+            href: books[0]?.collections?.find(c => c.title === title)?.href || ''
         },
         books
     }));

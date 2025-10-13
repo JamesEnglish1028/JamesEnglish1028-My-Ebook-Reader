@@ -130,15 +130,6 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
                     <span className="text-sm font-semibold leading-tight">{book.title}</span>
                   </div>
                 )}
-                
-                {/* Enhanced Format Badge */}
-                {book.format && (
-                  <div className="absolute top-2 right-2">
-                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600/90' : 'bg-sky-600/90'} backdrop-blur-sm`}>
-                      {book.format}
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* Enhanced Book Info */}
@@ -148,6 +139,16 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
                 </h4>
                 {book.author && (
                   <p className="text-xs text-slate-400 truncate leading-relaxed">{book.author}</p>
+                )}
+                {/* Format Badge - positioned consistently with flat view */}
+                {book.format && (
+                  <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                    book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                    book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                    'bg-sky-500'
+                  }`}>
+                    {book.format}
+                  </span>
                 )}
               </div>
             </div>

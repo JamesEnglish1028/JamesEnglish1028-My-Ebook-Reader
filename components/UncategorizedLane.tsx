@@ -99,7 +99,11 @@ export const UncategorizedLane: React.FC<UncategorizedLaneProps> = ({
                   <p className="text-xs text-slate-400 truncate">{book.author}</p>
                 )}
                 {book.format && (
-                  <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 'bg-sky-500'}`}>
+                  <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                    book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                    book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                    'bg-sky-500'
+                  }`}>
                     {book.format}
                   </span>
                 )}
