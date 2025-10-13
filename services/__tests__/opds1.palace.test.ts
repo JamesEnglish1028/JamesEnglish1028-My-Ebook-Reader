@@ -81,4 +81,34 @@ describe('OPDS 1 Collection Detection from Real Data', () => {
       expect(hasUplOpen).toBe(true);
     });
   });
+
+  test('should parse distributor information from real Palace OPDS data', () => {
+    const xmlPath = resolve(__dirname, '../../test-data/MinotaurOPDS.xml');
+    const xmlData = readFileSync(xmlPath, 'utf-8');
+    
+    const { books } = parseOpds1Xml(xmlData, 'https://minotaur.dev.palaceproject.io/minotaur-test-library/');
+    
+    // Find books with distributors
+    const booksWithDistributors = books.filter(book => book.distributor);
+    console.log('Books with distributors found:', booksWithDistributors.length);
+    
+    // Log some examples of distributors found
+    const distributorExamples = booksWithDistributors.slice(0, 5).map(book => ({
+      title: book.title,
+      distributor: book.distributor,
+      publisher: book.publisher
+    }));
+    console.log('Sample distributors:', distributorExamples);
+    
+    // Should have books with distributors
+    expect(booksWithDistributors.length).toBeGreaterThan(0);
+    
+    // Check that common distributors are present
+    const distributors = booksWithDistributors.map(book => book.distributor);
+    const uniqueDistributors = [...new Set(distributors)];
+    console.log('Unique distributors found:', uniqueDistributors);
+    
+    // Verify some expected distributors based on the MinotaurOPDS.xml content
+    expect(uniqueDistributors).toEqual(expect.arrayContaining(['OAPEN', 'BiblioBoard']));
+  });
 });

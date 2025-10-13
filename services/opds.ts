@@ -252,6 +252,12 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                     }
           
           const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
+          
+          // Parse distributor information from bibframe:distribution element
+          const distributorElement = entry.querySelector('bibframe\\:distribution');
+          const distributorRaw = distributorElement?.getAttribute('bibframe:ProviderName')?.trim();
+          const distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
+          
           const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
           const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
           const providerId = identifiers[0]?.textContent?.trim() || undefined;
@@ -309,6 +315,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   publisher: publisher || undefined, 
                   publicationDate: publicationDate || undefined, 
                   providerId, 
+                  distributor: distributor,
                   subjects: subjects.length > 0 ? subjects : undefined,
                   categories: categories.length > 0 ? categories : undefined,
                   format,

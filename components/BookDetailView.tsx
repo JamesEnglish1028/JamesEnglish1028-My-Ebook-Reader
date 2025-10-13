@@ -371,7 +371,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                     </section>
                 )}
 
-                {(book.publisher || book.publicationDate || providerId || format) && (
+                {(book.publisher || book.distributor || book.publicationDate || providerId || format) && (
                     <section>
                         <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
                         <div className="bg-slate-800/50 rounded-lg border border-slate-700">
@@ -380,6 +380,12 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                                     <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                                         <dt className="text-sm font-medium text-slate-400">Publisher</dt>
                                         <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.publisher}</dd>
+                                    </div>
+                                )}
+                                {book.distributor && (
+                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                        <dt className="text-sm font-medium text-slate-400">Distributor</dt>
+                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.distributor}</dd>
                                     </div>
                                 )}
                                 {book.publicationDate && (
