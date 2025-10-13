@@ -621,7 +621,8 @@ const Library: React.FC<LibraryProps> = ({
     level: number;
     onToggle: (url: string) => void;
     onNavigate: (link: { title: string, url: string }) => void;
-  }> = ({ link, level, onToggle, onNavigate }) => {
+    currentPath: Array<{ name: string; url: string }>;
+  }> = ({ link, level, onToggle, onNavigate, currentPath }) => {
     const indentation = 1.5 + (level * 1.5);
     const isAlreadyAdded = catalogs.some(c => c.url === link.url);
     const isCatalogLink = !!link.isCatalog;
@@ -656,17 +657,32 @@ const Library: React.FC<LibraryProps> = ({
       );
     };
 
+    // Check if this navigation item is currently active (matches current path)
+    const isActive = currentPath.length > 0 && currentPath[currentPath.length - 1].url === link.url;
+
     return (
         <li className="my-1 group/item">
       <div 
-        className={`flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-slate-700/50 transition-colors pl-[${indentation}rem]`}
+        className={`flex items-center gap-2 w-full text-left p-2 rounded-md transition-colors pl-[${indentation}rem] ${
+          isActive 
+            ? 'bg-sky-600/20 border border-sky-500/50' 
+            : 'hover:bg-slate-700/50'
+        }`}
       >
                 <div className="flex items-center justify-center w-6 h-6 flex-shrink-0">
                     {renderIcon()}
                 </div>
                  <button onClick={() => onNavigate(link)} className="flex-grow text-left flex items-center justify-between">
-                    <span className="font-semibold text-slate-200 group-hover/item:text-sky-300 transition-colors">{link.title}</span>
-                    <ChevronRightIcon className="w-4 h-4 text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity mr-2" />
+                    <span className={`font-semibold transition-colors ${
+                      isActive 
+                        ? 'text-sky-300' 
+                        : 'text-slate-200 group-hover/item:text-sky-300'
+                    }`}>{link.title}</span>
+                    <ChevronRightIcon className={`w-4 h-4 transition-opacity mr-2 ${
+                      isActive 
+                        ? 'text-sky-400 opacity-100' 
+                        : 'text-slate-400 opacity-0 group-hover/item:opacity-100'
+                    }`} />
                 </button>
                 <button
                     onClick={handleAdd}
@@ -683,7 +699,7 @@ const Library: React.FC<LibraryProps> = ({
             {!isCatalogLink && link.isExpanded && link.children && link.children.length > 0 && (
                 <ul className="pl-4 border-l border-slate-700 ml-3">
                     {link.children.map(child => (
-                        <OpdsNavigationItem key={child.url} link={child} level={level + 1} onToggle={onToggle} onNavigate={onNavigate} />
+                        <OpdsNavigationItem key={child.url} link={child} level={level + 1} onToggle={onToggle} onNavigate={onNavigate} currentPath={currentPath} />
                     ))}
                 </ul>
             )}
@@ -714,7 +730,7 @@ const Library: React.FC<LibraryProps> = ({
                         <h2 className="text-lg font-semibold text-slate-300 mb-2 px-2">Categories</h2>
                         <ul>
                             {catalogNavLinks.filter(link => link.rel !== 'collection').map(link => (
-                                <OpdsNavigationItem key={link.url} link={link} level={0} onToggle={handleToggleNode} onNavigate={handleNavLinkClick} />
+                                <OpdsNavigationItem key={link.url} link={link} level={0} onToggle={handleToggleNode} onNavigate={handleNavLinkClick} currentPath={catalogNavPath} />
                             ))}
                         </ul>
                     </div>
@@ -1357,52 +1373,54 @@ const Library: React.FC<LibraryProps> = ({
       )}
       
       {/* Main Content Area with Sidebar Layout */}
-      {isBrowsingOpds && availableCollections.length > 0 ? (
+      {isBrowsingOpds ? (
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Collections Sidebar */}
-          <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
-            <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
-              <h3 className="text-lg font-semibold text-white mb-4">Collections</h3>
-              <nav className="space-y-2">
-                <button
-                  onClick={() => handleCollectionChange('all')}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    (collectionMode === 'all' && catalogNavPath.length <= 1) || (!collectionMode || collectionMode === 'all')
-                      ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500' 
-                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
-                  }`}
-                >
-                  All Books
-                </button>
-                {availableCollections.map((collection, index) => {
-                  // Check multiple conditions for active state
-                  const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
-                  const isActiveByMode = collectionMode === collection;
-                  const isActive = isActiveByPath || isActiveByMode;
-                  
-                  return (
-                    <button
-                      key={`${collection}-${index}`}
-                      onClick={() => handleCollectionChange(collection as CollectionMode)}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border-2 ${
-                        isActive 
-                          ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500' 
-                          : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
-                      }`}
-                    >
-                      <span className={isActive ? '📁' : '📂'}>
-                        {isActive ? '📁' : '📂'}
-                      </span>
-                      {collection}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-          </aside>
+          {/* Collections Sidebar - Only show if collections are available */}
+          {availableCollections.length > 0 && (
+            <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
+              <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
+                <h3 className="text-lg font-semibold text-white mb-4">Collections</h3>
+                <nav className="space-y-2">
+                  <button
+                    onClick={() => handleCollectionChange('all')}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      (collectionMode === 'all' && catalogNavPath.length <= 1) || (!collectionMode || collectionMode === 'all')
+                        ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500' 
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
+                    }`}
+                  >
+                    All Books
+                  </button>
+                  {availableCollections.map((collection, index) => {
+                    // Check multiple conditions for active state
+                    const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
+                    const isActiveByMode = collectionMode === collection;
+                    const isActive = isActiveByPath || isActiveByMode;
+                    
+                    return (
+                      <button
+                        key={`${collection}-${index}`}
+                        onClick={() => handleCollectionChange(collection as CollectionMode)}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border-2 ${
+                          isActive 
+                            ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500' 
+                            : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
+                        }`}
+                      >
+                        <span className={isActive ? '📁' : '📂'}>
+                          {isActive ? '📁' : '📂'}
+                        </span>
+                        {collection}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+            </aside>
+          )}
           
           {/* Main Content */}
-          <main className="flex-1 min-w-0 order-1 lg:order-2">
+          <main className={`flex-1 min-w-0 order-1 lg:order-2 ${availableCollections.length === 0 ? '' : ''}`}>
             {renderCurrentView()}
           </main>
         </div>
