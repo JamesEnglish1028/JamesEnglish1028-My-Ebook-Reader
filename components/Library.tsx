@@ -255,49 +255,7 @@ const Library: React.FC<LibraryProps> = ({
             finalNavLinks = navLinks.filter(nav => !paginationUrls.includes(nav.url));
         }
         
-        // Check for category-based organization first (preferred)
-        const hasCategories = books.some(book => book.categories && book.categories.length > 0);
-        const hasSubjects = books.some(book => book.subjects && book.subjects.length > 0);
-        const hasCollections = books.some(book => book.collections && book.collections.length > 0);
-        
-        // Apply filtering chain: audience -> fiction -> media
-        const audienceFilteredBooks = filterBooksByAudience(books, audienceMode);
-        const fictionFilteredBooks = filterBooksByFiction(audienceFilteredBooks, fictionMode);
-        const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
-        
-        // Use the selected categorization mode
-        if (categorizationMode === 'flat') {
-            // Force flat view - no categorization
-            setCatalogCollections([]);
-            setCategoryLanes([]);
-            setCollectionLinks([]);
-            setUncategorizedBooks([]);
-            setShowCollectionView(false);
-            setShowCategoryView(false);
-            setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
-        } else if (categorizationMode === 'subject' && hasSubjects) {
-            // Use subjects-based categorization
-            const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, pagination, categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode);
-            setCategoryLanes(lanes);
-            setCollectionLinks(collLinks);
-            setUncategorizedBooks(uncategorized);
-            setShowCategoryView(true);
-            setShowCollectionView(false);
-        } else {
-            // No viable categorization - show flat view
-            setCatalogCollections([]);
-            setCategoryLanes([]);
-            setCollectionLinks([]);
-            setUncategorizedBooks([]);
-            setShowCollectionView(false);
-            setShowCategoryView(false);
-            setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
-        }
-        
-        // Set catalogBooks for all non-flat modes (flat mode sets it directly)
-        if (categorizationMode !== 'flat') {
-            setCatalogBooks(finalFilteredBooks);
-        }
+        // Store raw fetched data for processing by the useEffect
         setOriginalCatalogBooks(books); // Store unfiltered books for availability checks
         setCatalogNavLinks(finalNavLinks);
         setCatalogPagination(pagination);
@@ -316,7 +274,59 @@ const Library: React.FC<LibraryProps> = ({
         }
     }
     setIsCatalogLoading(false);
-  }, [categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode]);
+  }, [fetchCatalogContent, audienceMode, fictionMode, mediaMode, collectionMode, categorizationMode, catalogNavPath]);
+
+  // Separate useEffect for re-processing existing data when filters change
+  useEffect(() => {
+    if (!originalCatalogBooks.length || !catalogNavLinks) return;
+    
+    const books = originalCatalogBooks;
+    const finalNavLinks = catalogNavLinks;
+    
+    // Check for category-based organization first (preferred)
+    const hasCategories = books.some(book => book.categories && book.categories.length > 0);
+    const hasSubjects = books.some(book => book.subjects && book.subjects.length > 0);
+    const hasCollections = books.some(book => book.collections && book.collections.length > 0);
+    
+    // Apply filtering chain: audience -> fiction -> media
+    const audienceFilteredBooks = filterBooksByAudience(books, audienceMode);
+    const fictionFilteredBooks = filterBooksByFiction(audienceFilteredBooks, fictionMode);
+    const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
+    
+    // Use the selected categorization mode
+    if (categorizationMode === 'flat') {
+        // Force flat view - no categorization
+        setCatalogCollections([]);
+        setCategoryLanes([]);
+        setCollectionLinks([]);
+        setUncategorizedBooks([]);
+        setShowCollectionView(false);
+        setShowCategoryView(false);
+        setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
+    } else if (categorizationMode === 'subject' && hasSubjects) {
+        // Use subjects-based categorization
+        const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, catalogPagination || {}, categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode);
+        setCategoryLanes(lanes);
+        setCollectionLinks(collLinks);
+        setUncategorizedBooks(uncategorized);
+        setShowCategoryView(true);
+        setShowCollectionView(false);
+    } else {
+        // No viable categorization - show flat view
+        setCatalogCollections([]);
+        setCategoryLanes([]);
+        setCollectionLinks([]);
+        setUncategorizedBooks([]);
+        setShowCollectionView(false);
+        setShowCategoryView(false);
+        setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
+    }
+    
+    // Set catalogBooks for all non-flat modes (flat mode sets it directly)
+    if (categorizationMode !== 'flat') {
+        setCatalogBooks(finalFilteredBooks);
+    }
+  }, [originalCatalogBooks, catalogNavLinks, catalogPagination, categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode]);
   
   const handleSelectSource = useCallback((source: 'library' | Catalog | CatalogRegistry) => {
     setIsCatalogDropdownOpen(false);
