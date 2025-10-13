@@ -1394,8 +1394,8 @@ const Library: React.FC<LibraryProps> = ({
       {/* Main Content Area with Sidebar Layout */}
       {isBrowsingOpds ? (
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Collections Sidebar - Only show if collections are available */}
-          {availableCollections.length > 0 && (
+          {/* Collections Sidebar - Show if collections are available or we have root collections and are loading */}
+          {(availableCollections.length > 0 || (isCatalogLoading && rootLevelCollections.length > 0)) && (
             <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
               <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
                 <h3 className="text-lg font-semibold text-white mb-4">Collections</h3>
@@ -1410,7 +1410,7 @@ const Library: React.FC<LibraryProps> = ({
                   >
                     All Books
                   </button>
-                  {availableCollections.map((collection, index) => {
+                  {(availableCollections.length > 0 ? availableCollections : rootLevelCollections).map((collection, index) => {
                     // Check multiple conditions for active state
                     const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
                     const isActiveByMode = collectionMode === collection;
