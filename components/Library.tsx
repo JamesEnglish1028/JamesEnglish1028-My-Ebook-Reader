@@ -260,21 +260,31 @@ const Library: React.FC<LibraryProps> = ({
         setCatalogNavLinks(finalNavLinks);
         setCatalogPagination(pagination);
         
-        // Capture root-level collections when at the root of catalog navigation
-        if (catalogNavPath.length <= 1 && books.length > 0) {
-            const rootCollections = new Set<string>();
+        // Capture and accumulate root-level collections from any navigation level
+        if (books.length > 0) {
+            const newCollections = new Set<string>();
             books.forEach(book => {
                 if (book.collections && book.collections.length > 0) {
                     book.collections.forEach(collection => {
-                        rootCollections.add(collection.title);
+                        newCollections.add(collection.title);
                     });
                 }
             });
-            setRootLevelCollections(Array.from(rootCollections));
+            
+            // If we're at the root, replace the collections. If navigating deeper, merge with existing
+            if (catalogNavPath.length <= 1) {
+                setRootLevelCollections(Array.from(newCollections));
+            } else if (newCollections.size > 0) {
+                // Merge new collections with existing root collections
+                setRootLevelCollections(prev => {
+                    const merged = new Set([...prev, ...Array.from(newCollections)]);
+                    return Array.from(merged);
+                });
+            }
         }
     }
     setIsCatalogLoading(false);
-  }, [fetchCatalogContent, audienceMode, fictionMode, mediaMode, collectionMode, categorizationMode, catalogNavPath]);
+  }, [fetchCatalogContent, catalogNavPath]);
 
   // Separate useEffect for re-processing existing data when filters change
   useEffect(() => {
