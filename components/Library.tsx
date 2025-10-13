@@ -69,6 +69,9 @@ const Library: React.FC<LibraryProps> = ({
   const [uncategorizedBooks, setUncategorizedBooks] = useState<CatalogBook[]>([]);
   const [showCollectionView, setShowCollectionView] = useState(false);
   
+  // Persist root-level collections for sidebar navigation
+  const [rootLevelCollections, setRootLevelCollections] = useState<string[]>([]);
+  
   // Category-based organization state (with smooth transitions)
   const [categoryLanes, setCategoryLanes] = useState<CategoryLane[]>([]);
   const [collectionLinks, setCollectionLinks] = useState<Collection[]>([]);
@@ -298,6 +301,19 @@ const Library: React.FC<LibraryProps> = ({
         setOriginalCatalogBooks(books); // Store unfiltered books for availability checks
         setCatalogNavLinks(finalNavLinks);
         setCatalogPagination(pagination);
+        
+        // Capture root-level collections when at the root of catalog navigation
+        if (catalogNavPath.length <= 1 && books.length > 0) {
+            const rootCollections = new Set<string>();
+            books.forEach(book => {
+                if (book.collections && book.collections.length > 0) {
+                    book.collections.forEach(collection => {
+                        rootCollections.add(collection.title);
+                    });
+                }
+            });
+            setRootLevelCollections(Array.from(rootCollections));
+        }
     }
     setIsCatalogLoading(false);
   }, [categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode]);
@@ -949,7 +965,10 @@ const Library: React.FC<LibraryProps> = ({
     const audiences = getAvailableAudiences(originalCatalogBooks);
     const fictionModes = getAvailableFictionModes(originalCatalogBooks);
     const mediaModes = getAvailableMediaModes(originalCatalogBooks);
-    const collections = getAvailableCollections(originalCatalogBooks, catalogNavLinks);
+    // Use root-level collections when navigating deeper, otherwise use current collections
+    const collections = catalogNavPath.length > 1 && rootLevelCollections.length > 0 
+      ? rootLevelCollections
+      : getAvailableCollections(originalCatalogBooks, catalogNavLinks);
     const genreCategories = getAvailableCategories(originalCatalogBooks, catalogNavLinks);
     
     // Check if collections are available either from books or navigation links
@@ -965,7 +984,7 @@ const Library: React.FC<LibraryProps> = ({
       availableCollections: collections,
       availableGenreCategories: genreCategories
     };
-  }, [originalCatalogBooks, catalogNavLinks]);
+  }, [originalCatalogBooks, catalogNavLinks, rootLevelCollections]);
 
   const audienceOptions = [
     { key: 'all' as AudienceMode, label: 'All Ages', available: true },
