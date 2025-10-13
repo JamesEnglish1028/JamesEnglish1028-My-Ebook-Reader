@@ -256,9 +256,24 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
           const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
           const providerId = identifiers[0]?.textContent?.trim() || undefined;
 
-          const subjects = Array.from(entry.querySelectorAll('category'))
-              .map(cat => cat.getAttribute('term')?.trim())
-              .filter((term): term is string => !!term);
+          // Parse category elements into proper Category objects with scheme, term, and label
+          const categories = Array.from(entry.querySelectorAll('category')).map(cat => {
+              const scheme = cat.getAttribute('scheme') || 'http://palace.io/subjects';
+              const term = cat.getAttribute('term')?.trim();
+              const label = cat.getAttribute('label')?.trim();
+              
+              if (term) {
+                  return {
+                      scheme,
+                      term,
+                      label: label || term // Use label if available, otherwise fall back to term
+                  };
+              }
+              return null;
+          }).filter((category): category is Category => category !== null);
+
+          // Extract subjects as simple strings for backward compatibility
+          const subjects = categories.map(cat => cat.label);
 
           // Parse collection links - used for Palace Project navigation
           // Collections are rel="collection" links that point to curated book sets
@@ -295,6 +310,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   publicationDate: publicationDate || undefined, 
                   providerId, 
                   subjects: subjects.length > 0 ? subjects : undefined,
+                  categories: categories.length > 0 ? categories : undefined,
                   format,
                   acquisitionMediaType: finalMediaType || undefined,
                   collections: collections.length > 0 ? collections : undefined
@@ -1439,8 +1455,21 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
     filteredBooks.forEach(book => {
         let hasCategory = false;
         
-        if (mode === 'subject' && book.subjects && book.subjects.length > 0) {
-            // Use subjects as categories
+        // Handle actual categories from OPDS parsing (preferred)
+        if (book.categories && book.categories.length > 0) {
+            book.categories.forEach(category => {
+                const key = `${category.scheme}|${category.label}`;
+                if (!categoryMap.has(key)) {
+                    categoryMap.set(key, {
+                        category,
+                        books: []
+                    });
+                }
+                categoryMap.get(key)!.books.push(book);
+                hasCategory = true;
+            });
+        } else if (mode === 'subject' && book.subjects && book.subjects.length > 0) {
+            // Use subjects as categories (fallback for when categories aren't available)
             book.subjects.forEach(subject => {
                 // Create a synthetic category from the subject
                 const syntheticCategory: Category = {
