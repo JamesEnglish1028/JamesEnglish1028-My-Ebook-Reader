@@ -260,27 +260,31 @@ const Library: React.FC<LibraryProps> = ({
         setCatalogNavLinks(finalNavLinks);
         setCatalogPagination(pagination);
         
-        // Capture and accumulate root-level collections from any navigation level
-        if (books.length > 0) {
-            const newCollections = new Set<string>();
+        // Palace OPDS Collection Architecture:
+        // - Root level: Capture all collections from books AND navigation links
+        // - Inside collection: DON'T capture collections (we're in a curated set)
+        // - Inside category: May capture collections if this is structural navigation
+        if (books.length > 0 && catalogNavPath.length <= 1) {
+            // Only capture collections when at the catalog root level
+            const rootCollections = new Set<string>();
+            
+            // From book metadata (publication-level collections)
             books.forEach(book => {
                 if (book.collections && book.collections.length > 0) {
                     book.collections.forEach(collection => {
-                        newCollections.add(collection.title);
+                        rootCollections.add(collection.title);
                     });
                 }
             });
             
-            // If we're at the root, replace the collections. If navigating deeper, merge with existing
-            if (catalogNavPath.length <= 1) {
-                setRootLevelCollections(Array.from(newCollections));
-            } else if (newCollections.size > 0) {
-                // Merge new collections with existing root collections
-                setRootLevelCollections(prev => {
-                    const merged = new Set([...prev, ...Array.from(newCollections)]);
-                    return Array.from(merged);
-                });
-            }
+            // From navigation links (catalog-level collections)
+            finalNavLinks.forEach(link => {
+                if (link.rel === 'collection' || link.rel === 'subsection') {
+                    rootCollections.add(link.title);
+                }
+            });
+            
+            setRootLevelCollections(Array.from(rootCollections));
         }
     }
     setIsCatalogLoading(false);
@@ -985,10 +989,14 @@ const Library: React.FC<LibraryProps> = ({
     const audiences = getAvailableAudiences(originalCatalogBooks);
     const fictionModes = getAvailableFictionModes(originalCatalogBooks);
     const mediaModes = getAvailableMediaModes(originalCatalogBooks);
-    // Use root-level collections when navigating deeper, otherwise use current collections
-    const collections = catalogNavPath.length > 1 && rootLevelCollections.length > 0 
-      ? rootLevelCollections
-      : getAvailableCollections(originalCatalogBooks, catalogNavLinks);
+    // Palace OPDS Architecture: 
+    // - At root: Collections available via navigation links AND book metadata
+    // - Inside collection: No collection nav links (we're IN a collection), use preserved root collections
+    // - Inside category: May have collection nav links for sub-categories
+    const isInsideCollection = catalogNavPath.length > 1;
+    const collections = isInsideCollection && rootLevelCollections.length > 0
+      ? rootLevelCollections  // Always use preserved root collections when navigating deeper
+      : getAvailableCollections(originalCatalogBooks, catalogNavLinks); // Use current feed's collections at root
     const genreCategories = getAvailableCategories(originalCatalogBooks, catalogNavLinks);
     
     // Check if collections are available either from books or navigation links
@@ -1414,8 +1422,11 @@ const Library: React.FC<LibraryProps> = ({
       {/* Main Content Area with Sidebar Layout */}
       {isBrowsingOpds ? (
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Collections Sidebar - Show if collections are available, during loading, or when navigating deeper */}
-          {(availableCollections.length > 0 || rootLevelCollections.length > 0 || (isCatalogLoading && catalogNavPath.length > 1)) && (
+          {/* Collections Sidebar - Show based on Palace OPDS structure:
+              - At root: Show if current feed has collections
+              - Inside collection/category: Show preserved root collections for navigation back
+              - During loading: Keep visible if we had collections before */}
+          {(availableCollections.length > 0 || (catalogNavPath.length > 1 && rootLevelCollections.length > 0) || (isCatalogLoading && rootLevelCollections.length > 0)) && (
             <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
               <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
                 <h3 className="text-lg font-semibold text-white mb-4">Collections</h3>
