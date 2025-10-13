@@ -11,6 +11,7 @@ export interface BookRecord {
   isbn?: string; // Kept for backwards compatibility with existing library books
   providerId?: string;
   providerName?: string;
+  distributor?: string; // Distribution provider name (e.g., OAPEN, BiblioBoard, OverDrive)
   description?: string;
   subjects?: string[];
   format?: 'EPUB' | 'PDF' | string;

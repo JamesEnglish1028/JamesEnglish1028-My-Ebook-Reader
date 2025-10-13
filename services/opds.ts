@@ -254,9 +254,28 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
           const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
           
           // Parse distributor information from bibframe:distribution element
-          const distributorElement = entry.querySelector('bibframe\\:distribution');
-          const distributorRaw = distributorElement?.getAttribute('bibframe:ProviderName')?.trim();
-          const distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
+          // Use getElementsByTagName which is more compatible with namespaced elements
+          let distributor: string | undefined = undefined;
+          
+          try {
+            const distributionElements = entry.getElementsByTagName('bibframe:distribution');
+            if (distributionElements.length > 0) {
+              const distributorRaw = distributionElements[0].getAttribute('bibframe:ProviderName')?.trim();
+              distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
+            }
+          } catch (error) {
+            // Fallback: look for distribution elements without namespace prefix
+            try {
+              const distributionElements = entry.getElementsByTagName('distribution');
+              if (distributionElements.length > 0) {
+                const distributorRaw = distributionElements[0].getAttribute('ProviderName')?.trim();
+                distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
+              }
+            } catch (fallbackError) {
+              // If both fail, distributor remains undefined
+              console.warn('Could not parse distributor information:', fallbackError);
+            }
+          }
           
           const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
           const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
@@ -331,6 +350,30 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
           }
       }
     });
+
+    // Create navigation links from collections found in books (for Palace Project support)
+    if (books.length > 0 && navLinks.length === 0) {
+        const collectionMap = new Map<string, string>();
+        
+        books.forEach(book => {
+            if (book.collections) {
+                book.collections.forEach(collection => {
+                    if (!collectionMap.has(collection.title)) {
+                        collectionMap.set(collection.title, collection.href);
+                    }
+                });
+            }
+        });
+        
+        // Convert unique collections to navigation links
+        collectionMap.forEach((href, title) => {
+            navLinks.push({ 
+                title, 
+                url: href, 
+                rel: 'collection' 
+            });
+        });
+    }
 
     // Add check to see if a valid Atom feed contains no OPDS content.
     if (entries.length > 0 && books.length === 0 && navLinks.length === 0) {

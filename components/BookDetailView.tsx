@@ -82,7 +82,10 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
   // Use direct cover image URL in the browser first; fall back to proxy on error.
   const coverImage = book.coverImage ? book.coverImage : null;
   const providerId = (book as any).providerId || (book as any).isbn;
-  const providerName = (book as BookMetadata).providerName;
+  const providerName = isLibraryBook(book) 
+    ? (book as BookMetadata).providerName 
+    : (book as CatalogBook).distributor; // Use distributor as provider name for catalog books
+  
   const format = ('format' in book && book.format) || (isLibraryBook(book) ? 'EPUB' : undefined);
 
 
@@ -371,7 +374,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                     </section>
                 )}
 
-                {(book.publisher || book.distributor || book.publicationDate || providerId || format) && (
+                {(book.publisher || book.publicationDate || providerId || providerName || format) && (
                     <section>
                         <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
                         <div className="bg-slate-800/50 rounded-lg border border-slate-700">
@@ -382,16 +385,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                                         <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.publisher}</dd>
                                     </div>
                                 )}
-                                {book.distributor && (
-                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">Distributor</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.distributor}</dd>
-                                    </div>
-                                )}
                                 {book.publicationDate && (
                                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                                         <dt className="text-sm font-medium text-slate-400">Published</dt>
                                         <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{formatDate(book.publicationDate)}</dd>
+                                    </div>
+                                )}
+                                {providerName && !providerId && (
+                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                        <dt className="text-sm font-medium text-slate-400">Distributor</dt>
+                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{providerName}</dd>
                                     </div>
                                 )}
                                 {providerId && (

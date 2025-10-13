@@ -145,8 +145,8 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
     request.onsuccess = () => {
       const bookRecord = request.result as BookRecord | undefined;
       if (bookRecord) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format } = bookRecord;
-        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format });
+        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, distributor, description, subjects, format } = bookRecord;
+        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, distributor, description, subjects, format });
       } else {
         resolve(null);
       }

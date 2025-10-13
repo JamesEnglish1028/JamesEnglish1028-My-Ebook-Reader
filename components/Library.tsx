@@ -708,11 +708,12 @@ const Library: React.FC<LibraryProps> = ({
     if (activeOpdsSource) {
         return (
             <div>
-                {catalogNavLinks.length > 0 && (
+                {/* Only show category navigation links in main content, not collection links */}
+                {catalogNavLinks.filter(link => link.rel !== 'collection').length > 0 && (
                     <div className="bg-slate-800/50 rounded-lg p-4 mb-6">
                         <h2 className="text-lg font-semibold text-slate-300 mb-2 px-2">Categories</h2>
                         <ul>
-                            {catalogNavLinks.map(link => (
+                            {catalogNavLinks.filter(link => link.rel !== 'collection').map(link => (
                                 <OpdsNavigationItem key={link.url} link={link} level={0} onToggle={handleToggleNode} onNavigate={handleNavLinkClick} />
                             ))}
                         </ul>
@@ -722,7 +723,7 @@ const Library: React.FC<LibraryProps> = ({
                 {catalogBooks.length > 0 && (
                     <>
                         <div className="flex items-center justify-between mb-4">
-                            {catalogNavLinks.length > 0 && <h2 className="text-lg font-semibold text-slate-300">Books</h2>}
+                            {catalogNavLinks.filter(link => link.rel !== 'collection').length > 0 && <h2 className="text-lg font-semibold text-slate-300">Books</h2>}
                             <div className="flex gap-2">
                                 {/* Show collection navigation when collections exist in any form */}
                                 {(catalogCollections.length > 0 || collectionLinks.length > 0) && (
@@ -1014,7 +1015,8 @@ const Library: React.FC<LibraryProps> = ({
     if (collectionNavLink) {
       // Navigate to the collection's feed
       if (activeOpdsSource) {
-        setCatalogNavPath(prev => [...prev, { name: collectionNavLink.title, url: collectionNavLink.url }]);
+        const newPath = [...catalogNavPath, { name: collectionNavLink.title, url: collectionNavLink.url }];
+        setCatalogNavPath(newPath);
         fetchAndParseSource(collectionNavLink.url, activeOpdsSource.url);
       }
     } else {
