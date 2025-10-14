@@ -24,6 +24,7 @@ const sanitizeHtml = (html: string): string => {
 import DuplicateBookModal from './DuplicateBookModal';
 import OpdsCredentialsModal from './OpdsCredentialsModal';
 
+import { bookRepository } from '../domain/book';
 import { resolveAcquisitionChainOpds1 } from '../services/opds';
 import { saveOpdsCredential, findCredentialForUrl } from '../services/opds2';
 import { db } from '../services/db';
@@ -268,12 +269,18 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
     setExistingBook(null);
 
     try {
-      await db.saveBook(bookToSave);
-      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-      setTimeout(() => {
-        setImportStatus({ isLoading: false, message: '', error: null });
-        onBack();
-      }, 2000);
+      const result = await bookRepository.save(bookToSave);
+      
+      if (result.success) {
+        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+        setTimeout(() => {
+          setImportStatus({ isLoading: false, message: '', error: null });
+          onBack();
+        }, 2000);
+      } else {
+        console.error('Error replacing book:', (result as { success: false; error: string }).error);
+        setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
+      }
     } catch (error) {
       console.error('Error replacing book:', error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
@@ -290,12 +297,18 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
     setExistingBook(null);
 
     try {
-      await db.saveBook(bookToSave);
-      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-       setTimeout(() => {
-        setImportStatus({ isLoading: false, message: '', error: null });
-        onBack();
-      }, 2000);
+      const result = await bookRepository.save(bookToSave);
+      
+      if (result.success) {
+        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+        setTimeout(() => {
+          setImportStatus({ isLoading: false, message: '', error: null });
+          onBack();
+        }, 2000);
+      } else {
+        console.error('Error adding duplicate book:', (result as { success: false; error: string }).error);
+        setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
+      }
     } catch (error) {
       console.error('Error adding duplicate book:', error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
