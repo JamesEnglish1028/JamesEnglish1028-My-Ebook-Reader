@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { bookRepository } from '../domain/book';
 import { SORT_OPTIONS, useCatalogs, useLocalStorage, useSortedBooks } from '../hooks';
 import { db } from '../services/db';
 import { logger } from '../services/logger';
@@ -117,10 +118,18 @@ const Library: React.FC<LibraryProps> = ({
     setIsCatalogLoading(false);
     setIsLoading(true);
     try {
-      const booksData = await db.getBooksMetadata();
-      setBooks(booksData);
+      const result = await bookRepository.findAllMetadata();
+      
+      if (result.success) {
+        setBooks(result.data);
+      } else {
+        // result.success is false, so result.error exists
+        logger.error('Failed to fetch books from repository:', (result as { success: false; error: string }).error);
+        setBooks([]);
+      }
     } catch (error) {
       logger.error('Failed to fetch books:', error);
+      setBooks([]);
     } finally {
       setIsLoading(false);
     }
@@ -595,8 +604,13 @@ const Library: React.FC<LibraryProps> = ({
     if (!bookToDelete || typeof bookToDelete.id === 'undefined') return;
 
     try {
-      await db.deleteBook(bookToDelete.id);
-      setBooks(prevBooks => prevBooks.filter(b => b.id !== bookToDelete.id));
+      const result = await bookRepository.delete(bookToDelete.id);
+      
+      if (result.success) {
+        setBooks(prevBooks => prevBooks.filter(b => b.id !== bookToDelete.id));
+      } else {
+        logger.error('Failed to delete book:', (result as { success: false; error: string }).error);
+      }
     } catch (error) {
       logger.error('Failed to delete book:', error);
     } finally {
