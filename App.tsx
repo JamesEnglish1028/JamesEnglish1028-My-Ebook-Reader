@@ -300,30 +300,35 @@ const AppInner: React.FC = () => {
     setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
     try {
       // If this is an OPDS2 acquisition flow, attempt to resolve the acquisition chain
+      // Skip resolution for open-access books (no authentication required)
       let finalUrl = book.downloadUrl;
       
-      // Try to resolve acquisition chain with stored credentials
-      const cred = await findCredentialForUrl(book.downloadUrl);
-      const resolveResult = await opdsAcquisitionService.resolve(
-        book.downloadUrl, 
-        'auto', 
-        cred ? { username: cred.username, password: cred.password } : null
-      );
-      
-      if (resolveResult.success) {
-        finalUrl = resolveResult.data;
-      } else {
-        const errorResult = resolveResult as { success: false; error: string; status?: number; proxyUsed?: boolean };
+      if (!book.isOpenAccess) {
+        // Try to resolve acquisition chain with stored credentials
+        const cred = await findCredentialForUrl(book.downloadUrl);
+        const resolveResult = await opdsAcquisitionService.resolve(
+          book.downloadUrl, 
+          'auto', 
+          cred ? { username: cred.username, password: cred.password } : null
+        );
         
-        // If auth error (401/403), prompt for credentials and allow retry
-        if (errorResult.status === 401 || errorResult.status === 403) {
-          setImportStatus({ isLoading: false, message: '', error: null });
-          setCredentialPrompt({ isOpen: true, host: new URL(book.downloadUrl).host, pendingHref: book.downloadUrl, pendingBook: book, pendingCatalogName: catalogName });
-          setCredentialPrompt(prev => ({ ...prev, authDocument: undefined }));
-          return { success: false };
+        if (resolveResult.success) {
+          finalUrl = resolveResult.data;
+        } else {
+          const errorResult = resolveResult as { success: false; error: string; status?: number; proxyUsed?: boolean };
+          
+          // If auth error (401/403), prompt for credentials and allow retry
+          if (errorResult.status === 401 || errorResult.status === 403) {
+            setImportStatus({ isLoading: false, message: '', error: null });
+            setCredentialPrompt({ isOpen: true, host: new URL(book.downloadUrl).host, pendingHref: book.downloadUrl, pendingBook: book, pendingCatalogName: catalogName });
+            setCredentialPrompt(prev => ({ ...prev, authDocument: undefined }));
+            return { success: false };
+          }
+          // For other errors, log and continue with original URL (may fail later)
+          logger.warn('Failed to resolve acquisition chain, using original URL', errorResult.error);
         }
-        // For other errors, log and continue with original URL (may fail later)
-        logger.warn('Failed to resolve acquisition chain, using original URL', errorResult.error);
+      } else {
+        logger.info('Skipping acquisition chain resolution for open-access book:', book.title);
       }
 
       const proxyUrl = await maybeProxyForCors(finalUrl);

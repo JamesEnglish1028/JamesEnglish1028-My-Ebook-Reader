@@ -328,12 +328,20 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         }
       });
 
-      // Decide on a primary acquisition link (prefer borrow, then loan, then any)
+      // Decide on a primary acquisition link (prefer open-access, then borrow, then loan, then any)
       let chosen: typeof acquisitions[0] | undefined;
+      let isOpenAccess = false;
       if (acquisitions.length > 0) {
-        chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
-          || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
-          || acquisitions[0];
+        // Prefer open-access links (no authentication required)
+        const openAccessLink = acquisitions.find(a => a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access'));
+        if (openAccessLink) {
+          chosen = openAccessLink;
+          isOpenAccess = true;
+        } else {
+          chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
+            || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
+            || acquisitions[0];
+        }
       }
 
       let downloadUrl: string | undefined = undefined;
@@ -365,6 +373,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
           subjects: subjects || undefined,
           collections: collections.length > 0 ? collections : undefined,
           format: format || undefined,
+          isOpenAccess: isOpenAccess || undefined,
         };
         books.push(book);
       }

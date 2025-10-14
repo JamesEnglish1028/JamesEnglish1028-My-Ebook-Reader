@@ -44,6 +44,7 @@ export interface CatalogBook {
   // OPDS-specific metadata
   acquisitionMediaType?: string; // e.g., application/epub+zip
   mediaType?: string; // e.g., http://schema.org/EBook
+  isOpenAccess?: boolean; // True if acquisition link is open-access (no auth required)
   
   // OPDS 1 collections
   collections?: Collection[];

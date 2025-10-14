@@ -203,12 +203,20 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
       const isAudiobook = schemaType === 'http://bib.schema.org/Audiobook' || 
                          schemaType === 'http://schema.org/Audiobook';
       
-      // Find acquisition links for downloadable books - prefer specific media types
-      const acquisitionLink = allLinks.find(link => {
+      // Find acquisition links for downloadable books - prefer open-access, then specific media types
+      // Open-access links don't require authentication
+      const openAccessLink = allLinks.find(link => {
+          const rel = link.getAttribute('rel') || '';
+          return rel.includes('/open-access') || rel === 'http://opds-spec.org/acquisition/open-access';
+      });
+      
+      const acquisitionLink = openAccessLink || allLinks.find(link => {
           const rel = link.getAttribute('rel') || '';
           const type = link.getAttribute('type') || '';
           return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
       }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
+      
+      const isOpenAccess = !!openAccessLink;
 
     const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
 
@@ -343,6 +351,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   format,
                   acquisitionMediaType: finalMediaType || undefined,
                   collections: collections.length > 0 ? collections : undefined,
+                  isOpenAccess: isOpenAccess || undefined,
               });
           }
       } else if (subsectionLink) {
