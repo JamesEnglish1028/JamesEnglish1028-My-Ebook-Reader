@@ -450,7 +450,39 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                 }
             }
 
-            const acquisitionLink = pub.links?.find((l: any) => l.rel?.includes('opds-spec.org/acquisition'));
+            // Find all acquisition links and prefer open-access ones
+            const acquisitionLinks = pub.links?.filter((l: any) => l.rel?.includes('opds-spec.org/acquisition')) || [];
+            
+            // Separate open-access links
+            const openAccessLinks = acquisitionLinks.filter((l: any) => 
+                l.rel?.includes('/open-access') || l.rel === 'http://opds-spec.org/acquisition/open-access'
+            );
+            
+            // Prefer open-access EPUB over PDF as primary (EPUB is generally more reliable)
+            let acquisitionLink = openAccessLinks.find((l: any) => l.type?.includes('epub'));
+            if (!acquisitionLink) {
+                acquisitionLink = openAccessLinks[0] || acquisitionLinks[0];
+            }
+            
+            const isOpenAccess = openAccessLinks.length > 0;
+            
+            // Collect all unique formats as alternatives
+            const alternativeFormats: any[] = [];
+            const seenFormats = new Set<string>();
+            
+            for (const link of openAccessLinks.length > 0 ? openAccessLinks : acquisitionLinks) {
+                const fmt = getFormatFromMimeType(link.type);
+                if (fmt && !seenFormats.has(fmt)) {
+                    seenFormats.add(fmt);
+                    alternativeFormats.push({
+                        format: fmt,
+                        downloadUrl: new URL(link.href, baseUrl).href,
+                        mediaType: link.type,
+                        isOpenAccess: openAccessLinks.includes(link)
+                    });
+                }
+            }
+            
             const coverLink = pub.images?.[0];
 
             if (acquisitionLink?.href) {
@@ -514,6 +546,8 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     series,
                     format,
                     acquisitionMediaType: mimeType || undefined,
+                    isOpenAccess: isOpenAccess ? true : undefined,
+                    alternativeFormats: alternativeFormats.length > 0 ? alternativeFormats : undefined,
                 });
             }
         });
@@ -733,9 +767,14 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             return parseOpds1Xml(responseText, baseUrl);
         }
 
+    console.log('[mebooks] About to check JSON condition - forcedVersion:', forcedVersion, 'contentType includes opds+json:', contentType.includes('application/opds+json'), 'contentType includes json:', contentType.includes('application/json'));
     if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+            console.log('[mebooks] ENTERED JSON condition block! About to parse JSON...');
             try {
+                console.log('[mebooks] About to call JSON.parse on response, length:', responseText.length);
                 const jsonData = JSON.parse(responseText);
+                console.log('[mebooks] JSON.parse succeeded! About to call parseOpds2Json...');
+                logger.info('[mebooks] Delegating to parseOpds2Json for', baseUrl);
                 return parseOpds2Json(jsonData, baseUrl);
             } catch (e) {
                 // Some Palace endpoints return Atom XML but incorrectly set Content-Type

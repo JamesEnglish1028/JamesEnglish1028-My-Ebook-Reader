@@ -15,7 +15,7 @@
 // Main view components
 export { default as AboutPage } from './AboutPage';
 export { default as BookDetailView } from './BookDetailView';
-export { default as Library } from './Library';
+// Library component has been decomposed - use LibraryView from './library/LibraryView' instead
 export { default as ReaderView } from './ReaderView';
 
 // Reader-related components

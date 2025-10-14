@@ -301,6 +301,7 @@ const Library: React.FC<LibraryProps> = ({
     }
   }, [originalCatalogBooks, catalogNavLinks, catalogPagination, categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode]);
 
+  // DEBUG: Monitor categoryLanes data
   const handleSelectSource = useCallback((source: 'library' | Catalog | CatalogRegistry) => {
     setIsCatalogDropdownOpen(false);
     if (source === 'library') {
@@ -843,14 +844,31 @@ const Library: React.FC<LibraryProps> = ({
                         <div className="mt-2 space-y-1">
                           <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
                           <p className="text-xs text-slate-400 truncate">{book.author}</p>
-                          {book.format && (
-                            <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                          <div className="flex gap-1 flex-wrap">
+                            {book.alternativeFormats && book.alternativeFormats.length > 0 ? (
+                              book.alternativeFormats.map((fmt: any, idx: number) => (
+                                <span 
+                                  key={`${book.title}-${fmt.format}-${idx}`}
+                                  className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                                    fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                                    fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                                    'bg-sky-500'
+                                  }`}
+                                  title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
+                                >
+                                  {fmt.format}
+                                </span>
+                              ))
+                            ) : book.format && (
+                              <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                                book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
                                 book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                                  'bg-sky-500'
+                                'bg-sky-500'
                               }`}>
-                              {book.format}
-                            </span>
-                          )}
+                                {book.format}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -922,12 +940,31 @@ const Library: React.FC<LibraryProps> = ({
                 <div className="mt-2 space-y-1">
                   <h3 className="text-sm font-semibold text-white truncate group-hover:text-sky-400">{book.title}</h3>
                   <p className="text-xs text-slate-400 truncate">{book.author}</p>
-                  <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' :
-                      (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                  <div className="flex gap-1 flex-wrap">
+                    {(book as any).alternativeFormats && (book as any).alternativeFormats.length > 0 ? (
+                      (book as any).alternativeFormats.map((fmt: any, idx: number) => (
+                        <span 
+                          key={`${book.title}-${fmt.format}-${idx}`}
+                          className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                            fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                            'bg-sky-500'
+                          }`}
+                          title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
+                        >
+                          {fmt.format}
+                        </span>
+                      ))
+                    ) : (
+                      <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                        (book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' :
+                        (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
                         'bg-sky-500'
-                    }`}>
-                    {book.format || 'EPUB'}
-                  </span>
+                      }`}>
+                        {book.format || 'EPUB'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

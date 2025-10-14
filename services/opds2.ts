@@ -172,6 +172,7 @@ export function getCachedEtag(url: string) {
 }
 
 export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
+  console.log('[OPDS2] parseOpds2Json CALLED with baseUrl:', baseUrl, 'jsonData keys:', Object.keys(jsonData));
   const books: CatalogBook[] = [];
   const navLinks: CatalogNavigationLink[] = [];
   const pagination: CatalogPagination = {};
@@ -220,8 +221,10 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
   }
 
   if (jsonData.publications && Array.isArray(jsonData.publications)) {
+    console.log('[OPDS2] Parsing', jsonData.publications.length, 'publications from feed');
     jsonData.publications.forEach((pub: any) => {
       const metadata = pub.metadata || {};
+      console.log('[OPDS2] Processing publication:', metadata.title || 'Untitled');
       // Normalize links: some providers (e.g., Palace) embed XML serialized
       // <link> elements inside JSON string fields. Detect string-serialized
       // XML and convert to a links array so downstream logic can find

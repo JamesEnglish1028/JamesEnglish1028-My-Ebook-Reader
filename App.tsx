@@ -10,7 +10,6 @@ import {
   AboutPage,
   BookDetailView,
   ErrorBoundary,
-  Library,
   LocalStorageModal,
   NetworkDebugModal,
   OpdsCredentialsModal,
@@ -20,6 +19,10 @@ import {
   useConfirm,
   useToast
 } from './components';
+// Import new LibraryView from refactored structure
+import LibraryView from './components/library/LibraryView';
+// Import app-level components
+import { ViewRenderer, GlobalModals } from './components/app';
 
 // Service imports - using barrel exports
 import { useAuth } from './contexts/AuthContext';
@@ -334,13 +337,35 @@ const AppInner: React.FC = () => {
         logger.info('Skipping acquisition chain resolution for open-access book:', book.title);
       }
 
-      const proxyUrl = await maybeProxyForCors(finalUrl, book.isOpenAccess === true);
+      let proxyUrl = await maybeProxyForCors(finalUrl, book.isOpenAccess === true);
       const storedCred = await findCredentialForUrl(book.downloadUrl);
       const downloadHeaders: Record<string, string> = {};
       if (storedCred) {
         downloadHeaders['Authorization'] = `Basic ${btoa(`${storedCred.username}:${storedCred.password}`)}`;
       }
-      const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === finalUrl ? 'include' : 'omit' });
+      
+      // For open-access books, try direct fetch first (with credentials for cookies)
+      // If CORS blocks it, fall back to proxy
+      let response: Response;
+      if (book.isOpenAccess) {
+        try {
+          console.log('[App] Attempting direct fetch for open-access book:', finalUrl);
+          console.log('[App] Book downloadUrl from catalog:', book.downloadUrl);
+          console.log('[App] Download headers:', downloadHeaders);
+          response = await fetch(finalUrl, { headers: downloadHeaders, credentials: 'include', redirect: 'follow' });
+          console.log('[App] Direct fetch succeeded, status:', response.status, 'final URL:', response.url);
+        } catch (directError) {
+          console.log('[App] Direct fetch failed (likely CORS), trying proxy:', directError);
+          // Direct fetch failed, use proxy as fallback
+          // For open-access, don't do HEAD probe since it returns 401
+          proxyUrl = await maybeProxyForCors(finalUrl, true); // Skip probe
+          console.log('[App] Using proxy URL:', proxyUrl);
+          response = await fetch(proxyUrl, { headers: {}, credentials: 'omit', redirect: 'follow' }); // No auth headers for proxy
+          console.log('[App] Proxy fetch completed, status:', response.status, 'final URL:', response.url);
+        }
+      } else {
+        response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === finalUrl ? 'include' : 'omit' });
+      }
       if (!response.ok) {
         const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
         let errorMessage = `Download failed. The server responded with an error (${statusInfo}). The book might not be available at this address.`;
@@ -549,100 +574,51 @@ const AppInner: React.FC = () => {
   };
 
 
-  const renderView = () => {
-    switch (currentView) {
-      case 'reader':
-        return selectedBookId !== null && (
-          <ErrorBoundary
-            onReset={handleCloseReader}
-            fallbackMessage="There was an error while trying to display this book. Returning to the library."
-          >
-            <ReaderView
-              bookId={selectedBookId}
-              onClose={handleCloseReader}
-              animationData={coverAnimationData}
-            />
-          </ErrorBoundary>
-        );
-      case 'bookDetail':
-        return detailViewData && (
-          <ErrorBoundary
-            onReset={handleReturnToLibrary}
-            fallbackMessage="There was an error showing the book details. Returning to the library."
-          >
-            <BookDetailView
-              book={detailViewData.book}
-              source={detailViewData.source}
-              catalogName={detailViewData.catalogName}
-              onBack={handleReturnToLibrary}
-              onReadBook={handleOpenBook}
-              onImportFromCatalog={handleImportFromCatalog}
-              importStatus={importStatus}
-              setImportStatus={setImportStatus}
-            />
-          </ErrorBoundary>
-        );
-      case 'about':
-        return <AboutPage onBack={handleReturnToLibrary} />;
-      case 'library':
-      default:
-        return (
-          <ErrorBoundary
-            onReset={() => window.location.reload()}
-            fallbackMessage="There was a critical error in the library. Please try reloading the application."
-          >
-            <Library
-              onOpenBook={handleOpenBook}
-              onShowBookDetail={handleShowBookDetail}
-              processAndSaveBook={processAndSaveBook}
-              importStatus={importStatus}
-              setImportStatus={setImportStatus}
-              activeOpdsSource={activeOpdsSource}
-              setActiveOpdsSource={setActiveOpdsSource}
-              catalogNavPath={catalogNavPath}
-              setCatalogNavPath={setCatalogNavPath}
-              onOpenCloudSyncModal={() => setIsCloudSyncModalOpen(true)}
-              onOpenLocalStorageModal={() => setIsLocalStorageModalOpen(true)}
-              onShowAbout={handleShowAbout}
-            />
-          </ErrorBoundary>
-        );
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-900 font-sans">
       <SplashScreen isVisible={showSplash} />
-      {!showSplash && renderView()}
-      <SettingsModal
-        isOpen={isCloudSyncModalOpen}
-        onClose={() => setIsCloudSyncModalOpen(false)}
+      {!showSplash && (
+        <ViewRenderer
+          currentView={currentView}
+          selectedBookId={selectedBookId}
+          coverAnimationData={coverAnimationData}
+          onCloseReader={handleCloseReader}
+          detailViewData={detailViewData}
+          onReturnToLibrary={handleReturnToLibrary}
+          onReadBook={handleOpenBook}
+          onImportFromCatalog={handleImportFromCatalog}
+          onOpenBook={handleOpenBook}
+          onShowBookDetail={handleShowBookDetail}
+          processAndSaveBook={processAndSaveBook}
+          activeOpdsSource={activeOpdsSource}
+          setActiveOpdsSource={setActiveOpdsSource}
+          catalogNavPath={catalogNavPath}
+          setCatalogNavPath={setCatalogNavPath}
+          onOpenCloudSyncModal={() => setIsCloudSyncModalOpen(true)}
+          onOpenLocalStorageModal={() => setIsLocalStorageModalOpen(true)}
+          onShowAbout={handleShowAbout}
+          importStatus={importStatus}
+          setImportStatus={setImportStatus}
+        />
+      )}
+      <GlobalModals
+        isCloudSyncModalOpen={isCloudSyncModalOpen}
+        onCloseCloudSyncModal={() => setIsCloudSyncModalOpen(false)}
         onUploadToDrive={handleUploadToDrive}
         onDownloadFromDrive={handleDownloadFromDrive}
         syncStatus={syncStatus}
         setSyncStatus={setSyncStatus}
-      />
-      <LocalStorageModal
-        isOpen={isLocalStorageModalOpen}
-        onClose={() => setIsLocalStorageModalOpen(false)}
-      />
-      <OpdsCredentialsModal
-        isOpen={credentialPrompt.isOpen}
-        host={credentialPrompt.host}
-        authDocument={credentialPrompt.authDocument}
-        onClose={() => setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined })}
-        onSubmit={handleCredentialSubmit}
+        isLocalStorageModalOpen={isLocalStorageModalOpen}
+        onCloseLocalStorageModal={() => setIsLocalStorageModalOpen(false)}
+        credentialPrompt={credentialPrompt}
+        onCloseCredentialPrompt={() => setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined, authDocument: null })}
+        onCredentialSubmit={handleCredentialSubmit}
         onOpenAuthLink={handleOpenAuthLink}
-        onRetry={handleRetryAfterProviderLogin}
-        probeUrl={credentialPrompt.pendingHref}
+        onRetryAfterProviderLogin={handleRetryAfterProviderLogin}
+        showNetworkDebug={showNetworkDebug}
+        onCloseNetworkDebug={() => setShowNetworkDebug(false)}
+        onOpenNetworkDebug={() => setShowNetworkDebug(true)}
       />
-      <NetworkDebugModal isOpen={showNetworkDebug} onClose={() => setShowNetworkDebug(false)} />
-      {/** Debug floating button (visible only in debug mode) */}
-      {typeof window !== 'undefined' && (window as any).__MEBOOKS_DEBUG__ && (
-        <div className="fixed right-3 bottom-3 z-[60]">
-          <button onClick={() => setShowNetworkDebug(true)} className="px-3 py-2 bg-yellow-400 rounded shadow">Network Debug</button>
-        </div>
-      )}
     </div>
   );
 };

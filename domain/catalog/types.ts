@@ -26,13 +26,23 @@ export interface CatalogRegistry {
 }
 
 /**
+ * Acquisition format option for a book
+ */
+export interface AcquisitionFormat {
+  format: 'EPUB' | 'PDF' | string;
+  downloadUrl: string;
+  mediaType?: string; // e.g., application/epub+zip, application/pdf
+  isOpenAccess?: boolean;
+}
+
+/**
  * Book as it appears in a catalog (not yet in library)
  */
 export interface CatalogBook {
   title: string;
   author: string;
   coverImage: string | null;
-  downloadUrl: string; // Acquisition link
+  downloadUrl: string; // Primary acquisition link (preferred format)
   summary: string | null;
   publisher?: string;
   publicationDate?: string;
@@ -45,6 +55,9 @@ export interface CatalogBook {
   acquisitionMediaType?: string; // e.g., application/epub+zip
   mediaType?: string; // e.g., http://schema.org/EBook
   isOpenAccess?: boolean; // True if acquisition link is open-access (no auth required)
+  
+  // Multiple format options (when book is available in EPUB and PDF)
+  alternativeFormats?: AcquisitionFormat[];
   
   // OPDS 1 collections
   collections?: Collection[];

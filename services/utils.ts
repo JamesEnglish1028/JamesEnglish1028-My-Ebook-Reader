@@ -174,8 +174,10 @@ export const maybeProxyForCors = async (url: string, skipProbe = false): Promise
   }
 
   // Skip the probe for open-access content (no authentication required)
+  // For open-access, we still need to use the proxy due to CORS, but we skip the HEAD probe
+  // because HEAD might return 401 even though GET would succeed for open-access content
   if (skipProbe) {
-    console.log('[maybeProxyForCors] Skipping HEAD probe for open-access content, using proxy');
+    console.log('[maybeProxyForCors] Skipping HEAD probe for open-access content, using proxy for CORS');
     return proxiedUrl(url);
   }
 

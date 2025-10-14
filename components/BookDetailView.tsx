@@ -368,6 +368,38 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
             // Allow both EPUB and PDF formats
             const isUnsupportedFormat = !!format && format !== 'EPUB' && format !== 'PDF';
             const disabled = importStatus.isLoading || isUnsupportedFormat;
+            
+            // Check for alternative formats
+            const altFormats = catalogBook?.alternativeFormats;
+            const hasMultipleFormats = altFormats && altFormats.length > 1;
+            
+            if (hasMultipleFormats && !isPalace) {
+              // Show format selection buttons
+              return (
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-400 mb-2">Choose format:</p>
+                  {altFormats!.map((fmt: any, idx: number) => {
+                    const fmtDisabled = importStatus.isLoading;
+                    return (
+                      <button 
+                        key={idx}
+                        onClick={() => {
+                          // Create a modified book with this format's download URL
+                          const modifiedBook = { ...catalogBook, downloadUrl: fmt.downloadUrl, format: fmt.format, acquisitionMediaType: fmt.mediaType, isOpenAccess: fmt.isOpenAccess };
+                          onImportFromCatalog(modifiedBook, catalogName);
+                        }}
+                        disabled={fmtDisabled}
+                        className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <DownloadIcon className="w-6 h-6 mr-2" />
+                        {fmt.format} Format
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            }
+            
             return (
               <button onClick={handleAddToBookshelf} disabled={disabled} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
                 <DownloadIcon className="w-6 h-6 mr-2" />
@@ -443,13 +475,31 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                                         </dd>
                                     </div>
                                 )}
-                                {format && (
+                                {(format || (catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 0)) && (
                                     <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">Format</dt>
+                                        <dt className="text-sm font-medium text-slate-400">
+                                            {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? 'Available Formats' : 'Format'}
+                                        </dt>
                                         <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
-                                           <span className="bg-slate-700 text-slate-300 text-xs font-medium px-2 py-1 rounded-md">
-                                                {format}
-                                            </span>
+                                            <div className="flex flex-wrap gap-2">
+                                                {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? (
+                                                    // Show all alternative formats with color coding
+                                                    catalogBook.alternativeFormats.map((fmt: any, idx: number) => (
+                                                        <span key={idx} className={`text-white text-xs font-medium px-2 py-1 rounded-md ${
+                                                            fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
+                                                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
+                                                            'bg-sky-500'
+                                                        }`}>
+                                                            {fmt.format}
+                                                        </span>
+                                                    ))
+                                                ) : format ? (
+                                                    // Show single format
+                                                    <span className="bg-slate-700 text-slate-300 text-xs font-medium px-2 py-1 rounded-md">
+                                                        {format}
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         </dd>
                                     </div>
                                 )}

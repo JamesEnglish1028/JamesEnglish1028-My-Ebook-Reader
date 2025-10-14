@@ -29,33 +29,12 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
 
   if (categoryLane.books.length === 0) return null;
 
-  // Get icon for category based on label
-  const getCategoryIcon = (label: string) => {
-    const lowerLabel = label.toLowerCase();
-    if (lowerLabel.includes('art')) return '🎭';
-    if (lowerLabel.includes('music')) return '🎵';
-    if (lowerLabel.includes('technology')) return '💻';
-    if (lowerLabel.includes('science')) return '🔬';
-    if (lowerLabel.includes('political')) return '⚖️';
-    if (lowerLabel.includes('philosophy')) return '🤔';
-    if (lowerLabel.includes('fiction')) return '📚';
-    if (lowerLabel.includes('nonfiction')) return '📖';
-    if (lowerLabel.includes('social')) return '👥';
-    if (lowerLabel.includes('performing')) return '🎪';
-    return '📂'; // Default category icon
-  };
-
   return (
     <div className="mb-10">
-      {/* Enhanced Category Header */}
+      {/* Category Header */}
       <div className="flex items-center justify-between mb-6 px-4">
         <div className="flex items-center gap-4">
-          {/* Enhanced Category Icon */}
-          <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-sky-500/20 to-purple-500/20 rounded-xl border border-sky-500/30">
-            <span className="text-3xl filter drop-shadow-sm">{getCategoryIcon(categoryLane.category.label)}</span>
-          </div>
-          
-          {/* Enhanced Category Title */}
+          {/* Category Title */}
           <div className="flex flex-col">
             <h3 className="text-2xl font-bold text-white leading-tight tracking-tight">
               {categoryLane.category.label}
@@ -69,7 +48,7 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
           </div>
         </div>
         
-        {/* Enhanced Book Count Badge */}
+        {/* Book Count Badge */}
         <div className="flex items-center gap-2">
           <div className="bg-slate-700/80 text-slate-300 text-sm font-medium px-3 py-1.5 rounded-full border border-slate-600/50">
             {categoryLane.books.length} book{categoryLane.books.length !== 1 ? 's' : ''}
@@ -141,16 +120,38 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
                 {book.author && (
                   <p className="text-xs text-slate-400 truncate leading-relaxed">{book.author}</p>
                 )}
-                {/* Format Badge - positioned consistently with flat view */}
-                {book.format && (
-                  <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                    book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
-                    book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
-                    'bg-sky-500'
-                  }`}>
-                    {book.format}
-                  </span>
-                )}
+                {/* Format Badges - show all available formats */}
+                <div className="flex gap-1 flex-wrap mt-1">
+                  {book.alternativeFormats && book.alternativeFormats.length > 0 ? (
+                    book.alternativeFormats.map((fmt: any, idx: number) => (
+                      <span
+                        key={`${book.title}-${fmt.format}-${idx}`}
+                        className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                          fmt.format.toUpperCase() === 'PDF'
+                            ? 'bg-red-600'
+                            : fmt.format.toUpperCase() === 'AUDIOBOOK'
+                            ? 'bg-purple-600'
+                            : 'bg-sky-500'
+                        }`}
+                        title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
+                      >
+                        {fmt.format}
+                      </span>
+                    ))
+                  ) : book.format && (
+                    <span
+                      className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                        book.format.toUpperCase() === 'PDF'
+                          ? 'bg-red-600'
+                          : book.format.toUpperCase() === 'AUDIOBOOK'
+                          ? 'bg-purple-600'
+                          : 'bg-sky-500'
+                      }`}
+                    >
+                      {book.format}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
