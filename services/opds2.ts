@@ -348,8 +348,12 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         if (openAccessLink) {
           chosen = openAccessLink;
           isOpenAccess = true;
-          console.log('[OPDS2] Found open-access link:', openAccessLink.href);
+          console.log('[OPDS2] Found open-access link for book, setting isOpenAccess=true:', openAccessLink.href);
         } else {
+          console.log('[OPDS2] No open-access link found, isOpenAccess=false');
+        }
+        
+        if (!openAccessLink) {
           chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
             || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
             || acquisitions[0];
@@ -385,7 +389,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
           subjects: subjects || undefined,
           collections: collections.length > 0 ? collections : undefined,
           format: format || undefined,
-          isOpenAccess: isOpenAccess || undefined,
+          isOpenAccess: isOpenAccess ? true : undefined,
         };
         books.push(book);
       }

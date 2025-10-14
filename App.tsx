@@ -304,6 +304,7 @@ const AppInner: React.FC = () => {
       let finalUrl = book.downloadUrl;
       
       logger.info('Book isOpenAccess flag:', book.isOpenAccess, 'for book:', book.title);
+      logger.info('About to call maybeProxyForCors with skipProbe=', book.isOpenAccess === true, 'for URL:', finalUrl);
       
       if (!book.isOpenAccess) {
         // Try to resolve acquisition chain with stored credentials
