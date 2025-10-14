@@ -2,15 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
-import { bookmarkService, citationService } from '../domain/reader';
+import { bookmarkService, citationService, positionTracker } from '../domain/reader';
 import { db } from '../services/db';
 import { getEpubViewStateForBook, saveEpubViewStateForBook ,
   getReaderSettings,
   saveReaderSettings,
-  getLastPositionForBook,
-  saveLastPositionForBook,
-  getLastSpokenPositionForBook,
-  saveLastSpokenPositionForBook,
   performBookSearch,
   findFirstChapter,
   buildTocFromSpine,
@@ -319,7 +315,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const saveLastSpokenPosition = useCallback(() => {
     if (lastSpokenCfiRef.current) {
-        saveLastSpokenPositionForBook(bookId, lastSpokenCfiRef.current);
+        // Save TTS position using positionTracker
+        positionTracker.saveSpeechPosition(bookId, lastSpokenCfiRef.current);
     }
   }, [bookId]);
 
@@ -581,7 +578,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             latestCfiRef.current = cfi;
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             saveTimeoutRef.current = window.setTimeout(() => {
-              saveLastPositionForBook(bookId, cfi);
+              // Save reading position using positionTracker
+              positionTracker.savePosition(bookId, cfi);
             }, 1000);
           }
 
@@ -629,9 +627,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           setCitations(citationsResult.data);
         }
         
-        speechStartCfiRef.current = getLastSpokenPositionForBook(bookId);
+        // Load last spoken position (TTS) using positionTracker
+        const speechPosResult = positionTracker.getSpeechPosition(bookId);
+        speechStartCfiRef.current = speechPosResult.success ? speechPosResult.data : null;
         
-  const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
+        // Load last reading position using positionTracker
+        const posResult = positionTracker.getPosition(bookId);
+        const startLocation = (posResult.success ? posResult.data : null) || await findFirstChapter(bookInstance);
         
         if (!isMounted) return;
         
@@ -687,7 +689,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         stopSpeech();
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         if (latestCfiRef.current) {
-            saveLastPositionForBook(bookId, latestCfiRef.current);
+            positionTracker.savePosition(bookId, latestCfiRef.current);
         }
         locationsReadyRef.current = false;
         setIsNavReady(false);
