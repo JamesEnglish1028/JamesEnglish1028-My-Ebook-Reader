@@ -32,10 +32,12 @@ import {
   imageUrlToBase64,
   logger,
   maybeProxyForCors,
-  resolveAcquisitionChain,
   saveOpdsCredential,
   uploadLibraryToDrive
 } from './services';
+
+// Domain service imports
+import { opdsAcquisitionService } from './domain/catalog';
 
 // Type imports - kept separate as they're from a single file
 import type {
@@ -299,20 +301,29 @@ const AppInner: React.FC = () => {
     try {
       // If this is an OPDS2 acquisition flow, attempt to resolve the acquisition chain
       let finalUrl = book.downloadUrl;
-      try {
-        // try to resolve; will throw on 401/403 so we can prompt
-        const cred = await findCredentialForUrl(book.downloadUrl);
-        const resolved = await resolveAcquisitionChain(book.downloadUrl, cred ? { username: cred.username, password: cred.password } : null);
-        if (resolved) finalUrl = resolved;
-      } catch (e: any) {
-        // If auth error, prompt for credentials and allow retry
-        if (e?.status === 401 || e?.status === 403) {
+      
+      // Try to resolve acquisition chain with stored credentials
+      const cred = await findCredentialForUrl(book.downloadUrl);
+      const resolveResult = await opdsAcquisitionService.resolve(
+        book.downloadUrl, 
+        'auto', 
+        cred ? { username: cred.username, password: cred.password } : null
+      );
+      
+      if (resolveResult.success) {
+        finalUrl = resolveResult.data;
+      } else {
+        const errorResult = resolveResult as { success: false; error: string; status?: number; proxyUsed?: boolean };
+        
+        // If auth error (401/403), prompt for credentials and allow retry
+        if (errorResult.status === 401 || errorResult.status === 403) {
           setImportStatus({ isLoading: false, message: '', error: null });
           setCredentialPrompt({ isOpen: true, host: new URL(book.downloadUrl).host, pendingHref: book.downloadUrl, pendingBook: book, pendingCatalogName: catalogName });
           setCredentialPrompt(prev => ({ ...prev, authDocument: undefined }));
           return { success: false };
         }
-        throw e;
+        // For other errors, log and continue with original URL (may fail later)
+        logger.warn('Failed to resolve acquisition chain, using original URL', errorResult.error);
       }
 
       const proxyUrl = await maybeProxyForCors(finalUrl);
@@ -356,18 +367,19 @@ const AppInner: React.FC = () => {
     }
     const href = credentialPrompt.pendingHref;
     try {
-      const resolved = await resolveAcquisitionChain(href, { username, password });
-      if (resolved && credentialPrompt.pendingBook) {
+      const resolveResult = await opdsAcquisitionService.resolve(href, 'auto', { username, password });
+      
+      if (resolveResult.success && credentialPrompt.pendingBook) {
         // Optionally save credential
         if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
         // Proceed to import using resolved URL
         setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
         setImportStatus({ isLoading: true, message: `Downloading ${credentialPrompt.pendingBook.title}...`, error: null });
-        const proxyUrl = await maybeProxyForCors(resolved);
+        const proxyUrl = await maybeProxyForCors(resolveResult.data);
         const downloadHeaders: Record<string, string> = {};
         // Use the credentials the user just supplied for the download
         if (username && password) downloadHeaders['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
-        const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === resolved ? 'include' : 'omit' });
+        const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === resolveResult.data ? 'include' : 'omit' });
         if (!response.ok) {
           throw new Error(`Download failed: ${response.status}`);
         }
@@ -401,9 +413,13 @@ const AppInner: React.FC = () => {
     if (!credentialPrompt.pendingHref || !credentialPrompt.pendingBook) return;
     setImportStatus({ isLoading: true, message: 'Retrying download after provider login...', error: null });
     try {
-      const resolved = await resolveAcquisitionChain(credentialPrompt.pendingHref, null);
-      if (!resolved) throw new Error('Failed to resolve after login');
-      const proxyUrl = await maybeProxyForCors(resolved);
+      const resolveResult = await opdsAcquisitionService.resolve(credentialPrompt.pendingHref, 'auto', null);
+      
+      if (!resolveResult.success) {
+        throw new Error('Failed to resolve after login');
+      }
+      
+      const proxyUrl = await maybeProxyForCors(resolveResult.data);
       // If the probe chose the public CORS proxy, abort and instruct the user
       // to configure an owned proxy. Public proxies (e.g., corsproxy.io) often
       // strip cookies or Authorization and will prevent successful post-login
@@ -412,7 +428,7 @@ const AppInner: React.FC = () => {
         try { toast.pushToast('The retry would use a public CORS proxy which commonly strips authentication. Configure an owned proxy via VITE_OWN_PROXY_URL and retry.', 12000); } catch (_) { }
         throw new Error('Retry aborted: public CORS proxy would be used and may block authenticated downloads.');
       }
-      const response = await fetch(proxyUrl, { credentials: proxyUrl === resolved ? 'include' : 'omit' });
+      const response = await fetch(proxyUrl, { credentials: proxyUrl === resolveResult.data ? 'include' : 'omit' });
       if (!response.ok) throw new Error(`Download failed: ${response.status}`);
       const bookData = await response.arrayBuffer();
       await processAndSaveBook(bookData, credentialPrompt.pendingBook.title, credentialPrompt.pendingBook.author, 'catalog', credentialPrompt.pendingCatalogName, credentialPrompt.pendingBook.providerId, credentialPrompt.pendingBook.format, credentialPrompt.pendingBook.coverImage);

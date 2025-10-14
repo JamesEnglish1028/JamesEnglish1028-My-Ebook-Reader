@@ -21,7 +21,7 @@ import { logger } from '../../services/logger';
  */
 export type ParserResult<T> = 
   | { success: true; data: T }
-  | { success: false; error: string };
+  | { success: false; error: string; status?: number; proxyUsed?: boolean };
 
 /**
  * Parsed catalog data
@@ -202,10 +202,17 @@ export class OPDSAcquisitionService {
 
       logger.info('OPDS 2 acquisition resolved', { finalUrl: url });
       return { success: true, data: url };
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error resolving acquisition';
       logger.error('OPDS 2 acquisition error:', errorMessage);
-      return { success: false, error: errorMessage };
+      
+      // Preserve error metadata for authentication and proxy detection
+      return { 
+        success: false, 
+        error: errorMessage,
+        status: error?.status,
+        proxyUsed: error?.proxyUsed
+      };
     }
   }
 
@@ -233,10 +240,17 @@ export class OPDSAcquisitionService {
 
       logger.info('OPDS 1 acquisition resolved', { finalUrl: url });
       return { success: true, data: url };
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error resolving acquisition';
       logger.error('OPDS 1 acquisition error:', errorMessage);
-      return { success: false, error: errorMessage };
+      
+      // Preserve error metadata for authentication and proxy detection
+      return { 
+        success: false, 
+        error: errorMessage,
+        status: error?.status,
+        proxyUsed: error?.proxyUsed
+      };
     }
   }
 
