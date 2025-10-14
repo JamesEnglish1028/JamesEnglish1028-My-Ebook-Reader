@@ -97,7 +97,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
     console.log('✅ Library book detail view shows providerName, not distributor');
   });
 
-  test('catalog PDF book shows Cannot Import PDF button', () => {
+  test('catalog PDF book shows Add to Bookshelf button', () => {
     const pdfCatalogBook: CatalogBook = {
       title: 'PDF from BiblioBoard',
       author: 'PDF Author',
@@ -122,12 +122,12 @@ describe('Catalog vs Library BookDetailView Differences', () => {
 
     render(<BookDetailView {...mockProps} />);
 
-    // Should show PDF-specific disabled button
-    expect(screen.getByText('Cannot Import PDF')).toBeInTheDocument();
+    // PDF files should be importable (app supports PDF reader)
+    expect(screen.getByText('Add to Bookshelf')).toBeInTheDocument();
     
-    // But should still show distributor info
+    // Should still show distributor info
     expect(screen.getByText('from BiblioBoard')).toBeInTheDocument();
     
-    console.log('✅ PDF catalog book shows Cannot Import but still shows distributor');
+    console.log('✅ PDF catalog book shows Add to Bookshelf and distributor');
   });
 });
