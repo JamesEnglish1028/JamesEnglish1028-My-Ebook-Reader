@@ -312,6 +312,11 @@ const Library: React.FC<LibraryProps> = ({
       setFictionMode('all');
       setMediaMode('all');
       setCollectionMode('all');
+      // Clear collection-related state
+      setRootLevelCollections([]);
+      setCollectionLinks([]);
+      setCatalogCollections([]);
+      setShowCollectionView(false);
     } else if (activeOpdsSource?.id !== source.id) {
       // Reset filters when switching to a different catalog source
       setCategorizationMode('subject');
@@ -319,6 +324,11 @@ const Library: React.FC<LibraryProps> = ({
       setFictionMode('all');
       setMediaMode('all');
       setCollectionMode('all');
+      // Clear collection-related state from previous catalog
+      setRootLevelCollections([]);
+      setCollectionLinks([]);
+      setCatalogCollections([]);
+      setShowCollectionView(false);
 
       setActiveOpdsSource(source);
       // When a new source is selected, reset the navigation path to its root.
