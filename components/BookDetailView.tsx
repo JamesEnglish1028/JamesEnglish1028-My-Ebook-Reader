@@ -365,11 +365,13 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
             const acqType = (catalogBook && (catalogBook as any).acquisitionMediaType) || undefined;
             const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
             const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
-            const disabled = importStatus.isLoading || (!!format && format !== 'EPUB');
+            // Allow both EPUB and PDF formats
+            const isUnsupportedFormat = !!format && format !== 'EPUB' && format !== 'PDF';
+            const disabled = importStatus.isLoading || isUnsupportedFormat;
             return (
               <button onClick={handleAddToBookshelf} disabled={disabled} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
                 <DownloadIcon className="w-6 h-6 mr-2" />
-                {isPalace ? 'Read in Palace App' : (!!format && format !== 'EPUB' ? `Cannot Import ${format}` : 'Add to Bookshelf')}
+                {isPalace ? 'Read in Palace App' : (isUnsupportedFormat ? `Cannot Import ${format}` : 'Add to Bookshelf')}
               </button>
             );
           })()
