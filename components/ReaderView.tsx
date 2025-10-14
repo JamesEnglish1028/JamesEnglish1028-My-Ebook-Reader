@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
+import { bookmarkService } from '../domain/reader';
 import { db } from '../services/db';
 import { getEpubViewStateForBook, saveEpubViewStateForBook ,
   getReaderSettings,
   saveReaderSettings,
-  getBookmarksForBook,
-  saveBookmarksForBook,
   getCitationsForBook,
   saveCitationsForBook,
   getLastPositionForBook,
@@ -620,7 +619,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             setLocationInfo(prev => ({ ...prev, totalPages: bookInstance.locations.length(), currentPage: 1 }));
         }
 
-        setBookmarks(getBookmarksForBook(bookId));
+        // Load bookmarks using bookmarkService
+        const bookmarksResult = bookmarkService.findByBookId(bookId);
+        if (bookmarksResult.success) {
+          setBookmarks(bookmarksResult.data);
+        }
+        
         setCitations(getCitationsForBook(bookId));
         speechStartCfiRef.current = getLastSpokenPositionForBook(bookId);
         
@@ -843,9 +847,18 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           description: undefined,
           createdAt: Date.now(),
         };
-        const updated = [...bookmarks, newBookmark];
-        setBookmarks(updated);
-        saveBookmarksForBook(bookId, updated);
+        
+        // Add bookmark using bookmarkService
+        const addResult = bookmarkService.add(bookId, {
+          cfi: latestCfiRef.current!,
+          label: `Page ${locationInfo.currentPage}`,
+          chapter: currentChapterLabel,
+        });
+        
+        if (addResult.success) {
+          const updated = [...bookmarks, addResult.data];
+          setBookmarks(updated);
+        }
       }
     };
 
@@ -994,17 +1007,32 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         description: description || undefined,
         createdAt: Date.now(),
     };
-    const updatedBookmarks = [...bookmarks, newBookmark];
-    setBookmarks(updatedBookmarks);
-    saveBookmarksForBook(bookId, updatedBookmarks);
+    
+    // Add bookmark with custom note using bookmarkService
+    const addResult = bookmarkService.add(bookId, {
+      cfi: latestCfiRef.current!,
+      label: `Page ${locationInfo.currentPage} (${locationInfo.progress}%)`,
+      chapter: chapter,
+      description: description || undefined,
+    });
+    
+    if (addResult.success) {
+      const updatedBookmarks = [...bookmarks, addResult.data];
+      setBookmarks(updatedBookmarks);
+    }
+    
     setShowBookmarkModal(false);
   }, [bookId, bookmarks, locationInfo.currentPage, locationInfo.progress, currentChapterLabel]);
 
 
   const deleteBookmark = useCallback((bookmarkId: string) => {
-      const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
-      setBookmarks(updatedBookmarks);
-      saveBookmarksForBook(bookId, updatedBookmarks);
+      // Delete bookmark using bookmarkService
+      const deleteResult = bookmarkService.delete(bookId, bookmarkId);
+      
+      if (deleteResult.success) {
+        const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
+        setBookmarks(updatedBookmarks);
+      }
   }, [bookId, bookmarks]);
 
   const handleSaveCitation = useCallback(async (note: string) => {
