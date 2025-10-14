@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { migrateFromLocalStorage, findCredential, getAllCredentials, saveCredential, deleteCredential } from '../credentials';
 
 // jsdom provides indexedDB in the test environment; ensure a clean DB between tests
@@ -32,7 +33,7 @@ describe('credentials migration', () => {
     localStorage.setItem('mebooks.opds.credentials', JSON.stringify(legacy));
 
     // Ensure nothing exists yet
-    let pre = await getAllCredentials();
+    const pre = await getAllCredentials();
     expect(pre).toEqual([]);
 
     // Call migration

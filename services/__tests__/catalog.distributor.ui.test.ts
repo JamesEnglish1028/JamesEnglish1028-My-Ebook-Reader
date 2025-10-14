@@ -1,7 +1,9 @@
-import { describe, test, expect } from 'vitest';
-import { parseOpds1Xml } from '../opds';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import { describe, test, expect } from 'vitest';
+
+import { parseOpds1Xml } from '../opds';
 
 describe('Catalog Book Distributor Display Test', () => {
   test('verifies catalog books have distributor field for BookDetailView', async () => {
@@ -28,7 +30,7 @@ describe('Catalog Book Distributor Display Test', () => {
       // These are the exact fields that BookDetailView uses
       hasDistributor: !!book.distributor,
       hasPublisher: !!book.publisher,
-      hasPublicationDate: !!book.publicationDate
+      hasPublicationDate: !!book.publicationDate,
     }));
     
     console.log('\nSample catalog books (as seen by BookDetailView):');

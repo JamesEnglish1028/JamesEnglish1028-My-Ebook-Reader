@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { parseOpds1Xml, groupBooksByMode } from '../opds';
 
 describe('OPDS 1 Category Label Display', () => {
@@ -40,14 +41,14 @@ describe('OPDS 1 Category Label Display', () => {
     expect(literaryBook?.categories?.[0]).toEqual({
       scheme: 'http://librarysimplified.org/terms/genres/Simplified/',
       term: 'http://librarysimplified.org/terms/genres/Simplified/Literary%20Criticism',
-      label: 'Literary Criticism'
+      label: 'Literary Criticism',
     });
     
     const mysteryBook = books.find(b => b.title === 'Mystery Book');
     expect(mysteryBook?.categories?.[0]).toEqual({
       scheme: 'http://librarysimplified.org/terms/genres/Simplified/',
       term: 'http://librarysimplified.org/terms/genres/Simplified/Mystery',
-      label: 'Mystery'
+      label: 'Mystery',
     });
     
     // Book without label should fall back to term
@@ -55,7 +56,7 @@ describe('OPDS 1 Category Label Display', () => {
     expect(scienceBook?.categories?.[0]).toEqual({
       scheme: 'http://librarysimplified.org/terms/genres/Simplified/',
       term: 'Science',
-      label: 'Science'
+      label: 'Science',
     });
   });
 
@@ -95,7 +96,7 @@ describe('OPDS 1 Category Label Display', () => {
     
     // Find Literary Criticism lane
     const literaryLane = grouped.categoryLanes.find(lane => 
-      lane.category.label === 'Literary Criticism'
+      lane.category.label === 'Literary Criticism',
     );
     expect(literaryLane).toBeDefined();
     expect(literaryLane?.books).toHaveLength(2);
@@ -104,7 +105,7 @@ describe('OPDS 1 Category Label Display', () => {
     
     // Find Mystery lane
     const mysteryLane = grouped.categoryLanes.find(lane => 
-      lane.category.label === 'Mystery'
+      lane.category.label === 'Mystery',
     );
     expect(mysteryLane).toBeDefined();
     expect(mysteryLane?.books).toHaveLength(1);

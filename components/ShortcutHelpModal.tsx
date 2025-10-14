@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+
 import { PlusIcon, MinusIcon, AdjustmentsVerticalIcon } from './icons';
 import Tooltip from './Tooltip';
 
@@ -125,7 +126,7 @@ const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomO
 function getFocusableElements(root: Element | null) {
   if (!root) return [] as Element[];
   const nodes = root.querySelectorAll<HTMLElement>(
-    'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
   );
   return Array.from(nodes).filter((n) => n.offsetWidth > 0 || n.offsetHeight > 0);
 }

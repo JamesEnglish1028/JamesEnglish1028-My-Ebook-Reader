@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 
-type ToastItem = { id: string; message: string; actionLabel?: string; action?: (() => void) };
+interface ToastItem { id: string; message: string; actionLabel?: string; action?: (() => void) }
 
 interface ToastContextValue {
   toasts: ToastItem[];

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import BookDetailView from '../BookDetailView';
-import OpdsCredentialsModal from '../OpdsCredentialsModal';
-import { CatalogBook } from '../../types';
 import * as opds2 from '../../services/opds2';
 import { proxiedUrl } from '../../services/utils';
+import type { CatalogBook } from '../../types';
+import BookDetailView from '../BookDetailView';
+import OpdsCredentialsModal from '../OpdsCredentialsModal';
 
 describe('Import flow with authDocument', () => {
   let origFetch: any;

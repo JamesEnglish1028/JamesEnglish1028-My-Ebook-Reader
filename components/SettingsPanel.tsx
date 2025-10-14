@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+
 import './settings-panel.css';
-import { ReaderSettings } from '../types';
+import type { ReaderSettings } from '../types';
+
 import { CloseIcon, BookIcon, SpeakerIcon, PlayIcon } from './icons';
 
 interface SettingsPanelProps {
@@ -40,7 +42,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
   
   const previewVoice = (voice: SpeechSynthesisVoice) => {
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance("Hello, this is a preview of my voice.");
+    const utterance = new SpeechSynthesisUtterance('Hello, this is a preview of my voice.');
     utterance.voice = voice;
     utterance.rate = settings.readAloud.rate;
     utterance.pitch = settings.readAloud.pitch;
@@ -140,14 +142,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
 
         </div>
     );
-  }
+  };
 
   return (
     <>
       <div
         className="fixed inset-0 bg-black/60 z-30"
         onClick={onClose}
-      ></div>
+       />
       <div
         className={`fixed top-0 right-0 h-full w-80 bg-slate-800 shadow-2xl z-40 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -222,14 +224,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                           onClick={() => onSettingsChange({ theme: 'light' })}
                           className={`p-4 rounded-lg border-2 transition-colors ${settings.theme === 'light' ? 'border-sky-500 bg-sky-500/20' : 'border-slate-600 hover:border-slate-500'}`}
                       >
-                          <div className="w-full h-12 bg-white rounded"></div>
+                          <div className="w-full h-12 bg-white rounded" />
                           <p className="mt-2 text-center text-sm font-medium">Light</p>
                       </button>
                       <button
                           onClick={() => onSettingsChange({ theme: 'dark' })}
                           className={`p-4 rounded-lg border-2 transition-colors ${settings.theme === 'dark' ? 'border-sky-500 bg-sky-500/20' : 'border-slate-600 hover:border-slate-500'}`}
                       >
-                          <div className="w-full h-12 bg-gray-900 rounded"></div>
+                          <div className="w-full h-12 bg-gray-900 rounded" />
                           <p className="mt-2 text-center text-sm font-medium">Dark</p>
                       </button>
                   </div>

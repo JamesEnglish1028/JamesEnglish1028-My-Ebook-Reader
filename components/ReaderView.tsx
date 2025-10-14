@@ -1,19 +1,9 @@
 
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+
 import { db } from '../services/db';
-import { BookRecord, ReaderSettings, TocItem, Bookmark, SearchResult, CoverAnimationData, Citation } from '../types';
-import { LeftArrowIcon, RightArrowIcon, SettingsIcon, CloseIcon, ListIcon, BookmarkIcon, SearchIcon, AcademicCapIcon, PlayIcon, PauseIcon } from './icons';
-import SettingsPanel from './SettingsPanel';
-import TocPanel from './TocPanel';
-import SearchPanel from './SearchPanel';
-import Spinner from './Spinner';
-import ShortcutHelpModal from './ShortcutHelpModal';
-import ZoomHud from './ZoomHud';
-import { getEpubViewStateForBook, saveEpubViewStateForBook } from '../services/readerUtils';
-import CitationModal from './CitationModal';
-import BookmarkModal from './BookmarkModal';
-import {
+import { getEpubViewStateForBook, saveEpubViewStateForBook ,
   getReaderSettings,
   saveReaderSettings,
   getBookmarksForBook,
@@ -26,9 +16,20 @@ import {
   saveLastSpokenPositionForBook,
   performBookSearch,
   findFirstChapter,
-  buildTocFromSpine
+  buildTocFromSpine,
 } from '../services/readerUtils';
 import { trackEvent, isDebug } from '../services/utils';
+import type { BookRecord, ReaderSettings, TocItem, Bookmark, SearchResult, CoverAnimationData, Citation } from '../types';
+
+import BookmarkModal from './BookmarkModal';
+import CitationModal from './CitationModal';
+import { LeftArrowIcon, RightArrowIcon, SettingsIcon, CloseIcon, ListIcon, BookmarkIcon, SearchIcon, AcademicCapIcon, PlayIcon, PauseIcon } from './icons';
+import SearchPanel from './SearchPanel';
+import SettingsPanel from './SettingsPanel';
+import ShortcutHelpModal from './ShortcutHelpModal';
+import Spinner from './Spinner';
+import TocPanel from './TocPanel';
+import ZoomHud from './ZoomHud';
 
 
 interface ReaderViewProps {
@@ -44,7 +45,7 @@ const ABBREVIATIONS = [
   'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sr', 'Jr', 'Sen', 'Rep', 'Gov', 'Gen', 'Hon', // Titles
   'Sgt', 'Capt', 'Col', 'Lt', // Military
   'St', 'Ave', 'Blvd', // Locations
-  'etc', 'i.e', 'e.g', 'vs', 'al', 'op', 'cit' // Latin & Common
+  'etc', 'i.e', 'e.g', 'vs', 'al', 'op', 'cit', // Latin & Common
 ];
 
 // This regex improves sentence detection by handling common abbreviations and multiple punctuation marks (like ellipses).
@@ -59,7 +60,7 @@ const SENTENCE_REGEX = new RegExp(
     `[?!]+` + // Match '?' or '!', which are unambiguous sentence endings.
     `[.!?]*` + // Match any subsequent punctuation (for "?!").
     `\\s*`, // Include trailing whitespace.
-    'g'
+    'g',
 );
 
 
@@ -126,7 +127,7 @@ const findDomRangeFromCharacterOffsets = (root: Node, startOffset: number, endOf
             range.setEnd(endNode, endNodeOffset);
             return range;
         } catch (e) {
-            console.error("Error creating DOM range:", e);
+            console.error('Error creating DOM range:', e);
             return null;
         }
     }
@@ -148,14 +149,14 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const [citations, setCitations] = useState<Citation[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [locationInfo, setLocationInfo] = useState({ currentPage: 0, totalPages: 0, progress: 0 });
   const [controlsVisible, setControlsVisible] = useState(true);
   const [currentCfi, setCurrentCfi] = useState<string | null>(null);
   const [currentChapterLabel, setCurrentChapterLabel] = useState<string>('');
   const [currentHighlightCfi, setCurrentHighlightCfi] = useState<string | null>(null);
   const [animationState, setAnimationState] = useState<'start' | 'expanding' | 'fading' | 'finished'>(
-    animationData ? 'start' : 'finished'
+    animationData ? 'start' : 'finished',
   );
   const [isNavReady, setIsNavReady] = useState(false);
   const [usedTocFallback, setUsedTocFallback] = useState(false);
@@ -212,7 +213,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const isAnyPanelOpen = useMemo(
     () => showSettings || showNavPanel || showSearch,
-    [showSettings, showNavPanel, showSearch]
+    [showSettings, showNavPanel, showSearch],
   );
 
   const clearControlsTimeout = useCallback(() => {
@@ -271,7 +272,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       if (data) {
         setBookData(data);
       } else {
-        console.error("Book not found");
+        console.error('Book not found');
         onClose();
       }
     };
@@ -291,7 +292,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         return;
       }
   
-      let bestVoice = availableVoices.find(v => v.default) ||
+      const bestVoice = availableVoices.find(v => v.default) ||
                       availableVoices.find(v => v.lang === 'en-US' && /google/i.test(v.name)) ||
                       availableVoices.find(v => v.lang === 'en-US' && /microsoft/i.test(v.name)) ||
                       availableVoices.find(v => v.lang === 'en-US' && v.localService) ||
@@ -386,7 +387,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                 }
             }
         } catch (e) {
-            console.error("Could not find start CFI for speech, starting from beginning.", e);
+            console.error('Could not find start CFI for speech, starting from beginning.', e);
         } finally {
             speechStartCfiRef.current = null;
         }
@@ -467,7 +468,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                                     elementToScroll.scrollIntoView({
                                         behavior: 'smooth',
                                         block: 'center',
-                                        inline: 'nearest'
+                                        inline: 'nearest',
                                     });
                                 }
                             }
@@ -476,7 +477,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
                 }
             }
         } catch (e) {
-            console.error("Error during sentence highlighting:", e);
+            console.error('Error during sentence highlighting:', e);
         }
     };
     
@@ -504,7 +505,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     };
     
     utterance.onerror = (e) => {
-        console.error("SpeechSynthesisUtterance error", e);
+        console.error('SpeechSynthesisUtterance error', e);
         stopSpeech();
     };
 
@@ -667,7 +668,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         } catch (e) { /* ignore */ }
       } catch (error) {
         if (isMounted) {
-            console.error("Error initializing EPUB:", error);
+            console.error('Error initializing EPUB:', error);
         }
       }
     };
@@ -981,7 +982,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             }
         }
       } catch (e) {
-        console.warn("Could not fetch chapter for bookmark, using last known chapter.", e);
+        console.warn('Could not fetch chapter for bookmark, using last known chapter.', e);
       }
     }
     
@@ -1022,7 +1023,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
             }
         }
       } catch (e) {
-        console.warn("Could not fetch chapter for citation, using last known chapter.", e);
+        console.warn('Could not fetch chapter for citation, using last known chapter.', e);
       }
     }
 
@@ -1072,7 +1073,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         const results = await performBookSearch(bookRef.current, query);
         setSearchResults(results);
     } catch (err) {
-        console.error("Search failed:", err);
+        console.error('Search failed:', err);
         setSearchResults([]);
     } finally {
         setIsSearching(false);
@@ -1215,14 +1216,14 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               <button onClick={() => setShowNavPanel(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors relative" aria-label="Contents and Bookmarks">
                   <ListIcon className="w-6 h-6" />
                    {(bookmarks.length > 0 || citations.length > 0) && (
-                      <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-800"></span>
+                      <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-800" />
                   )}
               </button>
           </div>
           
           {/* Right controls */}
           <div className="flex justify-end items-center gap-2 sm:order-3">
-              <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={speechState === 'playing' ? "Pause Read Aloud" : "Start Read Aloud"}>
+              <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={speechState === 'playing' ? 'Pause Read Aloud' : 'Start Read Aloud'}>
                 {speechState === 'playing' ? <PauseIcon className="w-6 h-6 text-sky-400" /> : <PlayIcon className="w-6 h-6" />}
               </button>
               <button onClick={() => setShowSearch(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Search in book">
@@ -1231,7 +1232,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               <button onClick={() => setShowCitationModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Create citation for this page">
                   <AcademicCapIcon className="w-6 h-6" />
               </button>
-              <button onClick={toggleBookmark} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={isCurrentPageBookmarked ? "Remove bookmark from this page" : "Add bookmark to this page"}>
+              <button onClick={toggleBookmark} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={isCurrentPageBookmarked ? 'Remove bookmark from this page' : 'Add bookmark to this page'}>
                   <BookmarkIcon className="w-6 h-6" filled={isCurrentPageBookmarked} />
               </button>
         <button onClick={() => setShowHelp(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Keyboard help">?

@@ -1,10 +1,16 @@
-import { expect } from 'vitest';
+import { expect, afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 
 // Ensure Vitest's expect is available on globalThis before jest-dom loads.
 // Use a dynamic import (top-level await) because static imports are hoisted
 // and would execute before our assignment.
 // Make expect available globally for jest-dom to extend
 (globalThis as any).expect = expect;
+
+// Cleanup after each test to avoid DOM pollution
+afterEach(() => {
+	cleanup();
+});
 
 // Try to require jest-dom at runtime. Use a dynamic require so the TypeScript
 // compiler doesn't attempt to resolve it as an ES module at type-check time.

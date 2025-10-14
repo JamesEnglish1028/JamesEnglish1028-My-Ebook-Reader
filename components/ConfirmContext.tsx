@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useRef, ReactNode } from 'react';
-import { useToast } from './toast/ToastContext';
-import ConfirmModal from './ConfirmModal';
+import type { ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef } from 'react';
 
-type ConfirmOptions = {
+import ConfirmModal from './ConfirmModal';
+import { useToast } from './toast/ToastContext';
+
+interface ConfirmOptions {
   title?: string;
   message: string;
   confirmLabel?: string;
@@ -12,7 +14,7 @@ type ConfirmOptions = {
   undoCallback?: () => Promise<void> | void;
   // optional duration in ms to allow undo
   undoDurationMs?: number;
-};
+}
 
 type ConfirmFn = (opts: ConfirmOptions | string) => Promise<boolean>;
 

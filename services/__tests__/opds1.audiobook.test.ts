@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { parseOpds1Xml, getAvailableMediaModes, filterBooksByMedia, getFormatFromMimeType } from '../opds';
 
 describe('OPDS 1 Audiobook Detection', () => {
@@ -54,7 +55,7 @@ describe('OPDS 1 Audiobook Detection', () => {
         author: 'Author 1',
         downloadUrl: 'https://example.com/audio1',
         coverImage: null,
-        summary: null
+        summary: null,
       },
       {
         title: 'E-book 1',
@@ -63,7 +64,7 @@ describe('OPDS 1 Audiobook Detection', () => {
         author: 'Author 2',
         downloadUrl: 'https://example.com/ebook1',
         coverImage: null,
-        summary: null
+        summary: null,
       },
       {
         title: 'PDF Book',
@@ -72,8 +73,8 @@ describe('OPDS 1 Audiobook Detection', () => {
         author: 'Author 3',
         downloadUrl: 'https://example.com/pdf1',
         coverImage: null,
-        summary: null
-      }
+        summary: null,
+      },
     ];
 
     const mediaModes = getAvailableMediaModes(books);
@@ -93,7 +94,7 @@ describe('OPDS 1 Audiobook Detection', () => {
         author: 'Author 1',
         downloadUrl: 'https://example.com/audio1',
         coverImage: null,
-        summary: null
+        summary: null,
       },
       {
         title: 'E-book 1',
@@ -102,7 +103,7 @@ describe('OPDS 1 Audiobook Detection', () => {
         author: 'Author 2',
         downloadUrl: 'https://example.com/ebook1',
         coverImage: null,
-        summary: null
+        summary: null,
       },
       {
         title: 'PDF Book',
@@ -111,8 +112,8 @@ describe('OPDS 1 Audiobook Detection', () => {
         author: 'Author 3',
         downloadUrl: 'https://example.com/pdf1',
         coverImage: null,
-        summary: null
-      }
+        summary: null,
+      },
     ];
 
     // Test filtering by audiobook

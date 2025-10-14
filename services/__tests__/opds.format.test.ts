@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { parseOpds1Xml } from '../opds';
 import { parseOpds2Json } from '../opds2';
 
@@ -33,10 +34,10 @@ describe('OPDS format selection', () => {
           metadata: { title: 'Sample Book', author: 'Author' },
           links: [
             { href: '/entry/2', rel: ['alternate'], type: 'application/atom+xml;type=entry;profile=opds-catalog' },
-            { href: '/acq/2', rel: ['http://opds-spec.org/acquisition/borrow'], type: 'application/pdf' }
-          ]
-        }
-      ]
+            { href: '/acq/2', rel: ['http://opds-spec.org/acquisition/borrow'], type: 'application/pdf' },
+          ],
+        },
+      ],
     };
 
     const { books } = parseOpds2Json(json, 'https://example.org/');

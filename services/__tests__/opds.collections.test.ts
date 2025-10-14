@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { parseOpds1Xml, groupBooksByCollections, groupBooksByCollectionsAsLanes } from '../opds';
 
 describe('OPDS1 Collections Support', () => {
@@ -54,7 +55,7 @@ describe('OPDS1 Collections Support', () => {
         summary: null,
         collections: [
           { title: 'Fiction', href: '/collections/fiction' },
-        ]
+        ],
       },
       {
         title: 'Book 2',
@@ -65,7 +66,7 @@ describe('OPDS1 Collections Support', () => {
         collections: [
           { title: 'Fiction', href: '/collections/fiction' },
           { title: 'Bestsellers', href: '/collections/bestsellers' },
-        ]
+        ],
       },
       {
         title: 'Book 3',
@@ -73,7 +74,7 @@ describe('OPDS1 Collections Support', () => {
         coverImage: null,
         downloadUrl: '/books/3.epub',
         summary: null,
-      }
+      },
     ];
 
     const result = groupBooksByCollections(books, [], {});
@@ -108,8 +109,8 @@ describe('OPDS1 Collections Support', () => {
           downloadUrl: '/books/1.epub',
           summary: null,
           collections: [
-            { title: 'UPLOpen', href: '/collections/uplopen' }
-          ]
+            { title: 'UPLOpen', href: '/collections/uplopen' },
+          ],
         },
         {
           title: 'Book 2',
@@ -119,8 +120,8 @@ describe('OPDS1 Collections Support', () => {
           summary: null,
           collections: [
             { title: 'UPLOpen', href: '/collections/uplopen' },
-            { title: 'Courtney\'s Blackstone lane', href: '/collections/blackstone' }
-          ]
+            { title: 'Courtney\'s Blackstone lane', href: '/collections/blackstone' },
+          ],
         },
         {
           title: 'Book 3',
@@ -129,8 +130,8 @@ describe('OPDS1 Collections Support', () => {
           downloadUrl: '/books/3.epub',
           summary: null,
           collections: [
-            { title: 'Courtney\'s Blackstone lane', href: '/collections/blackstone' }
-          ]
+            { title: 'Courtney\'s Blackstone lane', href: '/collections/blackstone' },
+          ],
         },
         {
           title: 'Book 4',
@@ -139,7 +140,7 @@ describe('OPDS1 Collections Support', () => {
           downloadUrl: '/books/4.epub',
           summary: null,
           // No collections - should be uncategorized
-        }
+        },
       ];
 
       const result = groupBooksByCollectionsAsLanes(books, [], { next: undefined, prev: undefined, first: undefined, last: undefined });
@@ -181,7 +182,7 @@ describe('OPDS1 Collections Support', () => {
           downloadUrl: '/books/uncategorized.epub',
           summary: null,
           // No collections
-        }
+        },
       ];
 
       const result = groupBooksByCollectionsAsLanes(booksWithoutCollections, [], { next: undefined, prev: undefined, first: undefined, last: undefined });
@@ -210,9 +211,9 @@ describe('OPDS1 Collections Support', () => {
           summary: null,
           collections: [
             { title: 'Collection A', href: '/collections/a' },
-            { title: 'Collection B', href: '/collections/b' }
-          ]
-        }
+            { title: 'Collection B', href: '/collections/b' },
+          ],
+        },
       ];
 
       const result = groupBooksByCollectionsAsLanes(bookWithMultipleCollections, [], { next: undefined, prev: undefined, first: undefined, last: undefined });

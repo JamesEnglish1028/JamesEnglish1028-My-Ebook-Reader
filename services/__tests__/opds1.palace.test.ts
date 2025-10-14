@@ -1,7 +1,9 @@
-import { describe, test, expect } from 'vitest';
-import { parseOpds1Xml, groupBooksByMode, getAvailableCollections, filterBooksByCollection } from '../opds';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+
+import { describe, test, expect } from 'vitest';
+
+import { parseOpds1Xml, groupBooksByMode, getAvailableCollections, filterBooksByCollection } from '../opds';
 
 describe('OPDS 1 Collection Detection from Real Data', () => {
   test('parses collection links from Minotaur OPDS 1 XML correctly', () => {
@@ -96,7 +98,7 @@ describe('OPDS 1 Collection Detection from Real Data', () => {
     const distributorExamples = booksWithDistributors.slice(0, 5).map(book => ({
       title: book.title,
       distributor: book.distributor,
-      publisher: book.publisher
+      publisher: book.publisher,
     }));
     console.log('Sample distributors:', distributorExamples);
     

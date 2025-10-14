@@ -14,7 +14,7 @@ const wrapText = (
   x: number,
   y: number,
   maxWidth: number,
-  lineHeight: number
+  lineHeight: number,
 ): number => {
   const words = text.split(' ');
   let line = '';
@@ -137,7 +137,7 @@ export const proxiedUrl = (url: string): string => {
     return `${CORS_PROXY_URL}${encodeURIComponent(url)}`;
   } catch (e) {
     // If the URL is invalid, return an empty string or a placeholder to avoid breaking image tags.
-    console.error("Invalid URL passed to proxiedUrl:", url);
+    console.error('Invalid URL passed to proxiedUrl:', url);
     return '';
   }
 };
@@ -245,7 +245,7 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
             reader.readAsDataURL(blob);
         });
     } catch (error) {
-        console.error("Error fetching or converting image to base64:", error);
+        console.error('Error fetching or converting image to base64:', error);
         return null;
     }
 };

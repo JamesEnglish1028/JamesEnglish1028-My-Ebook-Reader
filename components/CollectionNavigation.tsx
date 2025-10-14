@@ -1,5 +1,6 @@
 import React from 'react';
-import { Collection } from '../types';
+
+import type { Collection } from '../types';
 
 interface CollectionNavigationProps {
   collections: Collection[];
@@ -8,7 +9,7 @@ interface CollectionNavigationProps {
 
 export const CollectionNavigation: React.FC<CollectionNavigationProps> = ({
   collections,
-  onCollectionClick
+  onCollectionClick,
 }) => {
   if (collections.length === 0) return null;
 

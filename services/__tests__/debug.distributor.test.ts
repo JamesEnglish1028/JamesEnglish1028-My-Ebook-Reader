@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { parseOpds1Xml } from '../opds';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+
+import { describe, it, expect } from 'vitest';
+
+import { parseOpds1Xml } from '../opds';
 
 describe('Distributor Debug Test', () => {
   it('debugs distributor parsing from MinotaurOPDS.xml', () => {

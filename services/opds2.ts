@@ -1,7 +1,8 @@
-import { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
-import { proxiedUrl, maybeProxyForCors } from './utils';
+import type { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
+
 import credentialsService from './credentials';
 import { logger } from './logger';
+import { proxiedUrl, maybeProxyForCors } from './utils';
 
 // Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
 function uint8ToBinaryString(u8: Uint8Array): string {
@@ -115,7 +116,7 @@ async function safeReadText(resp: Response): Promise<string> {
   }
 }
 
-type StoredCred = { host: string; username: string; password: string };
+interface StoredCred { host: string; username: string; password: string }
 const ETAG_PREFIX = 'mebooks.opds.etag.';
 
 function getHostFromUrl(url: string) {
@@ -307,8 +308,8 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
       const links = Array.isArray(pub.links) ? pub.links : (pub.links ? [pub.links] : []);
 
       // Find acquisition links and pick the most appropriate one.
-      const acquisitions: Array<{ href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }> = [];
-      const collections: Array<{ title: string; href: string }> = [];
+      const acquisitions: { href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }[] = [];
+      const collections: { title: string; href: string }[] = [];
       
       links.forEach((l: any) => {
         if (!l || !l.href) return;
@@ -363,7 +364,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
           providerId: providerId || undefined,
           subjects: subjects || undefined,
           collections: collections.length > 0 ? collections : undefined,
-          format: format || undefined
+          format: format || undefined,
         };
         books.push(book);
       }
@@ -386,7 +387,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
 export const fetchOpds2Feed = async (url: string, credentials?: { username: string; password: string } | null) => {
   const proxyUrl = proxiedUrl(url);
   const headers: Record<string,string> = {
-    'Accept': 'application/opds+json, application/json, application/ld+json, */*'
+    'Accept': 'application/opds+json, application/json, application/ld+json, */*',
   };
 
   // ETag support: send If-None-Match when we have a cached ETag
@@ -474,7 +475,7 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
   // the browser can perform interactive provider logins and send cookies when
   // appropriate. However, if credentials are supplied and the probe selects
   // a public proxy, fail early (public proxies often strip Authorization).
-  let current = await maybeProxyForCors(href);
+  const current = await maybeProxyForCors(href);
   try {
     const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
     if (usingPublicProxy && credentials) {

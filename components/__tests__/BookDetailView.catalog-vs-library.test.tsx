@@ -1,19 +1,23 @@
-import { describe, test, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { vi } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { describe, test, expect, vi, afterEach } from 'vitest';
+
+import type { CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
-import { CatalogBook } from '../../types';
 
 // Mock the ToastContext
 const mockUseToast = vi.fn(() => ({
-  showToast: vi.fn()
+  showToast: vi.fn(),
 }));
 
 vi.mock('../toast/ToastContext', () => ({
-  useToast: () => mockUseToast()
+  useToast: () => mockUseToast(),
 }));
 
 describe('Catalog vs Library BookDetailView Differences', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   test('catalog book shows Add to Bookshelf button and distributor as provider', () => {
     // This simulates exactly what happens when you click a book from a catalog
     const catalogBook: CatalogBook = {
@@ -25,7 +29,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
       distributor: 'OAPEN',
       providerId: 'oapen-123',
       format: 'EPUB',
-      acquisitionMediaType: 'application/epub+zip'
+      acquisitionMediaType: 'application/epub+zip',
     };
 
     const mockProps = {
@@ -36,7 +40,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
@@ -63,7 +67,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
       providerId: 'lib-456',
       providerName: 'My Local Library',
       distributor: 'OAPEN', // Library books have distributor but should use providerName
-      format: 'EPUB'
+      format: 'EPUB',
     };
 
     const mockProps = {
@@ -73,7 +77,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
@@ -103,7 +107,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
       distributor: 'BiblioBoard',
       providerId: 'biblio-789',
       format: 'PDF',
-      acquisitionMediaType: 'application/pdf'
+      acquisitionMediaType: 'application/pdf',
     };
 
     const mockProps = {
@@ -113,7 +117,7 @@ describe('Catalog vs Library BookDetailView Differences', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);

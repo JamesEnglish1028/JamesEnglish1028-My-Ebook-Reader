@@ -1,9 +1,11 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
+
+import type { ReaderSettings } from '../../types';
 import TocPanel from '../TocPanel';
-import { ReaderSettings } from '../../types';
 
 const mockSettings: ReaderSettings = {
   fontSize: 100,
@@ -11,7 +13,7 @@ const mockSettings: ReaderSettings = {
   flow: 'paginated',
   fontFamily: 'Original',
   citationFormat: 'apa',
-  readAloud: { voiceURI: null, rate: 0.9, pitch: 1, volume: 1 }
+  readAloud: { voiceURI: null, rate: 0.9, pitch: 1, volume: 1 },
 };
 
 const sampleToc = [
@@ -20,9 +22,9 @@ const sampleToc = [
     href: 'chapter1.html',
     label: 'Chapter 1',
     subitems: [
-      { id: '1.1', href: 'chapter1.html#sec1', label: 'Section 1' }
-    ]
-  }
+      { id: '1.1', href: 'chapter1.html#sec1', label: 'Section 1' },
+    ],
+  },
 ];
 
 describe('TocPanel keyboard and ARIA', () => {
@@ -48,7 +50,7 @@ describe('TocPanel keyboard and ARIA', () => {
         onDeleteCitation={onDeleteCitation}
         settings={mockSettings}
         bookData={null}
-      />
+      />,
     );
 
     // Dialog has role=dialog and labelledby heading

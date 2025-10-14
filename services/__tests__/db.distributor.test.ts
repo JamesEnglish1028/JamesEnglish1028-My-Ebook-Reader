@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vitest';
+
+import type { BookRecord } from '../../types';
 import { db } from '../db';
-import { BookRecord } from '../../types';
 
 describe('Database Distributor Persistence', () => {
   // Clean up before each test
@@ -22,7 +23,7 @@ describe('Database Distributor Persistence', () => {
       subjects: ['Test', 'Fiction'],
       format: 'EPUB',
       providerId: 'test-123',
-      providerName: 'Test Provider'
+      providerName: 'Test Provider',
     };
 
     // Save the book
@@ -48,7 +49,7 @@ describe('Database Distributor Persistence', () => {
       author: 'Test Author 2',
       coverImage: null,
       epubData: new ArrayBuffer(8),
-      format: 'EPUB'
+      format: 'EPUB',
     };
 
     // Save the book
@@ -71,7 +72,7 @@ describe('Database Distributor Persistence', () => {
       coverImage: null,
       epubData: new ArrayBuffer(8),
       distributor: 'OAPEN',
-      format: 'EPUB'
+      format: 'EPUB',
     };
 
     const book2: BookRecord = {
@@ -80,7 +81,7 @@ describe('Database Distributor Persistence', () => {
       coverImage: null,
       epubData: new ArrayBuffer(8),
       distributor: 'BiblioBoard',
-      format: 'PDF'
+      format: 'PDF',
     };
 
     await db.saveBook(book1);

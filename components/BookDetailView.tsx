@@ -1,7 +1,9 @@
 
 
 import React, { useState, useCallback } from 'react';
-import { BookMetadata, CatalogBook, CoverAnimationData, BookRecord, AuthDocument } from '../types';
+
+import type { BookMetadata, CatalogBook, CoverAnimationData, BookRecord, AuthDocument } from '../types';
+
 import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
 import Spinner from './Spinner';
 
@@ -21,10 +23,12 @@ const sanitizeHtml = (html: string): string => {
 };
 import DuplicateBookModal from './DuplicateBookModal';
 import OpdsCredentialsModal from './OpdsCredentialsModal';
+
 import { resolveAcquisitionChainOpds1 } from '../services/opds';
 import { saveOpdsCredential, findCredentialForUrl } from '../services/opds2';
 import { db } from '../services/db';
 import { proxiedUrl } from '../services/utils';
+
 import { useToast } from './toast/ToastContext';
 
 interface BookDetailViewProps {
@@ -114,7 +118,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                 width: rect.width, height: rect.height,
                 top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left,
             } as DOMRect,
-            coverImage: libraryBook.coverImage
+            coverImage: libraryBook.coverImage,
         };
       onReadBook(libraryBook.id, animationData, libraryBook.format || 'EPUB');
     }
@@ -271,7 +275,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         onBack();
       }, 2000);
     } catch (error) {
-      console.error("Error replacing book:", error);
+      console.error('Error replacing book:', error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
     }
   }, [duplicateBook, existingBook, onBack, setImportStatus]);
@@ -293,7 +297,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         onBack();
       }, 2000);
     } catch (error) {
-      console.error("Error adding duplicate book:", error);
+      console.error('Error adding duplicate book:', error);
       setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
     }
   }, [duplicateBook, onBack, setImportStatus]);
@@ -376,7 +380,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                                 <div dangerouslySetInnerHTML={{ __html: description }} />
                             </div>
                             {isLongDescription && !isDescriptionExpanded && (
-                                <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none"></div>
+                                <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
                             )}
                         </div>
                         {isLongDescription && (

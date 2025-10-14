@@ -1,7 +1,9 @@
-import { describe, test, expect } from 'vitest';
-import { parseOpds1Xml } from '../opds';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+
+import { describe, test, expect } from 'vitest';
+
+import { parseOpds1Xml } from '../opds';
 
 describe('Palace.io OPDS 1 UI State Diagnosis', () => {
   test('verifies collection availability detection for UI dropdown', () => {
@@ -30,7 +32,7 @@ describe('Palace.io OPDS 1 UI State Diagnosis', () => {
       .slice(0, 3)
       .map(book => ({
         title: book.title,
-        collections: book.collections
+        collections: book.collections,
       }));
     
     console.log('Sample books with collections:', JSON.stringify(sampleBooksWithCollections, null, 2));

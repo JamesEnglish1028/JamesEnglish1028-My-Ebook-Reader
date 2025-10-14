@@ -1,10 +1,12 @@
 import React from 'react';
+
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, test, expect, vi } from 'vitest';
+
+import BookDetailView from '../BookDetailView';
 import { ToastProvider } from '../toast/ToastContext';
 import ToastStack from '../toast/ToastStack';
-import BookDetailView from '../BookDetailView';
-import { describe, test, expect, vi } from 'vitest';
 
 // Mock services
 vi.mock('../../services/opds', () => ({
@@ -21,7 +23,7 @@ const sampleCatalogBook = {
   coverImage: null,
   downloadUrl: 'https://corsproxy.io/https://example.com/opds/acq',
   providerName: 'ExampleProvider',
-  acquisitionMediaType: 'application/adobe+epub'
+  acquisitionMediaType: 'application/adobe+epub',
 };
 
 describe('BookDetailView proxy toast', () => {
@@ -51,7 +53,7 @@ describe('BookDetailView proxy toast', () => {
           setImportStatus={() => {}}
         />
         <ToastStack />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     // Click the palace-style action button (labelled "Read in Palace App")

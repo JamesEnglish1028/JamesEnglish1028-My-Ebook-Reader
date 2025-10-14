@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { resolveAcquisitionChain } from '../opds2';
 
 describe('resolveAcquisitionChain', () => {
@@ -11,7 +12,7 @@ describe('resolveAcquisitionChain', () => {
       status: 200,
       headers: { get: (k: string) => 'application/json' },
       json: async () => ({ url: 'https://cdn.example/content/book.epub' }),
-      text: async () => '{}'
+      text: async () => '{}',
     }));
 
     const res = await resolveAcquisitionChain('https://opds.example/borrow/1', null);
@@ -22,7 +23,7 @@ describe('resolveAcquisitionChain', () => {
     (globalThis as any).fetch = vi.fn(async () => ({
       status: 302,
       headers: { get: (k: string) => k.toLowerCase() === 'location' ? 'https://cdn.example/redirected/book.epub' : null },
-      text: async () => ''
+      text: async () => '',
     }));
 
     const res = await resolveAcquisitionChain('https://opds.example/borrow/2', null);

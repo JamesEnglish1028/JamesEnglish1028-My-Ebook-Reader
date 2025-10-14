@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'vitest';
+
 import { parseOpds1Xml, extractCollectionNavigation, groupBooksByMode, getAvailableCollections, filterBooksByCollection } from '../opds';
 
 describe('OPDS 1 Collection Navigation', () => {
@@ -29,13 +30,13 @@ describe('OPDS 1 Collection Navigation', () => {
     expect(books[0].collections).toHaveLength(2);
     expect(books[0].collections).toEqual([
       { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' },
-      { title: 'Science Fiction', href: 'https://example.com/collection/scifi' }
+      { title: 'Science Fiction', href: 'https://example.com/collection/scifi' },
     ]);
     
     // Second book should have 1 collection link
     expect(books[1].collections).toHaveLength(1);
     expect(books[1].collections).toEqual([
-      { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' }
+      { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' },
     ]);
   });
 
@@ -49,8 +50,8 @@ describe('OPDS 1 Collection Navigation', () => {
         summary: null,
         collections: [
           { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' },
-          { title: 'Science Fiction', href: 'https://example.com/collection/scifi' }
-        ]
+          { title: 'Science Fiction', href: 'https://example.com/collection/scifi' },
+        ],
       },
       {
         title: 'Book 2',
@@ -59,9 +60,9 @@ describe('OPDS 1 Collection Navigation', () => {
         downloadUrl: 'https://example.com/book2',
         summary: null,
         collections: [
-          { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' }
-        ]
-      }
+          { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' },
+        ],
+      },
     ];
 
     const collectionLinks = extractCollectionNavigation(books);
@@ -84,9 +85,9 @@ describe('OPDS 1 Collection Navigation', () => {
         downloadUrl: 'https://example.com/book1',
         summary: null,
         collections: [
-          { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' }
-        ]
-      }
+          { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' },
+        ],
+      },
     ];
 
     const collections = getAvailableCollections(books, []);
@@ -105,8 +106,8 @@ describe('OPDS 1 Collection Navigation', () => {
         downloadUrl: 'https://example.com/book1',
         summary: null,
         collections: [
-          { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' }
-        ]
+          { title: 'Fantasy Books', href: 'https://example.com/collection/fantasy' },
+        ],
       },
       {
         title: 'Sci-Fi Book',
@@ -115,9 +116,9 @@ describe('OPDS 1 Collection Navigation', () => {
         downloadUrl: 'https://example.com/book2',
         summary: null,
         collections: [
-          { title: 'Sci-Fi Books', href: 'https://example.com/collection/scifi' }
-        ]
-      }
+          { title: 'Sci-Fi Books', href: 'https://example.com/collection/scifi' },
+        ],
+      },
     ];
 
     // Filter by Fantasy Books collection

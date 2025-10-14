@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { CatalogBook } from '../types';
+
 import { proxiedUrl } from '../services/utils';
+import type { CatalogBook } from '../types';
 import './collection-lane.css';
 
 interface UncategorizedLaneProps {
@@ -10,7 +11,7 @@ interface UncategorizedLaneProps {
 
 export const UncategorizedLane: React.FC<UncategorizedLaneProps> = ({
   books,
-  onBookClick
+  onBookClick,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 

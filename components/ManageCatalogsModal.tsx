@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Catalog, CatalogRegistry } from '../types';
+
+import type { Catalog, CatalogRegistry } from '../types';
+
 import { CloseIcon, GlobeIcon, PlusIcon, TrashIcon, PencilIcon, CheckIcon } from './icons';
 
 interface ManageCatalogsModalProps {
@@ -25,7 +27,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
     registries,
     onAddRegistry,
     onDeleteRegistry,
-    onUpdateRegistry
+    onUpdateRegistry,
 }) => {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -133,7 +135,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            placeholder={activeTab === 'catalogs' ? "e.g., Project Gutenberg" : "e.g., OPDS Registry"}
+                            placeholder={activeTab === 'catalogs' ? 'e.g., Project Gutenberg' : 'e.g., OPDS Registry'}
                             className="w-full bg-slate-700 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                         />
                     </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { LeftArrowIcon } from './icons';
 
 interface AboutPageProps {

@@ -1,19 +1,20 @@
 import React, { useState, useEffect, Suspense, useRef, useCallback } from 'react';
+
 import { useParams, useNavigate } from 'react-router-dom';
+
 import { db } from '../services/db';
-import { BookRecord } from '../types';
-import { CloseIcon, LeftArrowIcon, RightArrowIcon, ListIcon, BookmarkIcon, AcademicCapIcon } from './icons';
+import { getReaderSettings, getBookmarksForBook, getCitationsForBook, saveBookmarksForBook, saveCitationsForBook, getLastPositionForBook, saveLastPositionForBook , getPdfViewStateForBook, savePdfViewStateForBook } from '../services/readerUtils';
+import type { BookRecord , TocItem, Bookmark, Citation, ReaderSettings } from '../types';
+
+import AddedHud from './AddedHud';
 import BookmarkModal from './BookmarkModal';
 import CitationModal from './CitationModal';
 import { useConfirm } from './ConfirmContext';
-import TocPanel from './TocPanel';
-import { TocItem, Bookmark, Citation, ReaderSettings } from '../types';
-import { getReaderSettings, getBookmarksForBook, getCitationsForBook, saveBookmarksForBook, saveCitationsForBook, getLastPositionForBook, saveLastPositionForBook } from '../services/readerUtils';
-import { getPdfViewStateForBook, savePdfViewStateForBook } from '../services/readerUtils';
-import Spinner from './Spinner';
+import { CloseIcon, LeftArrowIcon, RightArrowIcon, ListIcon, BookmarkIcon, AcademicCapIcon } from './icons';
 import ShortcutHelpModal from './ShortcutHelpModal';
+import Spinner from './Spinner';
+import TocPanel from './TocPanel';
 import ZoomHud from './ZoomHud';
-import AddedHud from './AddedHud';
 // Lazy-load react-pdf to keep initial bundle small
 // Importing the package entry dynamically; react-pdf exposes Document and Page components.
 const PDFDocument = React.lazy(() => import('react-pdf').then(m => ({ default: m.Document })));
@@ -115,7 +116,7 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
           }
         }
         if (data.format !== 'PDF') {
-          throw new Error("The selected book is not in PDF format.");
+          throw new Error('The selected book is not in PDF format.');
         }
 
   setBookData(data);
@@ -396,7 +397,6 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [goToPrev, goToNext, bookData, currentPage, bookmarks]);
-
   
 
   useEffect(() => {
@@ -613,7 +613,7 @@ const PdfReaderView: React.FC<PdfReaderViewProps> = ({ bookId: propBookId, onClo
           <button onClick={() => setShowNavPanel(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Contents and Bookmarks">
             <ListIcon className="w-6 h-6" />
             {(bookmarks.length > 0 || citations.length > 0) && (
-              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-800"></span>
+              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-800" />
             )}
           </button>
         </div>

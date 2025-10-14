@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
 
-import BookDetailView from '../BookDetailView';
-import OpdsCredentialsModal from '../OpdsCredentialsModal';
-import { CatalogBook } from '../../types';
 import * as opds from '../../services/opds';
 import * as opds2 from '../../services/opds2';
+import type { CatalogBook } from '../../types';
+import BookDetailView from '../BookDetailView';
+import OpdsCredentialsModal from '../OpdsCredentialsModal';
 
 describe('BookDetailView credential retry using stored creds', () => {
   let origFetch: any;
@@ -43,7 +44,7 @@ describe('BookDetailView credential retry using stored creds', () => {
           // BookDetailView will call resolveAcquisitionChainOpds1 internally when palace-type
           // For this harness we don't need to do anything here; return success false to allow UI path
           return { success: false };
-        } catch (e) { return { success: false } }
+        } catch (e) { return { success: false }; }
       };
 
       const sample: CatalogBook = { title: 'Auth Book', author: 'A', coverImage: null, downloadUrl: 'https://opds.example/borrow/1', summary: null, providerId: 'p1', format: 'EPUB', acquisitionMediaType: 'application/adobe+epub' };

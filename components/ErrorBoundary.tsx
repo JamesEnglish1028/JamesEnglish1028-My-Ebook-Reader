@@ -1,4 +1,5 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -27,7 +28,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   private handleReset = () => {
@@ -45,7 +46,7 @@ class ErrorBoundary extends Component<Props, State> {
             </svg>
             <h1 className="text-2xl font-bold text-red-300">Something went wrong.</h1>
             <p className="mt-2 text-slate-300">
-              {this.props.fallbackMessage || "An unexpected error occurred. Please try again."}
+              {this.props.fallbackMessage || 'An unexpected error occurred. Please try again.'}
             </p>
             {this.state.error && (
                  <details className="mt-4 text-left bg-slate-900/50 p-3 rounded-md text-sm">

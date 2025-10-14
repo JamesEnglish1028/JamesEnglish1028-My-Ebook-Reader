@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+
 import { maybeProxyForCors } from '../services/utils';
 
 interface Props {
@@ -58,7 +59,7 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
   const realmFromAuth = authDocument?.realm || authDocument?.title || null;
   const description = authDocument?.description || authDocument?.instructions || null;
   const logo = authDocument?.logo || authDocument?.image || null;
-  const links: Array<any> = Array.isArray(authDocument?.links) ? authDocument.links : [];
+  const links: any[] = Array.isArray(authDocument?.links) ? authDocument.links : [];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-4">
       <div className="bg-slate-800 p-6 rounded-lg max-w-md w-full text-white">

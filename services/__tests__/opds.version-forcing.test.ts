@@ -1,7 +1,9 @@
-import { describe, test, expect } from 'vitest';
-import { parseOpds2Json, parseOpds1Xml } from '../opds';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+
+import { describe, test, expect } from 'vitest';
+
+import { parseOpds2Json, parseOpds1Xml } from '../opds';
 
 describe('OPDS Version Forcing Issue Diagnosis', () => {
   test('demonstrates the issue when OPDS 1 XML is forced to parse as OPDS 2', () => {
@@ -34,7 +36,7 @@ describe('OPDS Version Forcing Issue Diagnosis', () => {
       id: 'palace-test', 
       name: 'Palace Test', 
       url: 'https://example.palace.io/catalog', 
-      opdsVersion: 'auto' as const 
+      opdsVersion: 'auto' as const, 
     };
     
     // Scenario 2: opdsVersion: '2' (would cause the user's issue)
@@ -42,7 +44,7 @@ describe('OPDS Version Forcing Issue Diagnosis', () => {
       id: 'palace-test', 
       name: 'Palace Test', 
       url: 'https://example.palace.io/catalog', 
-      opdsVersion: '2' as const 
+      opdsVersion: '2' as const, 
     };
     
     // Scenario 3: opdsVersion: '1' (would work correctly)
@@ -50,7 +52,7 @@ describe('OPDS Version Forcing Issue Diagnosis', () => {
       id: 'palace-test', 
       name: 'Palace Test', 
       url: 'https://example.palace.io/catalog', 
-      opdsVersion: '1' as const 
+      opdsVersion: '1' as const, 
     };
     
     // Simulate the Library.tsx logic for determining forcedVersion

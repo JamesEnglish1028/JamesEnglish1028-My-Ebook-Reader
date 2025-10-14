@@ -1,5 +1,7 @@
 import React from 'react';
-import { SearchResult } from '../types';
+
+import type { SearchResult } from '../types';
+
 import { CloseIcon, SearchIcon } from './icons';
 import Spinner from './Spinner';
 
@@ -34,7 +36,7 @@ const SearchResultExcerpt: React.FC<{ excerpt: string; query: string }> = ({ exc
                         </strong>
                     ) : (
                         <span key={i}>{part}</span>
-                    )
+                    ),
                 )}
             </span>
         );
@@ -70,7 +72,7 @@ const SearchResultExcerpt: React.FC<{ excerpt: string; query: string }> = ({ exc
     }
     
     // Extract the potential sentence.
-    let snippet = normalizedExcerpt.substring(sentenceStartIndex, sentenceEndIndex).trim();
+    const snippet = normalizedExcerpt.substring(sentenceStartIndex, sentenceEndIndex).trim();
     
     // Add ellipsis if the extracted snippet seems to be a fragment.
     const leadingEllipsis = sentenceStartIndex > 0;
@@ -89,7 +91,7 @@ const SearchResultExcerpt: React.FC<{ excerpt: string; query: string }> = ({ exc
                     </strong>
                 ) : (
                     <span key={i}>{part}</span>
-                )
+                ),
             )}
             {trailingEllipsis && '...'}
         </span>
@@ -115,7 +117,7 @@ const SearchPanel: React.FC<SearchPanelProps> = ({
         className="fixed inset-0 bg-black/60 z-30"
         onClick={onClose}
         aria-hidden="true"
-      ></div>
+       />
       <div
         className={`fixed top-0 left-0 h-full w-80 bg-slate-800 shadow-2xl z-40 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'

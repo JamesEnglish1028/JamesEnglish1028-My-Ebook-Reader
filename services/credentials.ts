@@ -4,7 +4,7 @@ const DB_NAME = 'MeBooksCredentialsDB';
 const STORE_NAME = 'credentials';
 const DB_VERSION = 1;
 
-type Cred = { host: string; username: string; password: string };
+interface Cred { host: string; username: string; password: string }
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

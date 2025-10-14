@@ -1,30 +1,61 @@
-import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+
 // Styles required by react-pdf layers
-import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import Library from './components/Library';
-import { useConfirm } from './components/ConfirmContext';
-import ReaderView from './components/ReaderView';
-import BookDetailView from './components/BookDetailView';
-import { db } from './services/db';
-import { logger } from './services/logger';
-import { BookRecord, CoverAnimationData, BookMetadata, CatalogBook, Catalog, Bookmark, Citation, ReaderSettings, SyncPayload, CatalogRegistry, CredentialPrompt } from './types';
-import SplashScreen from './components/SplashScreen';
-import SettingsModal from './components/SettingsModal';
+import 'react-pdf/dist/Page/TextLayer.css';
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+
+// Component imports - using barrel exports for cleaner code
+import {
+  AboutPage,
+  BookDetailView,
+  ErrorBoundary,
+  Library,
+  LocalStorageModal,
+  NetworkDebugModal,
+  OpdsCredentialsModal,
+  ReaderView,
+  SettingsModal,
+  SplashScreen,
+  useConfirm,
+  useToast
+} from './components';
+
+// Service imports - using barrel exports
 import { useAuth } from './contexts/AuthContext';
-import { uploadLibraryToDrive, downloadLibraryFromDrive } from './services/google';
-import LocalStorageModal from './components/LocalStorageModal';
-import AboutPage from './components/AboutPage';
-import ErrorBoundary from './components/ErrorBoundary';
+import {
+  blobUrlToBase64,
+  db,
+  downloadLibraryFromDrive,
+  findCredentialForUrl,
+  generatePdfCover,
+  imageUrlToBase64,
+  logger,
+  maybeProxyForCors,
+  resolveAcquisitionChain,
+  saveOpdsCredential,
+  uploadLibraryToDrive
+} from './services';
+
+// Type imports - kept separate as they're from a single file
+import type {
+  Bookmark,
+  BookMetadata,
+  BookRecord,
+  Catalog,
+  CatalogBook,
+  CatalogRegistry,
+  Citation,
+  CoverAnimationData,
+  CredentialPrompt,
+  ReaderSettings,
+  SyncPayload,
+} from './types';
+
+// Context imports
+
 // Lazy-load the PDF reader so its dependencies (react-pdf, pdfjs-dist) are code-split
 const PdfReaderView = lazy(() => import('./components/PdfReaderView'));
-import { generatePdfCover, blobUrlToBase64, imageUrlToBase64, proxiedUrl, maybeProxyForCors } from './services/utils';
-import OpdsCredentialsModal from './components/OpdsCredentialsModal';
-import NetworkDebugModal from './components/NetworkDebugModal';
-import ToastStack from './components/toast/ToastStack';
-import { useToast } from './components/toast/ToastContext';
-import { resolveAcquisitionChain, findCredentialForUrl, saveOpdsCredential } from './services/opds2';
 
 
 const AppInner: React.FC = () => {
@@ -48,7 +79,7 @@ const AppInner: React.FC = () => {
     source: 'library' | 'catalog';
     catalogName?: string;
   } | null>(null);
-  
+
   const [importStatus, setImportStatus] = useState<{
     isLoading: boolean;
     message: string;
@@ -60,7 +91,7 @@ const AppInner: React.FC = () => {
   });
 
   const [credentialPrompt, setCredentialPrompt] = useState<CredentialPrompt>(
-    { isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined, authDocument: null }
+    { isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined, authDocument: null },
   );
 
   // Initialize DB on app start & handle splash screen
@@ -69,10 +100,10 @@ const AppInner: React.FC = () => {
     const timer = setTimeout(() => {
       setShowSplash(false);
     }, 2500); // Show splash for 2.5 seconds
-    
+
     return () => clearTimeout(timer);
   }, []);
-  
+
 
   const navigate = useNavigate();
 
@@ -123,14 +154,14 @@ const AppInner: React.FC = () => {
     setCurrentView('library');
     setCoverAnimationData(null);
     // If the user was on a route, navigate back to root
-    try { navigate('/'); } catch {}
+    try { navigate('/'); } catch { }
   }, [navigate]);
 
   const handleShowBookDetail = useCallback((book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => {
     setDetailViewData({ book, source, catalogName });
     setCurrentView('bookDetail');
   }, []);
-  
+
   const handleReturnToLibrary = useCallback(() => {
     setDetailViewData(null);
     setCurrentView('library');
@@ -148,122 +179,122 @@ const AppInner: React.FC = () => {
     providerName?: string,
     providerId?: string,
     format?: string,
-    coverImageUrl?: string | null
+    coverImageUrl?: string | null,
   ): Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }> => {
-    
+
     let finalCoverImage: string | null = null;
     if (coverImageUrl) {
       finalCoverImage = await imageUrlToBase64(coverImageUrl);
     }
-    
+
     const effectiveFormat = format || (fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB');
 
     if (effectiveFormat === 'PDF') {
-        setImportStatus({ isLoading: true, message: 'Saving PDF to library...', error: null });
-        try {
-            const title = fileName.replace(/\.(pdf)$/i, '');
-            const author = authorName || 'Unknown Author';
-            
-            if (!finalCoverImage && source === 'file') {
-                finalCoverImage = await generatePdfCover(title, author);
-            }
-            
-            const newBook: BookRecord = {
-                title: title,
-                author: author,
-                coverImage: finalCoverImage,
-                epubData: bookData,
-                format: 'PDF',
-                providerName,
-                providerId
-            };
-            await db.saveBook(newBook);
-            setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-            setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
-            return { success: true };
-        } catch (error) {
-            logger.error("Error saving PDF:", error);
-            let errorMessage = "Failed to save the PDF file to the library.";
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            }
-            setImportStatus({ isLoading: false, message: '', error: errorMessage });
-            return { success: false };
+      setImportStatus({ isLoading: true, message: 'Saving PDF to library...', error: null });
+      try {
+        const title = fileName.replace(/\.(pdf)$/i, '');
+        const author = authorName || 'Unknown Author';
+
+        if (!finalCoverImage && source === 'file') {
+          finalCoverImage = await generatePdfCover(title, author);
         }
+
+        const newBook: BookRecord = {
+          title: title,
+          author: author,
+          coverImage: finalCoverImage,
+          epubData: bookData,
+          format: 'PDF',
+          providerName,
+          providerId,
+        };
+        await db.saveBook(newBook);
+        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+        setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
+        return { success: true };
+      } catch (error) {
+        logger.error('Error saving PDF:', error);
+        let errorMessage = 'Failed to save the PDF file to the library.';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        setImportStatus({ isLoading: false, message: '', error: errorMessage });
+        return { success: false };
+      }
     }
 
     // Existing EPUB processing logic
     setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
     try {
-        const ePub = window.ePub;
-        const book = ePub(bookData);
-        const metadata = await book.loaded.metadata;
+      const ePub = window.ePub;
+      const book = ePub(bookData);
+      const metadata = await book.loaded.metadata;
 
-        setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
-        if (!finalCoverImage) {
-            const coverUrl = await book.coverUrl();
-            if (coverUrl) {
-                finalCoverImage = await blobUrlToBase64(coverUrl);
-            }
+      setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
+      if (!finalCoverImage) {
+        const coverUrl = await book.coverUrl();
+        if (coverUrl) {
+          finalCoverImage = await blobUrlToBase64(coverUrl);
         }
+      }
 
-        const subjectsRaw = metadata.subject || metadata.subjects;
-        const subjects = subjectsRaw ? (Array.isArray(subjectsRaw) ? subjectsRaw.map(s => typeof s === 'object' ? s.name : s) : [subjectsRaw]) : [];
-        
-        const finalProviderId = providerId || metadata.identifier;
+      const subjectsRaw = metadata.subject || metadata.subjects;
+      const subjects = subjectsRaw ? (Array.isArray(subjectsRaw) ? subjectsRaw.map(s => typeof s === 'object' ? s.name : s) : [subjectsRaw]) : [];
 
-        const newBook: BookRecord = {
-          title: metadata.title || fileName,
-          author: metadata.creator || 'Unknown Author',
-          coverImage: finalCoverImage,
-          epubData: bookData,
-          publisher: metadata.publisher,
-          publicationDate: metadata.pubdate,
-          providerId: finalProviderId,
-          providerName: providerName,
-          description: metadata.description,
-          subjects: subjects,
-          format: 'EPUB',
-        };
+      const finalProviderId = providerId || metadata.identifier;
 
-        if (finalProviderId) {
-            const existing = await db.findBookByIdentifier(finalProviderId);
-            if (existing) {
-                setImportStatus({ isLoading: false, message: '', error: null });
-                return { success: false, bookRecord: newBook, existingBook: existing };
-            }
+      const newBook: BookRecord = {
+        title: metadata.title || fileName,
+        author: metadata.creator || 'Unknown Author',
+        coverImage: finalCoverImage,
+        epubData: bookData,
+        publisher: metadata.publisher,
+        publicationDate: metadata.pubdate,
+        providerId: finalProviderId,
+        providerName: providerName,
+        description: metadata.description,
+        subjects: subjects,
+        format: 'EPUB',
+      };
+
+      if (finalProviderId) {
+        const existing = await db.findBookByIdentifier(finalProviderId);
+        if (existing) {
+          setImportStatus({ isLoading: false, message: '', error: null });
+          return { success: false, bookRecord: newBook, existingBook: existing };
         }
-        
-        setImportStatus(prev => ({ ...prev, message: 'Saving to library...' }));
-        await db.saveBook(newBook);
-        
-        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-        setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
-        
-        if (source === 'catalog') {
-            handleReturnToLibrary();
-        }
+      }
 
-        return { success: true };
+      setImportStatus(prev => ({ ...prev, message: 'Saving to library...' }));
+      await db.saveBook(newBook);
+
+      setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+      setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
+
+      if (source === 'catalog') {
+        handleReturnToLibrary();
+      }
+
+      return { success: true };
 
     } catch (error) {
-        logger.error("Error processing EPUB:", error);
-        let errorMessage = "Failed to import the EPUB file. It might be corrupted or in an unsupported format.";
-        if (error instanceof Error && error.message.includes('File is not a zip')) {
-          errorMessage = "The provided file is not a valid EPUB (it's not a zip archive). Please try a different file.";
-        }
-        setImportStatus({ isLoading: false, message: '', error: errorMessage });
-        return { success: false };
+      logger.error('Error processing EPUB:', error);
+      let errorMessage = 'Failed to import the EPUB file. It might be corrupted or in an unsupported format.';
+      if (error instanceof Error && error.message.includes('File is not a zip')) {
+        errorMessage = "The provided file is not a valid EPUB (it's not a zip archive). Please try a different file.";
+      }
+      setImportStatus({ isLoading: false, message: '', error: errorMessage });
+      return { success: false };
     }
   }, [handleReturnToLibrary]);
 
   const handleImportFromCatalog = useCallback(async (book: CatalogBook, catalogName?: string) => {
     if (book.format && book.format.toUpperCase() !== 'EPUB' && book.format.toUpperCase() !== 'PDF') {
-        const error = `Cannot import this book. The application currently only supports EPUB and PDF formats, but this book is a ${book.format}.`;
-        setImportStatus({ isLoading: false, message: '', error });
-        return { success: false };
+      const error = `Cannot import this book. The application currently only supports EPUB and PDF formats, but this book is a ${book.format}.`;
+      setImportStatus({ isLoading: false, message: '', error });
+      return { success: false };
     }
-    
+
     setImportStatus({ isLoading: true, message: `Downloading ${book.title}...`, error: null });
     try {
       // If this is an OPDS2 acquisition flow, attempt to resolve the acquisition chain
@@ -284,33 +315,33 @@ const AppInner: React.FC = () => {
         throw e;
       }
 
-  const proxyUrl = await maybeProxyForCors(finalUrl);
+      const proxyUrl = await maybeProxyForCors(finalUrl);
       const storedCred = await findCredentialForUrl(book.downloadUrl);
-      const downloadHeaders: Record<string,string> = {};
+      const downloadHeaders: Record<string, string> = {};
       if (storedCred) {
         downloadHeaders['Authorization'] = `Basic ${btoa(`${storedCred.username}:${storedCred.password}`)}`;
       }
-  const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === finalUrl ? 'include' : 'omit' });
+      const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === finalUrl ? 'include' : 'omit' });
       if (!response.ok) {
         const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
         let errorMessage = `Download failed. The server responded with an error (${statusInfo}). The book might not be available at this address.`;
         if (response.status === 401 || response.status === 403) {
-            errorMessage = `Download failed (${statusInfo}). This catalog or book requires authentication (a login or password), which is not supported by this application.`;
+          errorMessage = `Download failed (${statusInfo}). This catalog or book requires authentication (a login or password), which is not supported by this application.`;
         }
         if (response.status === 429) {
-            errorMessage = `Download failed (${statusInfo}). The request was rate-limited by the server or the proxy. Please wait a moment and try again.`;
+          errorMessage = `Download failed (${statusInfo}). The request was rate-limited by the server or the proxy. Please wait a moment and try again.`;
         }
         throw new Error(errorMessage);
       }
       const bookData = await response.arrayBuffer();
       return await processAndSaveBook(bookData, book.title, book.author, 'catalog', catalogName, book.providerId, book.format, book.coverImage);
     } catch (error) {
-      logger.error("Error importing from catalog:", error);
-      let message = "Download failed. The file may no longer be available or there was a network issue.";
+      logger.error('Error importing from catalog:', error);
+      let message = 'Download failed. The file may no longer be available or there was a network issue.';
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-          message = "Download failed due to a network error. This could be due to your internet connection or the public CORS proxy being temporarily down.";
+        message = 'Download failed due to a network error. This could be due to your internet connection or the public CORS proxy being temporarily down.';
       } else if (error instanceof Error) {
-          message = error.message;
+        message = error.message;
       }
       setImportStatus({ isLoading: false, message: '', error: message });
       return { success: false };
@@ -328,15 +359,15 @@ const AppInner: React.FC = () => {
       const resolved = await resolveAcquisitionChain(href, { username, password });
       if (resolved && credentialPrompt.pendingBook) {
         // Optionally save credential
-  if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
+        if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
         // Proceed to import using resolved URL
         setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
         setImportStatus({ isLoading: true, message: `Downloading ${credentialPrompt.pendingBook.title}...`, error: null });
-  const proxyUrl = await maybeProxyForCors(resolved);
-  const downloadHeaders: Record<string,string> = {};
-  // Use the credentials the user just supplied for the download
-  if (username && password) downloadHeaders['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
-  const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === resolved ? 'include' : 'omit' });
+        const proxyUrl = await maybeProxyForCors(resolved);
+        const downloadHeaders: Record<string, string> = {};
+        // Use the credentials the user just supplied for the download
+        if (username && password) downloadHeaders['Authorization'] = `Basic ${btoa(`${username}:${password}`)}`;
+        const response = await fetch(proxyUrl, { headers: downloadHeaders, credentials: proxyUrl === resolved ? 'include' : 'omit' });
         if (!response.ok) {
           throw new Error(`Download failed: ${response.status}`);
         }
@@ -345,9 +376,9 @@ const AppInner: React.FC = () => {
       } else {
         setImportStatus({ isLoading: false, message: '', error: 'Failed to resolve acquisition URL.' });
         setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined });
-          if (credentialPrompt.authDocument) {
-            // Handle the authDocument as needed
-          }
+        if (credentialPrompt.authDocument) {
+          // Handle the authDocument as needed
+        }
       }
     } catch (error) {
       logger.error('Credential resolve/import failed', error);
@@ -378,10 +409,10 @@ const AppInner: React.FC = () => {
       // strip cookies or Authorization and will prevent successful post-login
       // downloads from Palace servers.
       if (typeof proxyUrl === 'string' && proxyUrl.includes('corsproxy.io')) {
-        try { toast.pushToast('The retry would use a public CORS proxy which commonly strips authentication. Configure an owned proxy via VITE_OWN_PROXY_URL and retry.', 12000); } catch(_) {}
+        try { toast.pushToast('The retry would use a public CORS proxy which commonly strips authentication. Configure an owned proxy via VITE_OWN_PROXY_URL and retry.', 12000); } catch (_) { }
         throw new Error('Retry aborted: public CORS proxy would be used and may block authenticated downloads.');
       }
-  const response = await fetch(proxyUrl, { credentials: proxyUrl === resolved ? 'include' : 'omit' });
+      const response = await fetch(proxyUrl, { credentials: proxyUrl === resolved ? 'include' : 'omit' });
       if (!response.ok) throw new Error(`Download failed: ${response.status}`);
       const bookData = await response.arrayBuffer();
       await processAndSaveBook(bookData, credentialPrompt.pendingBook.title, credentialPrompt.pendingBook.author, 'catalog', credentialPrompt.pendingCatalogName, credentialPrompt.pendingBook.providerId, credentialPrompt.pendingBook.format, credentialPrompt.pendingBook.coverImage);
@@ -389,12 +420,12 @@ const AppInner: React.FC = () => {
     } catch (e) {
       logger.error('Retry after provider login failed', e);
       if ((e as any)?.proxyUsed) {
-        try { toast.pushToast('Retry after login failed because the request used a public CORS proxy that may strip authentication. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves credentials.', 10000); } catch(_) {}
+        try { toast.pushToast('Retry after login failed because the request used a public CORS proxy that may strip authentication. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves credentials.', 10000); } catch (_) { }
       }
       setImportStatus({ isLoading: false, message: '', error: e instanceof Error ? e.message : 'Retry failed' });
     }
   }, [credentialPrompt, processAndSaveBook]);
-  
+
   const gatherDataForUpload = async (): Promise<{ payload: SyncPayload; booksWithData: BookRecord[] }> => {
     const booksWithData = await db.getAllBooks();
     const library = booksWithData.map(({ epubData, ...meta }) => meta);
@@ -407,33 +438,33 @@ const AppInner: React.FC = () => {
     const positions: Record<number, string | null> = {};
 
     booksWithData.forEach(book => {
-        if (book.id) {
-            bookmarks[book.id] = JSON.parse(localStorage.getItem(`ebook-reader-bookmarks-${book.id}`) || '[]');
-            citations[book.id] = JSON.parse(localStorage.getItem(`ebook-reader-citations-${book.id}`) || '[]');
-            positions[book.id] = localStorage.getItem(`ebook-reader-pos-${book.id}`);
-        }
+      if (book.id) {
+        bookmarks[book.id] = JSON.parse(localStorage.getItem(`ebook-reader-bookmarks-${book.id}`) || '[]');
+        citations[book.id] = JSON.parse(localStorage.getItem(`ebook-reader-citations-${book.id}`) || '[]');
+        positions[book.id] = localStorage.getItem(`ebook-reader-pos-${book.id}`);
+      }
     });
 
     return {
-        payload: { library, catalogs, bookmarks, citations, positions, settings },
-        booksWithData
+      payload: { library, catalogs, bookmarks, citations, positions, settings },
+      booksWithData,
     };
   };
-  
+
   const handleUploadToDrive = async () => {
     if (!tokenClient) return;
     setSyncStatus({ state: 'syncing', message: 'Gathering local data...' });
     try {
-        const { payload, booksWithData } = await gatherDataForUpload();
-        setSyncStatus({ state: 'syncing', message: 'Uploading to Google Drive... This may take a while.' });
-        await uploadLibraryToDrive(payload, booksWithData, (progressMsg) => {
-            setSyncStatus({ state: 'syncing', message: progressMsg });
-        });
-        localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
-        setSyncStatus({ state: 'success', message: 'Library successfully uploaded!' });
+      const { payload, booksWithData } = await gatherDataForUpload();
+      setSyncStatus({ state: 'syncing', message: 'Uploading to Google Drive... This may take a while.' });
+      await uploadLibraryToDrive(payload, booksWithData, (progressMsg) => {
+        setSyncStatus({ state: 'syncing', message: progressMsg });
+      });
+      localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
+      setSyncStatus({ state: 'success', message: 'Library successfully uploaded!' });
     } catch (error) {
-        logger.error('Upload failed:', error);
-        setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
+      logger.error('Upload failed:', error);
+      setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
     }
   };
 
@@ -444,61 +475,61 @@ const AppInner: React.FC = () => {
 
     setSyncStatus({ state: 'syncing', message: 'Downloading from Google Drive...' });
     try {
-        const downloadedData = await downloadLibraryFromDrive((progressMsg) => {
-            setSyncStatus({ state: 'syncing', message: progressMsg });
-        });
+      const downloadedData = await downloadLibraryFromDrive((progressMsg) => {
+        setSyncStatus({ state: 'syncing', message: progressMsg });
+      });
 
-        if (!downloadedData) {
-          throw new Error("No data found in Google Drive.");
+      if (!downloadedData) {
+        throw new Error('No data found in Google Drive.');
+      }
+
+      setSyncStatus({ state: 'syncing', message: 'Clearing local library...' });
+      await db.clearAllBooks();
+
+      // Clear all localStorage data managed by the app
+      Object.keys(localStorage)
+        .filter(key => key.startsWith('ebook-reader-'))
+        .forEach(key => localStorage.removeItem(key));
+
+      setSyncStatus({ state: 'syncing', message: 'Importing downloaded library...' });
+
+      // Restore metadata
+      localStorage.setItem('ebook-catalogs', JSON.stringify(downloadedData.payload.catalogs || []));
+      localStorage.setItem('ebook-reader-settings-global', JSON.stringify(downloadedData.payload.settings || {}));
+
+      for (const book of downloadedData.booksWithData) {
+        await db.saveBook(book);
+        if (book.id) {
+          const bookId = book.id;
+          if (downloadedData.payload.bookmarks[bookId]) {
+            localStorage.setItem(`ebook-reader-bookmarks-${bookId}`, JSON.stringify(downloadedData.payload.bookmarks[bookId]));
+          }
+          if (downloadedData.payload.citations[bookId]) {
+            localStorage.setItem(`ebook-reader-citations-${bookId}`, JSON.stringify(downloadedData.payload.citations[bookId]));
+          }
+          if (downloadedData.payload.positions[bookId]) {
+            localStorage.setItem(`ebook-reader-pos-${bookId}`, downloadedData.payload.positions[bookId]!);
+          }
         }
+      }
+      localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
+      setSyncStatus({ state: 'success', message: 'Library successfully downloaded! Reloading app...' });
 
-        setSyncStatus({ state: 'syncing', message: 'Clearing local library...' });
-        await db.clearAllBooks();
-        
-        // Clear all localStorage data managed by the app
-        Object.keys(localStorage)
-          .filter(key => key.startsWith('ebook-reader-'))
-          .forEach(key => localStorage.removeItem(key));
-        
-        setSyncStatus({ state: 'syncing', message: 'Importing downloaded library...' });
-        
-        // Restore metadata
-        localStorage.setItem('ebook-catalogs', JSON.stringify(downloadedData.payload.catalogs || []));
-        localStorage.setItem('ebook-reader-settings-global', JSON.stringify(downloadedData.payload.settings || {}));
-
-        for (const book of downloadedData.booksWithData) {
-            await db.saveBook(book);
-            if (book.id) {
-                const bookId = book.id;
-                if (downloadedData.payload.bookmarks[bookId]) {
-                    localStorage.setItem(`ebook-reader-bookmarks-${bookId}`, JSON.stringify(downloadedData.payload.bookmarks[bookId]));
-                }
-                if (downloadedData.payload.citations[bookId]) {
-                    localStorage.setItem(`ebook-reader-citations-${bookId}`, JSON.stringify(downloadedData.payload.citations[bookId]));
-                }
-                if (downloadedData.payload.positions[bookId]) {
-                    localStorage.setItem(`ebook-reader-pos-${bookId}`, downloadedData.payload.positions[bookId]!);
-                }
-            }
-        }
-        localStorage.setItem('ebook-reader-last-sync', new Date().toISOString());
-        setSyncStatus({ state: 'success', message: 'Library successfully downloaded! Reloading app...' });
-
-        // Reload to apply all changes cleanly
-        setTimeout(() => window.location.reload(), 2000);
+      // Reload to apply all changes cleanly
+      setTimeout(() => window.location.reload(), 2000);
 
     } catch (error) {
-        logger.error('Download failed:', error);
-        setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
+      logger.error('Download failed:', error);
+      setSyncStatus({ state: 'error', message: error instanceof Error ? error.message : 'An unknown error occurred.' });
     }
   };
 
 
   const renderView = () => {
-    switch(currentView) {
+    switch (currentView) {
       case 'reader':
         return selectedBookId !== null && (
-          <ErrorBoundary 
+          <ErrorBoundary
             onReset={handleCloseReader}
             fallbackMessage="There was an error while trying to display this book. Returning to the library."
           >
@@ -559,7 +590,7 @@ const AppInner: React.FC = () => {
     <div className="min-h-screen bg-slate-900 font-sans">
       <SplashScreen isVisible={showSplash} />
       {!showSplash && renderView()}
-      <SettingsModal 
+      <SettingsModal
         isOpen={isCloudSyncModalOpen}
         onClose={() => setIsCloudSyncModalOpen(false)}
         onUploadToDrive={handleUploadToDrive}

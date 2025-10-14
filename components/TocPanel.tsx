@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+
 import './toc-panel.css';
-import { TocItem, Bookmark, Citation, ReaderSettings, BookRecord } from '../types';
+import type { TocItem, Bookmark, Citation, ReaderSettings, BookRecord } from '../types';
+
 import { CloseIcon, ChevronRightIcon, TrashIcon, ExportIcon } from './icons';
 
 interface NavigationPanelProps {
@@ -41,7 +43,7 @@ const formatAuthorName = (authorName: string, format: 'apa' | 'mla' | 'chicago' 
 
 const generateCitation = (
     book: BookRecord,
-    format: 'apa' | 'mla' | 'chicago'
+    format: 'apa' | 'mla' | 'chicago',
 ): { pre: string; title: string; post: string; isItalic: boolean } => {
     const author = book.author || 'Unknown Author';
     const title = book.title || 'Untitled Book';
@@ -161,7 +163,7 @@ const TocPanel: React.FC<NavigationPanelProps> = ({
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/60 z-30" onClick={onClose} aria-hidden="true"></div>
+            <div className="fixed inset-0 bg-black/60 z-30" onClick={onClose} aria-hidden="true" />
             <div
                 className={`fixed top-0 left-0 h-full w-80 bg-slate-800 shadow-2xl z-40 transform transition-transform duration-300 ease-in-out flex flex-col ${
                     isOpen ? 'translate-x-0' : '-translate-x-full'

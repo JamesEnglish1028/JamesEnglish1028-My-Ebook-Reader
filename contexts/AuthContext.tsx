@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import { GoogleUser } from '../types';
+
 import { initGoogleClient, revokeToken } from '../services/google';
+import type { GoogleUser } from '../types';
 
 interface AuthContextType {
   user: GoogleUser | null;
@@ -48,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (window.gapi?.client) {
           window.gapi.client.setToken({ access_token: accessToken });
       } else {
-          console.warn("gapi.client not ready when fetching profile.");
+          console.warn('gapi.client not ready when fetching profile.');
       }
       
       setUser({
@@ -58,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
     } catch (error) {
-      console.error("Token validation/profile fetch failed:", error);
+      console.error('Token validation/profile fetch failed:', error);
       signOut(); // If profile fetch fails, the token is invalid/expired. Sign out.
     }
   }, [signOut]);
@@ -77,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTokenClient(client);
         setIsInitialized(true); // Signal that client and GAPI are ready
       } catch (error) {
-        console.error("Error initializing Google Client:", error);
+        console.error('Error initializing Google Client:', error);
         setIsInitialized(true); // Still mark as initialized to not block app
       }
     };

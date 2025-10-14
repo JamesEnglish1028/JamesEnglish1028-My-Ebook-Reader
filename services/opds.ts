@@ -1,6 +1,8 @@
-import { CatalogBook, CatalogNavigationLink, CatalogPagination, Category, CategorizationMode, AudienceMode, FictionMode, MediaMode, CollectionMode, CatalogWithCategories, CatalogWithCollections, CollectionGroup, Series, Collection, CategoryLane } from '../types';
-import { proxiedUrl, maybeProxyForCors } from './utils';
+import type { CatalogBook, CatalogNavigationLink, CatalogPagination, Category, CategorizationMode, AudienceMode, FictionMode, MediaMode, CollectionMode, CatalogWithCategories, CatalogWithCollections, CollectionGroup, Series, Collection} from '../types';
+import { CategoryLane } from '../types';
+
 import { logger } from './logger';
+import { proxiedUrl, maybeProxyForCors } from './utils';
 // NOTE: prefer a static import for `maybeProxyForCors` instead of a dynamic import
 // because static imports keep bundling deterministic and avoid creating a
 // separate dynamic chunk for a small utility module. This prevents Vite from
@@ -60,7 +62,7 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
                 const chunks: Uint8Array[] = [];
                 let total = 0;
                 while (true) {
-                    // eslint-disable-next-line no-await-in-loop
+                     
                     const { done, value } = await reader.read();
                     if (done) break;
                     if (value) {
@@ -162,14 +164,14 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
 
     const errorNode = xmlDoc.querySelector('parsererror');
     if (errorNode) {
-      console.error("XML Parsing Error:", errorNode.textContent);
+      console.error('XML Parsing Error:', errorNode.textContent);
       throw new Error('Failed to parse catalog feed. The URL may not point to a valid OPDS feed, or the response was not valid XML.');
     }
 
     // Add check for the root <feed> element to validate it's an Atom feed.
     const rootNodeName = xmlDoc.documentElement?.nodeName;
     if (!rootNodeName || (rootNodeName.toLowerCase() !== 'feed' && !rootNodeName.endsWith(':feed'))) {
-        throw new Error("Invalid Atom/OPDS feed. The XML document is missing the root <feed> element.");
+        throw new Error('Invalid Atom/OPDS feed. The XML document is missing the root <feed> element.');
     }
 
     const entries = Array.from(xmlDoc.querySelectorAll('entry'));
@@ -292,7 +294,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   return {
                       scheme,
                       term,
-                      label: label || term // Use label if available, otherwise fall back to term
+                      label: label || term, // Use label if available, otherwise fall back to term
                   };
               }
               return null;
@@ -310,7 +312,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
               if (href && title) {
                   return {
                       title: title.trim(),
-                      href: new URL(href, baseUrl).href
+                      href: new URL(href, baseUrl).href,
                   };
               }
               return null;
@@ -340,7 +342,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                   categories: categories.length > 0 ? categories : undefined,
                   format,
                   acquisitionMediaType: finalMediaType || undefined,
-                  collections: collections.length > 0 ? collections : undefined
+                  collections: collections.length > 0 ? collections : undefined,
               });
           }
       } else if (subsectionLink) {
@@ -371,18 +373,18 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
             navLinks.push({ 
                 title, 
                 url: href, 
-                rel: 'collection' 
+                rel: 'collection', 
             });
         });
     }
 
     // Add check to see if a valid Atom feed contains no OPDS content.
     if (entries.length > 0 && books.length === 0 && navLinks.length === 0) {
-        throw new Error("This appears to be a valid Atom feed, but it contains no recognizable OPDS book entries or navigation links. Please ensure the URL points to an OPDS catalog.");
+        throw new Error('This appears to be a valid Atom feed, but it contains no recognizable OPDS book entries or navigation links. Please ensure the URL points to an OPDS catalog.');
     }
 
     return { books, navLinks, pagination };
-}
+};
 
 export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
     if (!jsonData || typeof jsonData !== 'object') {
@@ -473,7 +475,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     if (belongsTo.name) {
                         series = {
                             name: belongsTo.name.trim(),
-                            position: typeof belongsTo.position === 'number' ? belongsTo.position : undefined
+                            position: typeof belongsTo.position === 'number' ? belongsTo.position : undefined,
                         };
                     }
                 }
@@ -490,7 +492,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     subjects: subjects.length > 0 ? subjects : undefined,
                     series,
                     format,
-                    acquisitionMediaType: mimeType || undefined
+                    acquisitionMediaType: mimeType || undefined,
                 });
             }
         });
@@ -527,7 +529,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     }
 
     return { books, navLinks, pagination };
-}
+};
 
 export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVersion: 'auto' | '1' | '2' = 'auto'): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
@@ -567,8 +569,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             mode: 'cors',
             credentials: isDirectFetch ? 'include' : 'omit',
             headers: {
-                'Accept': acceptHeader
-            }
+                'Accept': acceptHeader,
+            },
         });
 
         // Diagnostic: log the initial response status and Content-Type as observed
@@ -589,8 +591,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             const proxiedResp = await fetch(proxyFetchUrl, {
                 method: 'GET',
                 headers: {
-                    'Accept': acceptHeader
-                }
+                    'Accept': acceptHeader,
+                },
             });
             // Replace response with proxied response for parsing below
             if (proxiedResp) {
@@ -642,7 +644,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                             }
                         }
                         const b64 = await captureFirstBytes(proxiedResp).catch(() => '');
-                        // eslint-disable-next-line no-console
+                         
                         console.warn('[mebooks] Failed to JSON.parse proxied response; first bytes (base64):', b64);
                         throw new Error(`Failed to parse proxied JSON response for ${url}. First bytes (base64): ${b64}`);
                     }
@@ -727,7 +729,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                     }
                 }
                 const b64 = await captureFirstBytes(response).catch(() => '');
-                // eslint-disable-next-line no-console
+                 
                 console.warn('[mebooks] Failed to JSON.parse response; first bytes (base64):', b64);
                 throw new Error(`Failed to parse JSON response for ${url}. First bytes (base64): ${b64}`);
             }
@@ -747,7 +749,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             throw new Error(`Unsupported or ambiguous catalog format. Content-Type: "${contentType}".`);
         }
     } catch (error) {
-        console.error("Error fetching or parsing catalog content:", error);
+        console.error('Error fetching or parsing catalog content:', error);
         let message: string;
 
         if (error instanceof TypeError) {
@@ -759,7 +761,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                  message = `A network error occurred: ${error.message}`;
             }
         } else if (error instanceof SyntaxError) {
-            message = "Failed to parse the catalog feed. The response was not valid JSON or XML.";
+            message = 'Failed to parse the catalog feed. The response was not valid JSON or XML.';
         } else if (error instanceof Error) {
             message = error.message; // Fallback for other generic errors
         } else {
@@ -1034,7 +1036,7 @@ export const filterBooksByAudience = (books: CatalogBook[], audienceMode: Audien
         // Check categories for audience information
         if (book.categories && book.categories.length > 0) {
             const audienceCategories = book.categories.filter(cat => 
-                cat.scheme.includes('audience') || cat.scheme.includes('target-age')
+                cat.scheme.includes('audience') || cat.scheme.includes('target-age'),
             );
             
             if (audienceCategories.length > 0) {
@@ -1157,7 +1159,7 @@ export const filterBooksByFiction = (books: CatalogBook[], fictionMode: FictionM
         // Check categories for fiction classification
         if (book.categories && book.categories.length > 0) {
             const fictionCategories = book.categories.filter(cat => 
-                cat.scheme.includes('fiction') || cat.scheme.includes('genre') || cat.scheme.includes('bisac')
+                cat.scheme.includes('fiction') || cat.scheme.includes('genre') || cat.scheme.includes('bisac'),
             );
             
             if (fictionCategories.length > 0) {
@@ -1183,10 +1185,10 @@ export const filterBooksByFiction = (books: CatalogBook[], fictionMode: FictionM
                                              'self-help', 'health', 'business', 'politics', 'economics'];
                     
                     const hasFictionGenre = fictionGenres.some(genre => 
-                        label.includes(genre) || term.includes(genre)
+                        label.includes(genre) || term.includes(genre),
                     );
                     const hasNonFictionGenre = nonFictionGenres.some(genre => 
-                        label.includes(genre) || term.includes(genre)
+                        label.includes(genre) || term.includes(genre),
                     );
                     
                     if (hasNonFictionGenre) return false;
@@ -1269,10 +1271,10 @@ export const getAvailableFictionModes = (books: CatalogBook[]): FictionMode[] =>
                                              'self-help', 'health', 'business', 'politics', 'economics'];
                     
                     const hasFictionGenre = fictionGenres.some(genre => 
-                        label.includes(genre) || term.includes(genre)
+                        label.includes(genre) || term.includes(genre),
                     );
                     const hasNonFictionGenre = nonFictionGenres.some(genre => 
-                        label.includes(genre) || term.includes(genre)
+                        label.includes(genre) || term.includes(genre),
                     );
                     
                     if (hasFictionGenre) hasFiction = true;
@@ -1382,7 +1384,7 @@ export const filterBooksByCollection = (books: CatalogBook[], collectionMode: Co
     
     // Check if this collection exists as a navigation link
     const collectionNavLink = navLinks.find(link => 
-        (link.rel === 'collection' || link.rel === 'subsection') && link.title === collectionMode
+        (link.rel === 'collection' || link.rel === 'subsection') && link.title === collectionMode,
     );
     
     // If it's a navigation-based collection, we should navigate rather than filter
@@ -1509,7 +1511,7 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
                 if (!categoryMap.has(key)) {
                     categoryMap.set(key, {
                         category,
-                        books: []
+                        books: [],
                     });
                 }
                 categoryMap.get(key)!.books.push(book);
@@ -1522,14 +1524,14 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
                 const syntheticCategory: Category = {
                     scheme: 'http://palace.io/subjects',
                     term: subject.toLowerCase().replace(/\s+/g, '-'),
-                    label: subject
+                    label: subject,
                 };
                 
                 const key = `${syntheticCategory.scheme}|${syntheticCategory.label}`;
                 if (!categoryMap.has(key)) {
                     categoryMap.set(key, {
                         category: syntheticCategory,
-                        books: []
+                        books: [],
                     });
                 }
                 categoryMap.get(key)!.books.push(book);
@@ -1573,7 +1575,7 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
         
         return {
             ...categoryGroup,
-            books: sortedBooks
+            books: sortedBooks,
         };
     });
     const collectionLinks = Array.from(collectionLinksSet).map(json => JSON.parse(json));
@@ -1584,7 +1586,7 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
         pagination,
         categoryLanes,
         collectionLinks,
-        uncategorizedBooks
+        uncategorizedBooks,
     };
 };
 
@@ -1629,9 +1631,9 @@ export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogN
     const collections: CollectionGroup[] = Array.from(collectionMap.entries()).map(([title, books]) => ({
         collection: {
             title: title,
-            href: books[0]?.collections?.find(c => c.title === title)?.href || ''
+            href: books[0]?.collections?.find(c => c.title === title)?.href || '',
         },
-        books
+        books,
     }));
     
     return {
@@ -1639,7 +1641,7 @@ export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogN
         navLinks,
         pagination,
         collections,
-        uncategorizedBooks
+        uncategorizedBooks,
     };
 };
 
@@ -1657,7 +1659,7 @@ export const groupBooksByCategories = (books: CatalogBook[], navLinks: CatalogNa
                 if (!categoryMap.has(key)) {
                     categoryMap.set(key, {
                         category,
-                        books: []
+                        books: [],
                     });
                 }
                 categoryMap.get(key)!.books.push(book);
@@ -1678,7 +1680,7 @@ export const groupBooksByCategories = (books: CatalogBook[], navLinks: CatalogNa
         pagination,
         categoryLanes,
         collectionLinks: [],
-        uncategorizedBooks
+        uncategorizedBooks,
     };
 };
 
@@ -1716,9 +1718,9 @@ export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: C
             category: {
                 scheme: 'http://opds-spec.org/collection',
                 term,
-                label: title
+                label: title,
             },
-            books
+            books,
         };
     });
     
@@ -1740,6 +1742,6 @@ export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: C
         pagination,
         categoryLanes,
         collectionLinks,
-        uncategorizedBooks
+        uncategorizedBooks,
     };
 };

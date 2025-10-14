@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+
 import { db } from '../services/db';
-import { CloseIcon, TrashIcon } from './icons';
+
 import { useConfirm } from './ConfirmContext';
+import { CloseIcon, TrashIcon } from './icons';
 
 interface LocalStorageModalProps {
   isOpen: boolean;
@@ -25,7 +27,7 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
   const handleClearLibrary = () => {
     (async () => {
       // Snapshot current library and localStorage keys managed by the app so we can restore on undo
-      let snapshot: { books: any[]; localStorageEntries: Record<string, string | null> } = { books: [], localStorageEntries: {} };
+      const snapshot: { books: any[]; localStorageEntries: Record<string, string | null> } = { books: [], localStorageEntries: {} };
       try {
         snapshot.books = await db.getAllBooks();
         Object.keys(localStorage)

@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { useAuth } from '../contexts/AuthContext';
+
 import { CloseIcon, UploadIcon, DownloadIcon } from './icons';
 import Spinner from './Spinner';
 

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { CatalogBook, CategoryLane as CategoryLaneType } from '../types';
+
 import { proxiedUrl } from '../services/utils';
+import type { CatalogBook, CategoryLane as CategoryLaneType } from '../types';
 import './collection-lane.css';
 
 interface CategoryLaneProps {
@@ -10,7 +11,7 @@ interface CategoryLaneProps {
 
 export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
   categoryLane,
-  onBookClick
+  onBookClick,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 

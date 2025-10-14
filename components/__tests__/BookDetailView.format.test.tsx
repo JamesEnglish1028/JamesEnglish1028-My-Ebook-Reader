@@ -1,15 +1,17 @@
-import { describe, it, expect } from 'vitest';
 import React from 'react';
+
 import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+
 import '@testing-library/jest-dom';
+import type { CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
-import { CatalogBook } from '../../types';
 
 const baseProps = {
   onBack: () => {},
   onReadBook: () => {},
   importStatus: { isLoading: false, message: '', error: null },
-  setImportStatus: () => {}
+  setImportStatus: () => {},
 } as any;
 
 describe('BookDetailView format badge and import button', () => {
@@ -21,7 +23,7 @@ describe('BookDetailView format badge and import button', () => {
       downloadUrl: 'https://example.org/p/book.pdf',
       summary: 'A PDF book',
       providerId: 'p1',
-      format: 'PDF'
+      format: 'PDF',
     };
 
     render(<BookDetailView {...baseProps} book={book} source="catalog" onImportFromCatalog={async () => ({ success: false })} />);
@@ -41,7 +43,7 @@ describe('BookDetailView format badge and import button', () => {
       downloadUrl: 'https://example.org/p/book.epub',
       summary: 'An EPUB book',
       providerId: 'p2',
-      format: 'EPUB'
+      format: 'EPUB',
     };
 
     render(<BookDetailView {...baseProps} book={book} source="catalog" onImportFromCatalog={async () => ({ success: false })} />);

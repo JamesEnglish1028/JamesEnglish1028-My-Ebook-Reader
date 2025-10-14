@@ -1,4 +1,5 @@
-import { SyncPayload, BookRecord } from '../types';
+import type { SyncPayload, BookRecord } from '../types';
+
 import { logger } from './logger';
 
 // IMPORTANT: Replace with your actual Google Client ID from the Google Cloud Console.
@@ -57,7 +58,7 @@ export const initGoogleClient = (callback: (resp: any) => void): Promise<any> =>
                 resolve(tokenClient);
             });
         } catch(error) {
-            logger.error("Error during Google Client initialization:", error);
+            logger.error('Error during Google Client initialization:', error);
             reject(error);
         }
     });
@@ -117,7 +118,7 @@ const updateFile = async (fileId: string, fileData: Blob | ArrayBuffer, mimeType
     const result = await response.json();
     if (result.error) throw new Error(result.error.message);
     return result;
-}
+};
 
 
 export const uploadLibraryToDrive = async (payload: SyncPayload, books: BookRecord[], onProgress: (message: string) => void) => {
@@ -199,7 +200,7 @@ export const downloadLibraryFromDrive = async (onProgress: (message: string) => 
             
             const accessToken = window.gapi.client.getToken().access_token;
             const response = await fetch(`https://www.googleapis.com/drive/v3/files/${bookFileId}?alt=media`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
+                headers: { 'Authorization': `Bearer ${accessToken}` },
             });
 
             if (!response.ok) {

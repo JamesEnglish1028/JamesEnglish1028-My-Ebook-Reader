@@ -1,19 +1,23 @@
-import { describe, test, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { vi } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { describe, test, expect, vi, afterEach } from 'vitest';
+
+import type { CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
-import { CatalogBook } from '../../types';
 
 // Mock the ToastContext
 const mockUseToast = vi.fn(() => ({
-  showToast: vi.fn()
+  showToast: vi.fn(),
 }));
 
 vi.mock('../toast/ToastContext', () => ({
-  useToast: () => mockUseToast()
+  useToast: () => mockUseToast(),
 }));
 
 describe('BookDetailView Distributor Display Integration', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   test('displays distributor information for catalog books in UI', () => {
     // Create a catalog book with distributor (exactly like what comes from OPDS parsing)
     const catalogBookWithDistributor: CatalogBook = {
@@ -27,7 +31,7 @@ describe('BookDetailView Distributor Display Integration', () => {
       publicationDate: '2024-01-01',
       subjects: ['Literature', 'Comparative Studies'],
       format: 'PDF',
-      acquisitionMediaType: 'application/pdf'
+      acquisitionMediaType: 'application/pdf',
     };
 
     const mockProps = {
@@ -38,14 +42,14 @@ describe('BookDetailView Distributor Display Integration', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     // Render the BookDetailView component
     render(<BookDetailView {...mockProps} />);
 
-    // Check that the book title is displayed
-    expect(screen.getByText('Geschichte der Komparatistik in Programmtexten')).toBeInTheDocument();
+    // Check that the book title is displayed (appears in both h1 and cover placeholder)
+    expect(screen.getAllByText('Geschichte der Komparatistik in Programmtexten').length).toBeGreaterThan(0);
 
     // Check that the Publication Details section exists
     expect(screen.getByText('Publication Details')).toBeInTheDocument();
@@ -65,7 +69,7 @@ describe('BookDetailView Distributor Display Integration', () => {
       downloadUrl: 'https://example.com/download2',
       summary: 'Another test book',
       distributor: 'BiblioBoard',
-      format: 'PDF'
+      format: 'PDF',
     };
 
     const mockProps = {
@@ -75,7 +79,7 @@ describe('BookDetailView Distributor Display Integration', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
@@ -94,7 +98,7 @@ describe('BookDetailView Distributor Display Integration', () => {
       coverImage: null,
       downloadUrl: 'https://example.com/download3',
       summary: 'Book without distributor info',
-      format: 'EPUB'
+      format: 'EPUB',
       // No distributor field
     };
 
@@ -105,7 +109,7 @@ describe('BookDetailView Distributor Display Integration', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);

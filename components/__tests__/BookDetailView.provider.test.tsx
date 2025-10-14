@@ -1,19 +1,23 @@
-import { describe, test, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { vi } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { describe, test, expect, vi, afterEach } from 'vitest';
+
+import type { CatalogBook, BookMetadata } from '../../types';
 import BookDetailView from '../BookDetailView';
-import { CatalogBook, BookMetadata } from '../../types';
 
 // Mock the ToastContext
 const mockUseToast = vi.fn(() => ({
-  showToast: vi.fn()
+  showToast: vi.fn(),
 }));
 
 vi.mock('../toast/ToastContext', () => ({
-  useToast: () => mockUseToast()
+  useToast: () => mockUseToast(),
 }));
 
 describe('BookDetailView Distributor as Provider Integration', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   test('displays distributor as provider name for catalog books', () => {
     const catalogBookWithDistributor: CatalogBook = {
       title: 'Test OAPEN Book',
@@ -23,7 +27,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       summary: 'A test book from OAPEN',
       distributor: 'OAPEN', // This should show as provider
       providerId: 'test-123',
-      format: 'PDF'
+      format: 'PDF',
     };
 
     const mockProps = {
@@ -33,7 +37,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
@@ -55,7 +59,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       providerId: 'lib-456',
       providerName: 'My Library Provider',
       distributor: 'OAPEN', // Library books should use providerName, not distributor
-      format: 'EPUB'
+      format: 'EPUB',
     };
 
     const mockProps = {
@@ -65,7 +69,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
@@ -89,7 +93,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       downloadUrl: 'https://example.com/download',
       summary: 'Book without distributor',
       providerId: 'no-dist-123',
-      format: 'EPUB'
+      format: 'EPUB',
     };
 
     const mockProps = {
@@ -99,7 +103,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
       importStatus: { isLoading: false, message: '', error: null },
-      setImportStatus: vi.fn()
+      setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);

@@ -1,8 +1,10 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+
 import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
+import type { ReaderSettings } from '../../types';
 import TocPanel from '../TocPanel';
-import { ReaderSettings } from '../../types';
 
 const mockSettings: ReaderSettings = {
   fontSize: 100,
@@ -10,7 +12,7 @@ const mockSettings: ReaderSettings = {
   flow: 'paginated',
   fontFamily: 'Original',
   citationFormat: 'apa',
-  readAloud: { voiceURI: null, rate: 0.9, pitch: 1, volume: 1 }
+  readAloud: { voiceURI: null, rate: 0.9, pitch: 1, volume: 1 },
 };
 
 const nestedToc = [
@@ -18,10 +20,10 @@ const nestedToc = [
     id: '1', href: 'c1.html', label: 'C1',
     subitems: [
       { id: '1.1', href: 'c1-1.html', label: 'C1.1', subitems: [
-        { id: '1.1.1', href: 'c1-1-1.html', label: 'C1.1.1' }
-      ] }
-    ]
-  }
+        { id: '1.1.1', href: 'c1-1-1.html', label: 'C1.1.1' },
+      ] },
+    ],
+  },
 ];
 
 describe('TocPanel nested behaviour', () => {

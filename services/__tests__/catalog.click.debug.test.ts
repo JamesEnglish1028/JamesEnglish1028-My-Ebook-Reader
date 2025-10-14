@@ -1,7 +1,9 @@
-import { describe, test, expect } from 'vitest';
-import { parseOpds1Xml } from '../opds';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import { describe, test, expect } from 'vitest';
+
+import { parseOpds1Xml } from '../opds';
 
 describe('OPDS 1 Catalog Book Click Debug', () => {
   test('verifies complete catalog navigation flow with real Palace data', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { fetchOpds2Feed, setCachedEtag, getCachedEtag } from '../opds2';
 
 describe('fetchOpds2Feed', () => {
@@ -26,7 +27,7 @@ describe('fetchOpds2Feed', () => {
       return {
         status: 304,
         headers: { get: (k: string) => null },
-        text: async () => ''
+        text: async () => '',
       };
     });
 
@@ -45,7 +46,7 @@ describe('fetchOpds2Feed', () => {
       return {
         status: 200,
         headers: { get: (k: string) => k.toLowerCase() === 'etag' ? '"etag-200"' : (k.toLowerCase() === 'content-type' ? 'application/opds+json' : null) },
-        text: async () => body
+        text: async () => body,
       };
     });
     (globalThis as any).fetch = mockFetch;

@@ -1,9 +1,11 @@
 import React from 'react';
+
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, test, expect } from 'vitest';
+
 import { ToastProvider, useToast } from '../toast/ToastContext';
 import ToastStack from '../toast/ToastStack';
-import { describe, test, expect } from 'vitest';
 
 const TestHarness: React.FC = () => {
   const toast = useToast();
@@ -20,7 +22,7 @@ describe('ToastStack', () => {
     render(
       <ToastProvider>
         <TestHarness />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     const btn = screen.getByRole('button', { name: /push/i });

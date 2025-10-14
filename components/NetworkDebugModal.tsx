@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { proxiedUrl, maybeProxyForCors, isDebug } from '../services/utils';
 
 const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {

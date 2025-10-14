@@ -1,7 +1,9 @@
 import React from 'react';
+
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { describe, it, expect } from 'vitest';
+
 import OpdsCredentialsModal from '../OpdsCredentialsModal';
 
 describe('OpdsCredentialsModal authDocument rendering', () => {
@@ -14,7 +16,7 @@ describe('OpdsCredentialsModal authDocument rendering', () => {
       username_hint: 'library-card-number',
       password_hint: '4-digit PIN',
       username_placeholder: 'Card number',
-      password_placeholder: 'PIN'
+      password_placeholder: 'PIN',
     };
 
     render(<OpdsCredentialsModal isOpen={true} host={'minotaur.dev'} authDocument={authDoc} onClose={() => {}} onSubmit={() => {}} />);

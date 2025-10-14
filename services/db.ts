@@ -1,9 +1,7 @@
-import { BookRecord, BookMetadata } from '../types';
-import { logger } from './logger';
+import { DB_INDEXES, DB_NAME, DB_VERSION, STORE_NAME } from '../constants';
+import type { BookMetadata, BookRecord } from '../types';
 
-const DB_NAME = 'EbookReaderDB';
-const STORE_NAME = 'books';
-const DB_VERSION = 3;
+import { logger } from './logger';
 
 let dbInstance: IDBDatabase | null = null;
 
@@ -31,25 +29,25 @@ const init = (): Promise<IDBDatabase> => {
       let store: IDBObjectStore;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('title', 'title', { unique: false });
+        store.createIndex(DB_INDEXES.TITLE, DB_INDEXES.TITLE, { unique: false });
       } else {
         const transaction = (event.target as IDBOpenDBRequest).transaction;
         if (transaction) {
-            store = transaction.objectStore(STORE_NAME);
+          store = transaction.objectStore(STORE_NAME);
         } else {
-             // This case should not happen in a normal onupgradeneeded event
-             return;
+          // This case should not happen in a normal onupgradeneeded event
+          return;
         }
       }
 
       if (event.oldVersion < 2) {
-        if (!store.indexNames.contains('isbn')) {
-            store.createIndex('isbn', 'isbn', { unique: false });
+        if (!store.indexNames.contains(DB_INDEXES.ISBN)) {
+          store.createIndex(DB_INDEXES.ISBN, DB_INDEXES.ISBN, { unique: false });
         }
       }
       if (event.oldVersion < 3) {
-        if (!store.indexNames.contains('providerId')) {
-            store.createIndex('providerId', 'providerId', { unique: false });
+        if (!store.indexNames.contains(DB_INDEXES.PROVIDER_ID)) {
+          store.createIndex(DB_INDEXES.PROVIDER_ID, DB_INDEXES.PROVIDER_ID, { unique: false });
         }
       }
     };
@@ -162,43 +160,43 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
 
 
 const findBookByIdentifier = async (identifier: string): Promise<BookRecord | null> => {
-    if (!identifier) return null;
-    const db = await init();
+  if (!identifier) return null;
+  const db = await init();
 
-    const search = (indexName: 'providerId' | 'isbn'): Promise<BookRecord | null> => {
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = db.transaction(STORE_NAME, 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                if (!store.indexNames.contains(indexName)) {
-                    resolve(null);
-                    return;
-                }
-                const index = store.index(indexName);
-                const request = index.get(identifier);
+  const search = (indexName: 'providerId' | 'isbn'): Promise<BookRecord | null> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        if (!store.indexNames.contains(indexName)) {
+          resolve(null);
+          return;
+        }
+        const index = store.index(indexName);
+        const request = index.get(identifier);
 
-                request.onsuccess = () => {
-                    resolve((request.result as BookRecord) || null);
-                };
-                request.onerror = () => {
-                    logger.error(`Error finding book by ${indexName}:`, request.error);
-                    reject(`Error finding book by ${indexName}`);
-                };
-            } catch (e) {
-                logger.error(`Error initiating search on index ${indexName}:`, e);
-                resolve(null);
-            }
-        });
-    };
-    
-    // First, try searching by the new `providerId` field.
-    const byProviderId = await search('providerId');
-    if (byProviderId) {
-        return byProviderId;
-    }
+        request.onsuccess = () => {
+          resolve((request.result as BookRecord) || null);
+        };
+        request.onerror = () => {
+          logger.error(`Error finding book by ${indexName}:`, request.error);
+          reject(`Error finding book by ${indexName}`);
+        };
+      } catch (e) {
+        logger.error(`Error initiating search on index ${indexName}:`, e);
+        resolve(null);
+      }
+    });
+  };
 
-    // If not found, fall back to searching by the old `isbn` field for backward compatibility.
-    return search('isbn');
+  // First, try searching by the new `providerId` field.
+  const byProviderId = await search('providerId');
+  if (byProviderId) {
+    return byProviderId;
+  }
+
+  // If not found, fall back to searching by the old `isbn` field for backward compatibility.
+  return search('isbn');
 };
 
 const deleteBook = async (id: number): Promise<void> => {
