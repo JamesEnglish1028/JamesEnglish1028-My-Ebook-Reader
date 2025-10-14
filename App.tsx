@@ -303,6 +303,8 @@ const AppInner: React.FC = () => {
       // Skip resolution for open-access books (no authentication required)
       let finalUrl = book.downloadUrl;
       
+      logger.info('Book isOpenAccess flag:', book.isOpenAccess, 'for book:', book.title);
+      
       if (!book.isOpenAccess) {
         // Try to resolve acquisition chain with stored credentials
         const cred = await findCredentialForUrl(book.downloadUrl);
@@ -331,7 +333,7 @@ const AppInner: React.FC = () => {
         logger.info('Skipping acquisition chain resolution for open-access book:', book.title);
       }
 
-      const proxyUrl = await maybeProxyForCors(finalUrl);
+      const proxyUrl = await maybeProxyForCors(finalUrl, book.isOpenAccess === true);
       const storedCred = await findCredentialForUrl(book.downloadUrl);
       const downloadHeaders: Record<string, string> = {};
       if (storedCred) {

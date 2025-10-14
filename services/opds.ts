@@ -205,10 +205,22 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
       
       // Find acquisition links for downloadable books - prefer open-access, then specific media types
       // Open-access links don't require authentication
+      
+      // Debug: Log all link rels
+      allLinks.forEach((link, idx) => {
+        const rel = link.getAttribute('rel') || '';
+        const href = link.getAttribute('href') || '';
+        console.log(`[OPDS1] Link ${idx} rel:`, rel, 'href:', href);
+      });
+      
       const openAccessLink = allLinks.find(link => {
           const rel = link.getAttribute('rel') || '';
           return rel.includes('/open-access') || rel === 'http://opds-spec.org/acquisition/open-access';
       });
+      
+      if (openAccessLink) {
+        console.log('[OPDS1] Found open-access link:', openAccessLink.getAttribute('href'));
+      }
       
       const acquisitionLink = openAccessLink || allLinks.find(link => {
           const rel = link.getAttribute('rel') || '';

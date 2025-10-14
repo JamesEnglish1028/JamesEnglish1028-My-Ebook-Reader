@@ -151,8 +151,9 @@ export const proxiedUrl = (url: string): string => {
  *   not support HEAD (405); in that case we fall back to using the proxy.
  * - Browsers will perform preflight automatically when the request requires it. This
  *   helper attempts a lightweight probe so we can choose the proxy only when necessary.
+ * - For open-access content, skips the HEAD probe since authentication shouldn't be required.
  */
-export const maybeProxyForCors = async (url: string): Promise<string> => {
+export const maybeProxyForCors = async (url: string, skipProbe = false): Promise<string> => {
   // If developer explicitly requests forcing the owned proxy, respect it immediately.
   if (FORCE_PROXY) {
     try {
@@ -170,6 +171,12 @@ export const maybeProxyForCors = async (url: string): Promise<string> => {
   } catch (e) {
     console.error('Invalid URL for maybeProxyForCors:', url);
     return '';
+  }
+
+  // Skip the probe for open-access content (no authentication required)
+  if (skipProbe) {
+    console.log('[maybeProxyForCors] Skipping HEAD probe for open-access content, using proxy');
+    return proxiedUrl(url);
   }
 
   try {

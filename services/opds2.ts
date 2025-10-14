@@ -315,8 +315,14 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         if (!l || !l.href) return;
         const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
         
-        // If rel contains 'acquisition' or opds acquisition URIs, treat as acquisition link
-        const isAcq = rels.some((r: string) => r.includes('acquisition') || r === 'http://opds-spec.org/acquisition/borrow' || r === 'http://opds-spec.org/acquisition/loan');
+        // If rel contains 'acquisition' or opds acquisition URIs (including open-access), treat as acquisition link
+        const isAcq = rels.some((r: string) => 
+          r.includes('acquisition') || 
+          r === 'http://opds-spec.org/acquisition/borrow' || 
+          r === 'http://opds-spec.org/acquisition/loan' ||
+          r === 'http://opds-spec.org/acquisition/open-access' ||
+          r.includes('/open-access')
+        );
         if (isAcq) {
           const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
           acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
@@ -332,11 +338,17 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
       let chosen: typeof acquisitions[0] | undefined;
       let isOpenAccess = false;
       if (acquisitions.length > 0) {
+        // Debug: Log all acquisition link rels
+        acquisitions.forEach((a, idx) => {
+          console.log(`[OPDS2] Acquisition link ${idx} rels:`, a.rels, 'href:', a.href);
+        });
+        
         // Prefer open-access links (no authentication required)
         const openAccessLink = acquisitions.find(a => a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access'));
         if (openAccessLink) {
           chosen = openAccessLink;
           isOpenAccess = true;
+          console.log('[OPDS2] Found open-access link:', openAccessLink.href);
         } else {
           chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
             || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
