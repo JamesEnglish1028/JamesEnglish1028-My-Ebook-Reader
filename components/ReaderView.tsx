@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
-import { bookmarkService } from '../domain/reader';
+import { bookmarkService, citationService } from '../domain/reader';
 import { db } from '../services/db';
 import { getEpubViewStateForBook, saveEpubViewStateForBook ,
   getReaderSettings,
   saveReaderSettings,
-  getCitationsForBook,
-  saveCitationsForBook,
   getLastPositionForBook,
   saveLastPositionForBook,
   getLastSpokenPositionForBook,
@@ -625,7 +623,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           setBookmarks(bookmarksResult.data);
         }
         
-        setCitations(getCitationsForBook(bookId));
+        // Load citations using citationService
+        const citationsResult = citationService.findByBookId(bookId);
+        if (citationsResult.success) {
+          setCitations(citationsResult.data);
+        }
+        
         speechStartCfiRef.current = getLastSpokenPositionForBook(bookId);
         
   const startLocation = getLastPositionForBook(bookId) || await findFirstChapter(bookInstance);
@@ -1055,24 +1058,30 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       }
     }
 
-    const newCitation: Citation = {
-        id: new Date().toISOString(),
-        cfi: cfi,
-        note: note,
-        createdAt: Date.now(),
-        pageNumber: locationInfo.currentPage > 0 ? locationInfo.currentPage : undefined,
-        chapter: chapter,
-    };
-    const updatedCitations = [...citations, newCitation];
-    setCitations(updatedCitations);
-    saveCitationsForBook(bookId, updatedCitations);
+    // Add citation using citationService
+    const addResult = citationService.add(bookId, {
+      cfi: cfi,
+      note: note,
+      pageNumber: locationInfo.currentPage > 0 ? locationInfo.currentPage : undefined,
+      chapter: chapter,
+    });
+    
+    if (addResult.success) {
+      const updatedCitations = [...citations, addResult.data];
+      setCitations(updatedCitations);
+    }
+    
     setShowCitationModal(false);
   }, [bookId, citations, locationInfo.currentPage, currentChapterLabel]);
 
   const deleteCitation = useCallback((citationId: string) => {
-      const updatedCitations = citations.filter(c => c.id !== citationId);
-      setCitations(updatedCitations);
-      saveCitationsForBook(bookId, updatedCitations);
+      // Delete citation using citationService
+      const deleteResult = citationService.delete(bookId, citationId);
+      
+      if (deleteResult.success) {
+        const updatedCitations = citations.filter(c => c.id !== citationId);
+        setCitations(updatedCitations);
+      }
   }, [bookId, citations]);
 
   const isCurrentPageBookmarked = useMemo(() => bookmarks.some(b => b.cfi === currentCfi), [bookmarks, currentCfi]);
