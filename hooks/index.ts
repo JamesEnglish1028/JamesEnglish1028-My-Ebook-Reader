@@ -42,3 +42,6 @@ export type { KeyboardNavigationOptions, GridNavigationOptions } from './useKeyb
 export { useFocusTrap, useFocusManagement } from './useFocusTrap';
 export type { FocusTrapOptions } from './useFocusTrap';
 
+export { useGlobalShortcuts, registerShortcut, unregisterShortcut, getShortcutsByCategory, formatShortcut, shortcutRegistry } from './useGlobalShortcuts';
+export type { ShortcutAction, GlobalShortcutsOptions } from './useGlobalShortcuts';
+

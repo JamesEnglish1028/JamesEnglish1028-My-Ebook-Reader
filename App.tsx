@@ -17,6 +17,7 @@ import {
   OpdsCredentialsModal,
   ReaderView,
   SettingsModal,
+  ShortcutHelpModal,
   SplashScreen,
   useConfirm,
   useToast
@@ -25,6 +26,9 @@ import {
 import LibraryView from './components/library/LibraryView';
 // Import app-level components
 import { ViewRenderer, GlobalModals } from './components/app';
+
+// Hooks imports
+import { useGlobalShortcuts } from './hooks';
 
 // Service imports - using barrel exports
 import { useAuth } from './contexts/AuthContext';
@@ -103,6 +107,7 @@ const AppInner: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
   const [isLocalStorageModalOpen, setIsLocalStorageModalOpen] = useState(false);
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const { tokenClient } = useAuth();
   const [syncStatus, setSyncStatus] = useState<{
     state: 'idle' | 'syncing' | 'success' | 'error';
@@ -139,6 +144,38 @@ const AppInner: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Global keyboard shortcuts
+  useGlobalShortcuts({
+    shortcuts: [
+      {
+        key: '?',
+        description: 'Show keyboard shortcuts',
+        category: 'global',
+        action: () => setIsShortcutHelpOpen(true),
+      },
+      {
+        key: 'Escape',
+        description: 'Close active modal or return to library',
+        category: 'global',
+        action: () => {
+          // Close modals in priority order
+          if (isShortcutHelpOpen) {
+            setIsShortcutHelpOpen(false);
+          } else if (isCloudSyncModalOpen) {
+            setIsCloudSyncModalOpen(false);
+          } else if (isLocalStorageModalOpen) {
+            setIsLocalStorageModalOpen(false);
+          } else if (credentialPrompt.isOpen) {
+            setCredentialPrompt({ ...credentialPrompt, isOpen: false });
+          } else if (currentView === 'bookDetail') {
+            setCurrentView('library');
+          }
+          // Note: Reader views handle their own Escape key for UI elements
+        },
+      },
+    ],
+    enabled: !showSplash, // Disable shortcuts during splash screen
+  });
 
   const navigate = useNavigate();
 
@@ -657,6 +694,8 @@ const AppInner: React.FC = () => {
         showNetworkDebug={showNetworkDebug}
         onCloseNetworkDebug={() => setShowNetworkDebug(false)}
         onOpenNetworkDebug={() => setShowNetworkDebug(true)}
+        isShortcutHelpOpen={isShortcutHelpOpen}
+        onCloseShortcutHelp={() => setIsShortcutHelpOpen(false)}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import {
   LocalStorageModal,
   OpdsCredentialsModal,
   NetworkDebugModal,
+  ShortcutHelpModal,
 } from '..';
 
 import type { CredentialPrompt } from '../../types';
@@ -38,6 +39,10 @@ interface GlobalModalsProps {
   showNetworkDebug: boolean;
   onCloseNetworkDebug: () => void;
   onOpenNetworkDebug: () => void;
+  
+  // Shortcut help modal
+  isShortcutHelpOpen: boolean;
+  onCloseShortcutHelp: () => void;
 }
 
 /**
@@ -61,6 +66,8 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
   showNetworkDebug,
   onCloseNetworkDebug,
   onOpenNetworkDebug,
+  isShortcutHelpOpen,
+  onCloseShortcutHelp,
 }) => {
   return (
     <>
@@ -92,6 +99,12 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
       <NetworkDebugModal
         isOpen={showNetworkDebug}
         onClose={onCloseNetworkDebug}
+      />
+      
+      <ShortcutHelpModal
+        isOpen={isShortcutHelpOpen}
+        onClose={onCloseShortcutHelp}
+        activeReader={null}
       />
       
       {/* Debug floating button (visible only in debug mode) */}
