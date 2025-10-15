@@ -608,7 +608,8 @@ const AppInner: React.FC = () => {
     <div className="min-h-screen bg-slate-900 font-sans">
       <SplashScreen isVisible={showSplash} />
       {!showSplash && (
-        <ViewRenderer
+        <main id="main-content">
+          <ViewRenderer
           currentView={currentView}
           selectedBookId={selectedBookId}
           coverAnimationData={coverAnimationData}
@@ -630,6 +631,7 @@ const AppInner: React.FC = () => {
           importStatus={importStatus}
           setImportStatus={setImportStatus}
         />
+        </main>
       )}
       <GlobalModals
         isCloudSyncModalOpen={isCloudSyncModalOpen}
