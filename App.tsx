@@ -1,6 +1,6 @@
-import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider, QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
 // Styles required by react-pdf layers
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -9,24 +9,15 @@ import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-ro
 
 // Component imports - using barrel exports for cleaner code
 import {
-  AboutPage,
-  BookDetailView,
   ErrorBoundary,
-  LocalStorageModal,
-  NetworkDebugModal,
-  OpdsCredentialsModal,
-  ReaderView,
   ScreenReaderAnnouncer,
-  SettingsModal,
-  ShortcutHelpModal,
   SplashScreen,
   useConfirm,
   useToast
 } from './components';
 // Import new LibraryView from refactored structure
-import LibraryView from './components/library/LibraryView';
 // Import app-level components
-import { ViewRenderer, GlobalModals } from './components/app';
+import { GlobalModals, ViewRenderer } from './components/app';
 
 // Hooks imports
 import { useGlobalShortcuts } from './hooks';
@@ -373,24 +364,24 @@ const AppInner: React.FC = () => {
       // If this is an OPDS2 acquisition flow, attempt to resolve the acquisition chain
       // Skip resolution for open-access books (no authentication required)
       let finalUrl = book.downloadUrl;
-      
+
       logger.info('Book isOpenAccess flag:', book.isOpenAccess, 'for book:', book.title);
       logger.info('About to call maybeProxyForCors with skipProbe=', book.isOpenAccess === true, 'for URL:', finalUrl);
-      
+
       if (!book.isOpenAccess) {
         // Try to resolve acquisition chain with stored credentials
         const cred = await findCredentialForUrl(book.downloadUrl);
         const resolveResult = await opdsAcquisitionService.resolve(
-          book.downloadUrl, 
-          'auto', 
+          book.downloadUrl,
+          'auto',
           cred ? { username: cred.username, password: cred.password } : null
         );
-        
+
         if (resolveResult.success) {
           finalUrl = resolveResult.data;
         } else {
           const errorResult = resolveResult as { success: false; error: string; status?: number; proxyUsed?: boolean };
-          
+
           // If auth error (401/403), prompt for credentials and allow retry
           if (errorResult.status === 401 || errorResult.status === 403) {
             setImportStatus({ isLoading: false, message: '', error: null });
@@ -411,7 +402,7 @@ const AppInner: React.FC = () => {
       if (storedCred) {
         downloadHeaders['Authorization'] = `Basic ${btoa(`${storedCred.username}:${storedCred.password}`)}`;
       }
-      
+
       // For open-access books, try direct fetch first (with credentials for cookies)
       // If CORS blocks it, fall back to proxy
       let response: Response;
@@ -469,7 +460,7 @@ const AppInner: React.FC = () => {
     const href = credentialPrompt.pendingHref;
     try {
       const resolveResult = await opdsAcquisitionService.resolve(href, 'auto', { username, password });
-      
+
       if (resolveResult.success && credentialPrompt.pendingBook) {
         // Optionally save credential
         if (save && credentialPrompt.host) saveOpdsCredential(credentialPrompt.host, username, password);
@@ -515,11 +506,11 @@ const AppInner: React.FC = () => {
     setImportStatus({ isLoading: true, message: 'Retrying download after provider login...', error: null });
     try {
       const resolveResult = await opdsAcquisitionService.resolve(credentialPrompt.pendingHref, 'auto', null);
-      
+
       if (!resolveResult.success) {
         throw new Error('Failed to resolve after login');
       }
-      
+
       const proxyUrl = await maybeProxyForCors(resolveResult.data);
       // If the probe chose the public CORS proxy, abort and instruct the user
       // to configure an owned proxy. Public proxies (e.g., corsproxy.io) often
@@ -655,27 +646,27 @@ const AppInner: React.FC = () => {
       {!showSplash && (
         <main id="main-content">
           <ViewRenderer
-          currentView={currentView}
-          selectedBookId={selectedBookId}
-          coverAnimationData={coverAnimationData}
-          onCloseReader={handleCloseReader}
-          detailViewData={detailViewData}
-          onReturnToLibrary={handleReturnToLibrary}
-          onReadBook={handleOpenBook}
-          onImportFromCatalog={handleImportFromCatalog}
-          onOpenBook={handleOpenBook}
-          onShowBookDetail={handleShowBookDetail}
-          processAndSaveBook={processAndSaveBook}
-          activeOpdsSource={activeOpdsSource}
-          setActiveOpdsSource={setActiveOpdsSource}
-          catalogNavPath={catalogNavPath}
-          setCatalogNavPath={setCatalogNavPath}
-          onOpenCloudSyncModal={() => setIsCloudSyncModalOpen(true)}
-          onOpenLocalStorageModal={() => setIsLocalStorageModalOpen(true)}
-          onShowAbout={handleShowAbout}
-          importStatus={importStatus}
-          setImportStatus={setImportStatus}
-        />
+            currentView={currentView}
+            selectedBookId={selectedBookId}
+            coverAnimationData={coverAnimationData}
+            onCloseReader={handleCloseReader}
+            detailViewData={detailViewData}
+            onReturnToLibrary={handleReturnToLibrary}
+            onReadBook={handleOpenBook}
+            onImportFromCatalog={handleImportFromCatalog}
+            onOpenBook={handleOpenBook}
+            onShowBookDetail={handleShowBookDetail}
+            processAndSaveBook={processAndSaveBook}
+            activeOpdsSource={activeOpdsSource}
+            setActiveOpdsSource={setActiveOpdsSource}
+            catalogNavPath={catalogNavPath}
+            setCatalogNavPath={setCatalogNavPath}
+            onOpenCloudSyncModal={() => setIsCloudSyncModalOpen(true)}
+            onOpenLocalStorageModal={() => setIsLocalStorageModalOpen(true)}
+            onShowAbout={handleShowAbout}
+            importStatus={importStatus}
+            setImportStatus={setImportStatus}
+          />
         </main>
       )}
       <GlobalModals

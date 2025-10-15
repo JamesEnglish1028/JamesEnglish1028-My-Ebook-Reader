@@ -1,10 +1,12 @@
 
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 
-import type { BookMetadata, CatalogBook, CoverAnimationData, BookRecord, AuthDocument } from '../types';
+import type { AuthDocument, BookMetadata, BookRecord, CatalogBook, CoverAnimationData } from '../types';
 
+import DuplicateBookModal from './DuplicateBookModal';
 import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
+import OpdsCredentialsModal from './OpdsCredentialsModal';
 import Spinner from './Spinner';
 
 // Simple HTML sanitizer for OPDS descriptions - allows safe formatting tags but removes dangerous attributes and scripts
@@ -12,7 +14,7 @@ const sanitizeHtml = (html: string): string => {
   // Allow basic formatting tags but strip dangerous attributes and elements
   return html
     .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
-    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags  
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags
     .replace(/<object[^>]*>.*?<\/object>/gi, '') // Remove object tags
     .replace(/<embed[^>]*>/gi, '') // Remove embed tags
     .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers (onclick, onload, etc.)
@@ -21,13 +23,10 @@ const sanitizeHtml = (html: string): string => {
     .replace(/<([^>]+)\s+style\s*=\s*["'][^"']*["']/gi, '<$1') // Remove style attributes (optional - can be kept if needed)
     .trim();
 };
-import DuplicateBookModal from './DuplicateBookModal';
-import OpdsCredentialsModal from './OpdsCredentialsModal';
 
 import { bookRepository } from '../domain/book';
 import { resolveAcquisitionChainOpds1 } from '../services/opds';
-import { saveOpdsCredential, findCredentialForUrl } from '../services/opds2';
-import { db } from '../services/db';
+import { findCredentialForUrl, saveOpdsCredential } from '../services/opds2';
 import { proxiedUrl } from '../services/utils';
 
 import { useToast } from './toast/ToastContext';
@@ -44,12 +43,12 @@ interface BookDetailViewProps {
 }
 
 const isLibraryBook = (b: BookMetadata | CatalogBook): b is BookMetadata => {
-    return 'id' in b && typeof b.id === 'number';
+  return 'id' in b && typeof b.id === 'number';
 };
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
-  
+
   // Check if the created date is invalid
   if (isNaN(date.getTime())) {
     // If parsing fails, it might be a simple year or year-month string
@@ -72,7 +71,7 @@ const formatDate = (dateString: string): string => {
       timeZone: 'UTC', // Use UTC to avoid timezone shifting the month
     });
   }
-  
+
   // Handles full dates like "YYYY-MM-DD" or ISO strings
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -103,94 +102,94 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
   // Use direct cover image URL in the browser first; fall back to proxy on error.
   const coverImage = book.coverImage ? book.coverImage : null;
   const providerId = (book as any).providerId || (book as any).isbn;
-  const providerName = isLibraryBook(book) 
-    ? (book as BookMetadata).providerName 
+  const providerName = isLibraryBook(book)
+    ? (book as BookMetadata).providerName
     : (book as CatalogBook).distributor; // Use distributor as provider name for catalog books
-  
+
   const format = ('format' in book && book.format) || (isLibraryBook(book) ? 'EPUB' : undefined);
 
 
   const handleReadClick = () => {
     if (libraryBook?.id && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-         const animationData = {
-            rect: {
-                x: rect.x, y: rect.y,
-                width: rect.width, height: rect.height,
-                top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left,
-            } as DOMRect,
-            coverImage: libraryBook.coverImage,
-        };
+      const rect = containerRef.current.getBoundingClientRect();
+      const animationData = {
+        rect: {
+          x: rect.x, y: rect.y,
+          width: rect.width, height: rect.height,
+          top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left,
+        } as DOMRect,
+        coverImage: libraryBook.coverImage,
+      };
       onReadBook(libraryBook.id, animationData, libraryBook.format || 'EPUB');
     }
   };
 
   const handleAddToBookshelf = async () => {
     if (catalogBook) {
-        // If the catalog looks like a Palace/OPDS1 host and the acquisition
-        // appears to be a Palace/LCP style type, attempt to resolve the
-        // acquisition chain (may require authentication). If auth is needed,
-        // show the credentials modal and let the user retry.
-        const acqType = (catalogBook as any).acquisitionMediaType || '';
-        const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
-        const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
+      // If the catalog looks like a Palace/OPDS1 host and the acquisition
+      // appears to be a Palace/LCP style type, attempt to resolve the
+      // acquisition chain (may require authentication). If auth is needed,
+      // show the credentials modal and let the user retry.
+      const acqType = (catalogBook as any).acquisitionMediaType || '';
+      const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
+      const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
 
-        if (isPalace) {
-            setImportStatus({ isLoading: true, message: 'Resolving acquisition...', error: null });
-            setPendingCatalogBook(catalogBook);
-      try {
-  // First, try any stored credential for this host automatically
-  const stored = await findCredentialForUrl(catalogBook.downloadUrl);
-        let finalHref = null;
-        if (stored) {
-          try {
-            finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, { username: stored.username, password: stored.password });
-            // Inform the user a stored credential was used
-            try { toast.pushToast('Using saved credentials', 3000); } catch {}
-          } catch (e) {
-            // Stored credentials failed; we'll fall back to an unauthenticated attempt below
-            finalHref = null;
-          }
-        }
-
-        if (!finalHref) {
-          finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, null);
-        }
-                if (finalHref) {
-                    // Convert into a CatalogBook-like object for import flow
-                    const clone = { ...catalogBook, downloadUrl: finalHref } as CatalogBook;
-                    const result = await onImportFromCatalog(clone, catalogName);
-                    if (!result.success && result.bookRecord && result.existingBook) {
-                        setDuplicateBook(result.bookRecord);
-                        setExistingBook(result.existingBook);
-                    }
-                } else {
-                    setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
-                }
-            } catch (err: any) {
-                // If the resolver throws an error with an authDocument, surface the
-                // credentials modal and allow the user to supply credentials.
-        if (err && err.authDocument) {
-                    setCredHost((catalogBook as any).providerName || (new URL(catalogBook.downloadUrl).host));
-                    setCredAuthDoc(err.authDocument);
-                    setCredModalOpen(true);
-                } else {
-          setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
-          // If this error indicates a public proxy was used and likely stripped Authorization
-          if (err && err.proxyUsed) {
-            try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch {}
-          }
-                }
+      if (isPalace) {
+        setImportStatus({ isLoading: true, message: 'Resolving acquisition...', error: null });
+        setPendingCatalogBook(catalogBook);
+        try {
+          // First, try any stored credential for this host automatically
+          const stored = await findCredentialForUrl(catalogBook.downloadUrl);
+          let finalHref = null;
+          if (stored) {
+            try {
+              finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, { username: stored.username, password: stored.password });
+              // Inform the user a stored credential was used
+              try { toast.pushToast('Using saved credentials', 3000); } catch { }
+            } catch (e) {
+              // Stored credentials failed; we'll fall back to an unauthenticated attempt below
+              finalHref = null;
             }
-            setPendingCatalogBook(null);
-            return;
-        }
+          }
 
-        const result = await onImportFromCatalog(catalogBook, catalogName);
-        if (!result.success && result.bookRecord && result.existingBook) {
-            setDuplicateBook(result.bookRecord);
-            setExistingBook(result.existingBook);
+          if (!finalHref) {
+            finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, null);
+          }
+          if (finalHref) {
+            // Convert into a CatalogBook-like object for import flow
+            const clone = { ...catalogBook, downloadUrl: finalHref } as CatalogBook;
+            const result = await onImportFromCatalog(clone, catalogName);
+            if (!result.success && result.bookRecord && result.existingBook) {
+              setDuplicateBook(result.bookRecord);
+              setExistingBook(result.existingBook);
+            }
+          } else {
+            setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
+          }
+        } catch (err: any) {
+          // If the resolver throws an error with an authDocument, surface the
+          // credentials modal and allow the user to supply credentials.
+          if (err && err.authDocument) {
+            setCredHost((catalogBook as any).providerName || (new URL(catalogBook.downloadUrl).host));
+            setCredAuthDoc(err.authDocument);
+            setCredModalOpen(true);
+          } else {
+            setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
+            // If this error indicates a public proxy was used and likely stripped Authorization
+            if (err && err.proxyUsed) {
+              try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch { }
+            }
+          }
         }
+        setPendingCatalogBook(null);
+        return;
+      }
+
+      const result = await onImportFromCatalog(catalogBook, catalogName);
+      if (!result.success && result.bookRecord && result.existingBook) {
+        setDuplicateBook(result.bookRecord);
+        setExistingBook(result.existingBook);
+      }
     }
   };
 
@@ -211,8 +210,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         const clone = { ...pendingCatalogBook, downloadUrl: finalHref } as CatalogBook;
         const result = await onImportFromCatalog(clone, catalogName);
         if (!result.success && result.bookRecord && result.existingBook) {
-            setDuplicateBook(result.bookRecord);
-            setExistingBook(result.existingBook);
+          setDuplicateBook(result.bookRecord);
+          setExistingBook(result.existingBook);
         }
       } else {
         setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link with provided credentials.' });
@@ -220,14 +219,14 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
     } catch (err: any) {
       setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition with credentials.' });
       if (err && err.proxyUsed) {
-        try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch {}
+        try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch { }
       }
     }
   };
 
   const handleOpenAuthLink = (href: string) => {
     // Open provider auth link in a new tab/window; user can sign in and then click Retry
-    try { window.open(href, '_blank', 'noopener'); } catch {}
+    try { window.open(href, '_blank', 'noopener'); } catch { }
   };
 
   const handleRetry = async () => {
@@ -240,8 +239,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         const clone = { ...pendingCatalogBook, downloadUrl: finalHref } as CatalogBook;
         const result = await onImportFromCatalog(clone, catalogName);
         if (!result.success && result.bookRecord && result.existingBook) {
-            setDuplicateBook(result.bookRecord);
-            setExistingBook(result.existingBook);
+          setDuplicateBook(result.bookRecord);
+          setExistingBook(result.existingBook);
         }
       } else {
         setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
@@ -253,7 +252,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
       } else {
         setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
         if (err && err.proxyUsed) {
-          try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch {}
+          try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch { }
         }
       }
     }
@@ -270,7 +269,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
     try {
       const result = await bookRepository.save(bookToSave);
-      
+
       if (result.success) {
         setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
         setTimeout(() => {
@@ -292,13 +291,13 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
 
     setImportStatus({ isLoading: true, message: 'Saving new copy...', error: null });
     const bookToSave = { ...duplicateBook };
-    
+
     setDuplicateBook(null);
     setExistingBook(null);
 
     try {
       const result = await bookRepository.save(bookToSave);
-      
+
       if (result.success) {
         setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
         setTimeout(() => {
@@ -334,219 +333,218 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
       <main className="grid md:grid-cols-12 gap-8 md:gap-12">
         {/* Left Column: Cover & Actions */}
         <aside ref={containerRef} className="md:col-span-4 lg:col-span-3">
-            {coverImage ? (
-                <img
-                    src={coverImage}
-                    alt={book.title}
-                    className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]"
-                    onError={(e) => {
-                      const img = e.currentTarget as HTMLImageElement;
-                      img.onerror = null as any;
-                      if (typeof book.coverImage === 'string') {
-                        img.src = proxiedUrl(book.coverImage);
-                      }
-                    }}
-                />
-            ) : (
-                <div className="w-full flex items-center justify-center p-4 text-center text-slate-400 bg-slate-800 rounded-lg aspect-[2/3] shadow-2xl">
-                    <span className="font-semibold">{book.title}</span>
-                </div>
-            )}
-             <div className="mt-6">
-                {source === 'library' ? (
-                    <button onClick={handleReadClick} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg">
-                        <BookIcon className="w-6 h-6 mr-2" />
-                        Read Book
-                    </button>
-        ) : (
-          (() => {
-            // If acquisitionMediaType indicates Palace/DRM or LCP-style acquisition,
-            // the UX should surface that the book must be opened in the Palace App.
-            const acqType = (catalogBook && (catalogBook as any).acquisitionMediaType) || undefined;
-            const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
-            const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
-            // Allow both EPUB and PDF formats
-            const isUnsupportedFormat = !!format && format !== 'EPUB' && format !== 'PDF';
-            const disabled = importStatus.isLoading || isUnsupportedFormat;
-            
-            // Check for alternative formats
-            const altFormats = catalogBook?.alternativeFormats;
-            const hasMultipleFormats = altFormats && altFormats.length > 1;
-            
-            if (hasMultipleFormats && !isPalace) {
-              // Show format selection buttons
-              return (
-                <div className="space-y-2">
-                  <p className="text-sm text-slate-400 mb-2">Choose format:</p>
-                  {altFormats!.map((fmt: any, idx: number) => {
-                    const fmtDisabled = importStatus.isLoading;
-                    return (
-                      <button 
-                        key={idx}
-                        onClick={() => {
-                          // Create a modified book with this format's download URL
-                          const modifiedBook = { ...catalogBook, downloadUrl: fmt.downloadUrl, format: fmt.format, acquisitionMediaType: fmt.mediaType, isOpenAccess: fmt.isOpenAccess };
-                          onImportFromCatalog(modifiedBook, catalogName);
-                        }}
-                        disabled={fmtDisabled}
-                        className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <DownloadIcon className="w-6 h-6 mr-2" />
-                        {fmt.format} Format
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            }
-            
-            return (
-              <button onClick={handleAddToBookshelf} disabled={disabled} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                <DownloadIcon className="w-6 h-6 mr-2" />
-                {isPalace ? 'Read in Palace App' : (isUnsupportedFormat ? `Cannot Import ${format}` : 'Add to Bookshelf')}
-              </button>
-            );
-          })()
-        )}
+          {coverImage ? (
+            <img
+              src={coverImage}
+              alt={book.title}
+              className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]"
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.onerror = null as any;
+                if (typeof book.coverImage === 'string') {
+                  img.src = proxiedUrl(book.coverImage);
+                }
+              }}
+            />
+          ) : (
+            <div className="w-full flex items-center justify-center p-4 text-center text-slate-400 bg-slate-800 rounded-lg aspect-[2/3] shadow-2xl">
+              <span className="font-semibold">{book.title}</span>
             </div>
+          )}
+          <div className="mt-6">
+            {source === 'library' ? (
+              <button onClick={handleReadClick} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg">
+                <BookIcon className="w-6 h-6 mr-2" />
+                Read Book
+              </button>
+            ) : (
+              (() => {
+                // If acquisitionMediaType indicates Palace/DRM or LCP-style acquisition,
+                // the UX should surface that the book must be opened in the Palace App.
+                const acqType = (catalogBook && (catalogBook as any).acquisitionMediaType) || undefined;
+                const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
+                const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
+                // Allow both EPUB and PDF formats
+                const isUnsupportedFormat = !!format && format !== 'EPUB' && format !== 'PDF';
+                const disabled = importStatus.isLoading || isUnsupportedFormat;
+
+                // Check for alternative formats
+                const altFormats = catalogBook?.alternativeFormats;
+                const hasMultipleFormats = altFormats && altFormats.length > 1;
+
+                if (hasMultipleFormats && !isPalace) {
+                  // Show format selection buttons
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-sm text-slate-400 mb-2">Choose format:</p>
+                      {altFormats!.map((fmt: any, idx: number) => {
+                        const fmtDisabled = importStatus.isLoading;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              // Create a modified book with this format's download URL
+                              const modifiedBook = { ...catalogBook, downloadUrl: fmt.downloadUrl, format: fmt.format, acquisitionMediaType: fmt.mediaType, isOpenAccess: fmt.isOpenAccess };
+                              onImportFromCatalog(modifiedBook, catalogName);
+                            }}
+                            disabled={fmtDisabled}
+                            className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <DownloadIcon className="w-6 h-6 mr-2" />
+                            {fmt.format} Format
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                return (
+                  <button onClick={handleAddToBookshelf} disabled={disabled} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <DownloadIcon className="w-6 h-6 mr-2" />
+                    {isPalace ? 'Read in Palace App' : (isUnsupportedFormat ? `Cannot Import ${format}` : 'Add to Bookshelf')}
+                  </button>
+                );
+              })()
+            )}
+          </div>
         </aside>
 
         {/* Right Column: Details */}
         <article className="md:col-span-8 lg:col-span-9">
-            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-white">{book.title}</h1>
-            <h2 className="text-xl lg:text-2xl text-slate-300 mt-2">{book.author}</h2>
-            
-            <div className="mt-8 border-t border-slate-700 pt-8 space-y-8">
-                {description && (
-                    <section>
-                        <h3 className="text-lg font-semibold text-slate-200 mb-3">Description</h3>
-                        <div className="relative">
-                            <div 
-                                className={`prose prose-invert max-w-none text-slate-300 prose-p:mb-4 overflow-hidden transition-all duration-500 ease-in-out ${isLongDescription && !isDescriptionExpanded ? 'max-h-40' : 'max-h-[1000px]'}`}
-                            >
-                                <div dangerouslySetInnerHTML={{ __html: description }} />
-                            </div>
-                            {isLongDescription && !isDescriptionExpanded && (
-                                <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
-                            )}
-                        </div>
-                        {isLongDescription && (
-                            <button
-                                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                                className="text-sky-400 hover:text-sky-300 font-semibold text-sm mt-2"
-                            >
-                                {isDescriptionExpanded ? 'Show Less' : 'Read More'}
-                            </button>
-                        )}
-                    </section>
-                )}
+          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-white">{book.title}</h1>
+          <h2 className="text-xl lg:text-2xl text-slate-300 mt-2">{book.author}</h2>
 
-                {(book.publisher || book.publicationDate || providerId || providerName || format) && (
-                    <section>
-                        <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
-                        <div className="bg-slate-800/50 rounded-lg border border-slate-700">
-                            <dl className="divide-y divide-slate-700">
-                                {book.publisher && (
-                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">Publisher</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.publisher}</dd>
-                                    </div>
-                                )}
-                                {book.publicationDate && (
-                                     <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">Published</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{formatDate(book.publicationDate)}</dd>
-                                    </div>
-                                )}
-                                {providerName && !providerId && (
-                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">Distributor</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{providerName}</dd>
-                                    </div>
-                                )}
-                                {providerId && (
-                                     <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">Provider ID</dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
-                                            {providerId}
-                                            {providerName && (
-                                                <span className="block text-xs text-slate-400">from {providerName}</span>
-                                            )}
-                                        </dd>
-                                    </div>
-                                )}
-                                {(format || (catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 0)) && (
-                                    <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                                        <dt className="text-sm font-medium text-slate-400">
-                                            {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? 'Available Formats' : 'Format'}
-                                        </dt>
-                                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
-                                            <div className="flex flex-wrap gap-2">
-                                                {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? (
-                                                    // Show all alternative formats with color coding
-                                                    catalogBook.alternativeFormats.map((fmt: any, idx: number) => (
-                                                        <span key={idx} className={`text-white text-xs font-medium px-2 py-1 rounded-md ${
-                                                            fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
-                                                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
-                                                            'bg-sky-500'
-                                                        }`}>
-                                                            {fmt.format}
-                                                        </span>
-                                                    ))
-                                                ) : format ? (
-                                                    // Show single format
-                                                    <span className="bg-slate-700 text-slate-300 text-xs font-medium px-2 py-1 rounded-md">
-                                                        {format}
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        </dd>
-                                    </div>
-                                )}
-                            </dl>
-                        </div>
-                    </section>
+          <div className="mt-8 border-t border-slate-700 pt-8 space-y-8">
+            {description && (
+              <section>
+                <h3 className="text-lg font-semibold text-slate-200 mb-3">Description</h3>
+                <div className="relative">
+                  <div
+                    className={`prose prose-invert max-w-none text-slate-300 prose-p:mb-4 overflow-hidden transition-all duration-500 ease-in-out ${isLongDescription && !isDescriptionExpanded ? 'max-h-40' : 'max-h-[1000px]'}`}
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: description }} />
+                  </div>
+                  {isLongDescription && !isDescriptionExpanded && (
+                    <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
+                  )}
+                </div>
+                {isLongDescription && (
+                  <button
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="text-sky-400 hover:text-sky-300 font-semibold text-sm mt-2"
+                  >
+                    {isDescriptionExpanded ? 'Show Less' : 'Read More'}
+                  </button>
                 )}
-                
-                {book.subjects && book.subjects.length > 0 && (
-                    <section>
-                        <h3 className="text-lg font-semibold text-slate-200 mb-3">Subjects</h3>
-                        <div className="flex flex-wrap gap-2">
-                            {book.subjects.map((subject, index) => (
-                                <span key={index} className="bg-slate-700 text-slate-300 text-sm font-medium px-3 py-1.5 rounded-full">
-                                    {subject}
+              </section>
+            )}
+
+            {(book.publisher || book.publicationDate || providerId || providerName || format) && (
+              <section>
+                <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
+                <div className="bg-slate-800/50 rounded-lg border border-slate-700">
+                  <dl className="divide-y divide-slate-700">
+                    {book.publisher && (
+                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-slate-400">Publisher</dt>
+                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.publisher}</dd>
+                      </div>
+                    )}
+                    {book.publicationDate && (
+                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-slate-400">Published</dt>
+                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{formatDate(book.publicationDate)}</dd>
+                      </div>
+                    )}
+                    {providerName && !providerId && (
+                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-slate-400">Distributor</dt>
+                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{providerName}</dd>
+                      </div>
+                    )}
+                    {providerId && (
+                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-slate-400">Provider ID</dt>
+                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
+                          {providerId}
+                          {providerName && (
+                            <span className="block text-xs text-slate-400">from {providerName}</span>
+                          )}
+                        </dd>
+                      </div>
+                    )}
+                    {(format || (catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 0)) && (
+                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-slate-400">
+                          {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? 'Available Formats' : 'Format'}
+                        </dt>
+                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
+                          <div className="flex flex-wrap gap-2">
+                            {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? (
+                              // Show all alternative formats with color coding
+                              catalogBook.alternativeFormats.map((fmt: any, idx: number) => (
+                                <span key={idx} className={`text-white text-xs font-medium px-2 py-1 rounded-md ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                                    fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                                      'bg-sky-500'
+                                  }`}>
+                                  {fmt.format}
                                 </span>
-                            ))}
-                        </div>
-                    </section>
-                )}
-            </div>
+                              ))
+                            ) : format ? (
+                              // Show single format
+                              <span className="bg-slate-700 text-slate-300 text-xs font-medium px-2 py-1 rounded-md">
+                                {format}
+                              </span>
+                            ) : null}
+                          </div>
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              </section>
+            )}
+
+            {book.subjects && book.subjects.length > 0 && (
+              <section>
+                <h3 className="text-lg font-semibold text-slate-200 mb-3">Subjects</h3>
+                <div className="flex flex-wrap gap-2">
+                  {book.subjects.map((subject, index) => (
+                    <span key={index} className="bg-slate-700 text-slate-300 text-sm font-medium px-3 py-1.5 rounded-full">
+                      {subject}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         </article>
       </main>
-      
+
       {(importStatus.isLoading || importStatus.error || importStatus.message === 'Import successful!') && (
         <div className="fixed inset-0 bg-slate-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
-                {importStatus.isLoading && !importStatus.error && <Spinner text={importStatus.message} />}
-                {importStatus.message === 'Import successful!' && !importStatus.isLoading && (
-                    <div className="flex flex-col items-center">
-                        <h3 className="text-xl font-bold text-green-400 mb-4">Success</h3>
-                        <p className="text-slate-300 mb-6">Book added to your library!</p>
-                    </div>
-                )}
-                {importStatus.error && (
-                    <div className="flex flex-col items-center">
-                        <h3 className="text-xl font-bold text-red-400 mb-4">Import Failed</h3>
-                        <p className="text-slate-300 mb-6">{importStatus.error}</p>
-                        <button
-                            onClick={() => setImportStatus({ isLoading: false, message: '', error: null })}
-                            className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-                        >
-                            Close
-                        </button>
-                    </div>
-                )}
-            </div>
+          <div className="bg-slate-800 p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
+            {importStatus.isLoading && !importStatus.error && <Spinner text={importStatus.message} />}
+            {importStatus.message === 'Import successful!' && !importStatus.isLoading && (
+              <div className="flex flex-col items-center">
+                <h3 className="text-xl font-bold text-green-400 mb-4">Success</h3>
+                <p className="text-slate-300 mb-6">Book added to your library!</p>
+              </div>
+            )}
+            {importStatus.error && (
+              <div className="flex flex-col items-center">
+                <h3 className="text-xl font-bold text-red-400 mb-4">Import Failed</h3>
+                <p className="text-slate-300 mb-6">{importStatus.error}</p>
+                <button
+                  onClick={() => setImportStatus({ isLoading: false, message: '', error: null })}
+                  className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -557,7 +555,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
         onAddAnyway={handleAddAnyway}
         bookTitle={duplicateBook?.title || ''}
       />
-  {/* ToastStack provided at app root; individual components push toasts via useToast().pushToast */}
+      {/* ToastStack provided at app root; individual components push toasts via useToast().pushToast */}
 
       <OpdsCredentialsModal isOpen={credModalOpen} host={credHost} authDocument={credAuthDoc} onClose={() => setCredModalOpen(false)} onSubmit={handleCredSubmit} onOpenAuthLink={handleOpenAuthLink} onRetry={handleRetry} probeUrl={pendingCatalogBook?.downloadUrl} />
     </div>

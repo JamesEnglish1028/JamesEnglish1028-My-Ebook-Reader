@@ -22,30 +22,30 @@ interface ErrorProps {
 
 /**
  * Error - Unified error component for all error states
- * 
+ *
  * Provides consistent error display across the application with multiple variants:
  * - inline: Compact inline error message
  * - card: Card-style error with optional actions
  * - page: Full-page error display (default)
- * 
+ *
  * Supports different severity levels (error, warning, info) with appropriate styling.
- * 
+ *
  * @example
  * // Page error with retry
- * <Error 
+ * <Error
  *   title="Failed to Load Books"
  *   message="Could not connect to the library database."
  *   onRetry={() => refetch()}
  * />
- * 
+ *
  * @example
  * // Inline warning
- * <Error 
+ * <Error
  *   variant="inline"
  *   severity="warning"
  *   message="Some books failed to sync"
  * />
- * 
+ *
  * @example
  * // Card error with dismiss
  * <Error
@@ -154,7 +154,7 @@ const Error: React.FC<ErrorProps> = ({
               </h3>
             )}
             <p className="text-slate-300 text-sm">{message}</p>
-            
+
             {/* Actions */}
             {(onRetry || onDismiss) && (
               <div className="flex gap-3 mt-4">
@@ -177,7 +177,7 @@ const Error: React.FC<ErrorProps> = ({
               </div>
             )}
           </div>
-          
+
           {/* Close button */}
           {onDismiss && (
             <button
@@ -200,15 +200,15 @@ const Error: React.FC<ErrorProps> = ({
     <div className={`text-center py-20 ${colors.bg} rounded-lg ${className}`}>
       <div className="flex flex-col items-center max-w-md mx-auto">
         <div className="mb-4">{getSeverityIcon()}</div>
-        
+
         <h2 className={`text-2xl font-semibold mb-2 ${colors.text}`}>
           {title || 'Something Went Wrong'}
         </h2>
-        
+
         <p className="text-slate-300 mb-6">
           {message}
         </p>
-        
+
         {/* Actions */}
         {(onRetry || onDismiss) && (
           <div className="flex gap-3">

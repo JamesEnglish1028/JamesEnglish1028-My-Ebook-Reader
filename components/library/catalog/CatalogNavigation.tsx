@@ -17,7 +17,7 @@ interface CatalogNavigationProps {
 
 /**
  * CatalogNavigation - Displays breadcrumb trail and pagination controls
- * 
+ *
  * Shows the navigation path through catalog sections and provides
  * Previous/Next buttons for paginated results.
  */
@@ -40,11 +40,10 @@ const CatalogNavigation: React.FC<CatalogNavigationProps> = ({
             <React.Fragment key={index}>
               <button
                 onClick={() => onBreadcrumbClick(index)}
-                className={`hover:text-sky-400 transition-colors ${
-                  index === navPath.length - 1
+                className={`hover:text-sky-400 transition-colors ${index === navPath.length - 1
                     ? 'font-semibold text-white'
                     : ''
-                }`}
+                  }`}
                 aria-current={index === navPath.length - 1 ? 'page' : undefined}
               >
                 {item.name}

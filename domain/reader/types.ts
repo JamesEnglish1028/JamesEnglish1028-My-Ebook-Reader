@@ -1,6 +1,6 @@
 /**
  * Reader Domain Types
- * 
+ *
  * This module defines all types related to the reading experience,
  * including settings, bookmarks, citations, and navigation.
  */

@@ -11,19 +11,21 @@ const init = (): Promise<IDBDatabase> => {
       resolve(dbInstance);
       return;
     }
-
+    if (typeof indexedDB === 'undefined') {
+      const err = new Error('IndexedDB is not available in this environment.');
+      logger.error('IndexedDB unavailable:', err);
+      reject(err);
+      return;
+    }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-
     request.onerror = () => {
       logger.error('IndexedDB error:', request.error);
       reject(request.error);
     };
-
     request.onsuccess = () => {
       dbInstance = request.result;
       resolve(dbInstance);
     };
-
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       let store: IDBObjectStore;
@@ -39,7 +41,6 @@ const init = (): Promise<IDBDatabase> => {
           return;
         }
       }
-
       if (event.oldVersion < 2) {
         if (!store.indexNames.contains(DB_INDEXES.ISBN)) {
           store.createIndex(DB_INDEXES.ISBN, DB_INDEXES.ISBN, { unique: false });

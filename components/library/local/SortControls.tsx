@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { SORT_OPTIONS } from '../../../hooks';
 import { AdjustmentsVerticalIcon } from '../../icons';
 
@@ -12,7 +12,7 @@ interface SortControlsProps {
 
 /**
  * SortControls - Dropdown for sorting books in the library
- * 
+ *
  * Provides a dropdown menu with various sort options (title, author, date added, etc.)
  * Handles click-outside behavior to close the dropdown.
  */
@@ -56,7 +56,7 @@ const SortControls: React.FC<SortControlsProps> = ({
         <AdjustmentsVerticalIcon className="w-5 h-5 sm:mr-2" />
         <span className="hidden sm:inline">Sort</span>
       </button>
-      
+
       {isOpen && (
         <div className="absolute top-full right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
           <ul className="p-1 text-white">
@@ -64,11 +64,10 @@ const SortControls: React.FC<SortControlsProps> = ({
               <li key={option.key}>
                 <button
                   onClick={() => handleSortChange(option.key)}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                    sortOrder === option.key
+                  className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${sortOrder === option.key
                       ? 'bg-sky-600 font-medium'
                       : 'hover:bg-slate-700'
-                  }`}
+                    }`}
                 >
                   {option.label}
                 </button>

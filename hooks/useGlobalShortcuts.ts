@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export interface ShortcutAction {
   /**
@@ -56,16 +56,16 @@ export interface GlobalShortcutsOptions {
 
 /**
  * Hook for managing global keyboard shortcuts
- * 
+ *
  * Provides a centralized way to register keyboard shortcuts with
  * conflict detection, modifier key support, and input field prevention.
- * 
+ *
  * @example
  * ```tsx
  * function App() {
  *   const [showHelp, setShowHelp] = useState(false);
  *   const [showSearch, setShowSearch] = useState(false);
- * 
+ *
  *   useGlobalShortcuts({
  *     shortcuts: [
  *       {
@@ -83,7 +83,7 @@ export interface GlobalShortcutsOptions {
  *       }
  *     ]
  *   });
- * 
+ *
  *   return <div>...</div>;
  * }
  * ```
@@ -106,7 +106,7 @@ export function useGlobalShortcuts(options: GlobalShortcutsOptions) {
         const target = event.target as HTMLElement;
         const tagName = target.tagName.toLowerCase();
         const isInput = tagName === 'input' || tagName === 'textarea' || target.isContentEditable;
-        
+
         if (isInput) {
           return;
         }
@@ -150,15 +150,15 @@ export function useGlobalShortcuts(options: GlobalShortcutsOptions) {
 
 /**
  * Hook to get all registered shortcuts for display in help
- * 
+ *
  * This is a companion hook to useGlobalShortcuts that allows
  * components to access the shortcut definitions for display purposes.
- * 
+ *
  * @example
  * ```tsx
  * function ShortcutHelp() {
  *   const shortcuts = useShortcutRegistry();
- *   
+ *
  *   return (
  *     <div>
  *       {shortcuts.map(s => (
@@ -178,11 +178,11 @@ export function registerShortcut(shortcut: ShortcutAction) {
   const existing = shortcutRegistry.find(
     (s) => s.key === shortcut.key && s.ctrl === shortcut.ctrl && s.shift === shortcut.shift && s.alt === shortcut.alt
   );
-  
+
   if (existing) {
     console.warn(`Shortcut conflict detected: ${shortcut.key} is already registered for "${existing.description}"`);
   }
-  
+
   shortcutRegistry.push(shortcut);
 }
 
@@ -200,7 +200,7 @@ export function getShortcutsByCategory(category?: string) {
 
 /**
  * Format a shortcut for display
- * 
+ *
  * @example
  * formatShortcut({ key: 's', ctrl: true }) // "Ctrl+S" or "⌘S" on Mac
  */

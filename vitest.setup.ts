@@ -1,5 +1,5 @@
-import { expect, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { afterEach, expect } from 'vitest';
 
 // Ensure Vitest's expect is available on globalThis before jest-dom loads.
 // Use a dynamic import (top-level await) because static imports are hoisted

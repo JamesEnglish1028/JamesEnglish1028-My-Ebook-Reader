@@ -1,5 +1,5 @@
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, test, expect, vi, afterEach } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
@@ -48,12 +48,12 @@ describe('Catalog vs Library BookDetailView Differences', () => {
     // Should show catalog-specific UI elements
     expect(screen.getByText('Return to Catalog')).toBeInTheDocument();
     expect(screen.getByText('Add to Bookshelf')).toBeInTheDocument();
-    
+
     // Should show distributor information in Provider ID section
     expect(screen.getByText('Provider ID')).toBeInTheDocument();
     expect(screen.getByText('oapen-123')).toBeInTheDocument();
     expect(screen.getByText('from OAPEN')).toBeInTheDocument();
-    
+
     console.log('✅ Catalog book detail view shows distributor as provider');
   });
 
@@ -85,15 +85,15 @@ describe('Catalog vs Library BookDetailView Differences', () => {
     // Should show library-specific UI elements
     expect(screen.getByText('Return to My Library')).toBeInTheDocument();
     expect(screen.getByText('Read Book')).toBeInTheDocument();
-    
+
     // Should show providerName (not distributor) in Provider ID section
     expect(screen.getByText('Provider ID')).toBeInTheDocument();
     expect(screen.getByText('lib-456')).toBeInTheDocument();
     expect(screen.getByText('from My Local Library')).toBeInTheDocument();
-    
+
     // Should NOT show the distributor info since it's a library book
     expect(screen.queryByText('from OAPEN')).not.toBeInTheDocument();
-    
+
     console.log('✅ Library book detail view shows providerName, not distributor');
   });
 
@@ -124,10 +124,10 @@ describe('Catalog vs Library BookDetailView Differences', () => {
 
     // PDF files should be importable (app supports PDF reader)
     expect(screen.getByText('Add to Bookshelf')).toBeInTheDocument();
-    
+
     // Should still show distributor info
     expect(screen.getByText('from BiblioBoard')).toBeInTheDocument();
-    
+
     console.log('✅ PDF catalog book shows Add to Bookshelf and distributor');
   });
 });

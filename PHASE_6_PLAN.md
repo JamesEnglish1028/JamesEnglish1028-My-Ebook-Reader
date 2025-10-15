@@ -1,7 +1,7 @@
 # Phase 6: Accessibility & Keyboard Navigation
 
-**Status**: Ready to begin  
-**Phase 5 Commit**: a3e577a ✅  
+**Status**: Ready to begin
+**Phase 5 Commit**: a3e577a ✅
 **Test Status**: 89/89 passing (100%) ✅
 
 ## Overview

@@ -38,13 +38,13 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ isOpe
             <CloseIcon className="w-6 h-6" />
           </button>
         </div>
-        
+
         <p className="text-slate-300 mb-6 text-sm">
           Are you sure you want to permanently delete "<strong className="font-semibold text-slate-100">{bookTitle}</strong>"? This action cannot be undone.
         </p>
 
         <div className="flex justify-end gap-4">
-           <button
+          <button
             onClick={onClose}
             className="py-2 px-4 rounded-md bg-slate-600 hover:bg-slate-500 transition-colors font-semibold"
           >

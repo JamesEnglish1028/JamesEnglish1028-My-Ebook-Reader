@@ -1,3 +1,6 @@
+
+// DEPRECATED: This component is no longer used in the current catalog/library UI as of October 2025.
+// It is retained for reference only and will be removed in a future release.
 import React, { useRef } from 'react';
 
 import { proxiedUrl } from '../services/utils';
@@ -108,13 +111,12 @@ export const CollectionLane: React.FC<CollectionLaneProps> = ({
                   {book.alternativeFormats && book.alternativeFormats.length > 0 ? (
                     // Show all alternative formats
                     book.alternativeFormats.map((fmt: any, idx: number) => (
-                      <span 
+                      <span
                         key={`${book.title}-${fmt.format}-${idx}`}
-                        className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                          fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
-                          fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
-                          'bg-sky-500'
-                        }`}
+                        className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                              'bg-sky-500'
+                          }`}
                         title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
                       >
                         {fmt.format}
@@ -122,11 +124,10 @@ export const CollectionLane: React.FC<CollectionLaneProps> = ({
                     ))
                   ) : book.format ? (
                     // Show single format
-                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                      book.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
-                      book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' : 
-                      'bg-sky-500'
-                    }`}>
+                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                        book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                          'bg-sky-500'
+                      }`}>
                       {book.format}
                     </span>
                   ) : null}

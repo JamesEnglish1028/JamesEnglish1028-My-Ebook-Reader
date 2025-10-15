@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
-import { useFocusTrap, formatShortcut, type ShortcutAction } from '../hooks';
-import { PlusIcon, MinusIcon, AdjustmentsVerticalIcon } from './icons';
+import { formatShortcut, useFocusTrap, type ShortcutAction } from '../hooks';
+import { AdjustmentsVerticalIcon, MinusIcon, PlusIcon } from './icons';
 import Tooltip from './Tooltip';
 
 interface Props {
@@ -27,19 +27,19 @@ const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomO
 
   // Define shortcuts based on context
   const globalShortcuts: ShortcutAction[] = [
-    { key: '?', description: 'Show/hide keyboard shortcuts', category: 'global', action: () => {} },
-    { key: 'Escape', description: 'Close active modal or return to library', category: 'global', action: () => {} },
+    { key: '?', description: 'Show/hide keyboard shortcuts', category: 'global', action: () => { } },
+    { key: 'Escape', description: 'Close active modal or return to library', category: 'global', action: () => { } },
   ];
 
   const readerShortcuts: ShortcutAction[] = activeReader ? [
-    { key: 'ArrowLeft', description: 'Previous page', category: 'reader', action: () => {} },
-    { key: 'ArrowRight', description: 'Next page', category: 'reader', action: () => {} },
-    { key: ' ', description: 'Next page', category: 'reader', action: () => {} },
-    { key: '+', description: `Zoom in ${activeReader === 'epub' ? '(increase font size)' : ''}`, category: 'reader', action: () => {} },
-    { key: '-', description: `Zoom out ${activeReader === 'epub' ? '(decrease font size)' : ''}`, category: 'reader', action: () => {} },
-    { key: 'f', description: 'Toggle fit width / fit page', category: 'reader', action: () => {} },
-    { key: 'c', description: 'Open/close contents & bookmarks', category: 'reader', action: () => {} },
-    { key: 'b', description: 'Add a quick bookmark for current page', category: 'reader', action: () => {} },
+    { key: 'ArrowLeft', description: 'Previous page', category: 'reader', action: () => { } },
+    { key: 'ArrowRight', description: 'Next page', category: 'reader', action: () => { } },
+    { key: ' ', description: 'Next page', category: 'reader', action: () => { } },
+    { key: '+', description: `Zoom in ${activeReader === 'epub' ? '(increase font size)' : ''}`, category: 'reader', action: () => { } },
+    { key: '-', description: `Zoom out ${activeReader === 'epub' ? '(decrease font size)' : ''}`, category: 'reader', action: () => { } },
+    { key: 'f', description: 'Toggle fit width / fit page', category: 'reader', action: () => { } },
+    { key: 'c', description: 'Open/close contents & bookmarks', category: 'reader', action: () => { } },
+    { key: 'b', description: 'Add a quick bookmark for current page', category: 'reader', action: () => { } },
   ] : [];
 
   const renderShortcut = (shortcut: ShortcutAction) => (
@@ -64,10 +64,10 @@ const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomO
       >
         <div className="flex items-center justify-between mb-4">
           <h3 id="shortcut-help-title" className="text-xl font-bold">Keyboard Shortcuts</h3>
-          <button 
-            ref={closeButtonRef} 
-            onClick={onClose} 
-            className="p-2 rounded hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+          <button
+            ref={closeButtonRef}
+            onClick={onClose}
+            className="p-2 rounded hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
             aria-label="Close help"
           >
             ✕
@@ -100,27 +100,27 @@ const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomO
             <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Quick Actions</h4>
             <div className="flex gap-2">
               <Tooltip label="Zoom out (-)">
-                <button 
-                  onClick={onZoomOut} 
-                  className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                <button
+                  onClick={onZoomOut}
+                  className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
                   aria-label="Zoom out"
                 >
                   <MinusIcon className="w-5 h-5 text-slate-50" />
                 </button>
               </Tooltip>
               <Tooltip label="Zoom in (+)">
-                <button 
-                  onClick={onZoomIn} 
-                  className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                <button
+                  onClick={onZoomIn}
+                  className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
                   aria-label="Zoom in"
                 >
                   <PlusIcon className="w-5 h-5 text-slate-50" />
                 </button>
               </Tooltip>
               <Tooltip label="Toggle fit (F)">
-                <button 
-                  onClick={onToggleFit} 
-                  className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                <button
+                  onClick={onToggleFit}
+                  className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
                   aria-label="Toggle fit mode"
                 >
                   <AdjustmentsVerticalIcon className="w-5 h-5 text-slate-50" />

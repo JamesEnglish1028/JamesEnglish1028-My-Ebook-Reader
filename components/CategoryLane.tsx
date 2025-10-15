@@ -41,13 +41,13 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
             </h3>
             {categoryLane.category.scheme && (
               <span className="text-xs text-slate-400 uppercase tracking-wider font-medium mt-0.5">
-                {categoryLane.category.scheme.includes('Simplified') ? 'Simplified' : 
-                 categoryLane.category.scheme.includes('fiction') ? 'Fiction' : 'Category'}
+                {categoryLane.category.scheme.includes('Simplified') ? 'Simplified' :
+                  categoryLane.category.scheme.includes('fiction') ? 'Fiction' : 'Category'}
               </span>
             )}
           </div>
         </div>
-        
+
         {/* Book Count Badge */}
         <div className="flex items-center gap-2">
           <div className="bg-slate-700/80 text-slate-300 text-sm font-medium px-3 py-1.5 rounded-full border border-slate-600/50">
@@ -126,13 +126,12 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
                     book.alternativeFormats.map((fmt: any, idx: number) => (
                       <span
                         key={`${book.title}-${fmt.format}-${idx}`}
-                        className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                          fmt.format.toUpperCase() === 'PDF'
+                        className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF'
                             ? 'bg-red-600'
                             : fmt.format.toUpperCase() === 'AUDIOBOOK'
-                            ? 'bg-purple-600'
-                            : 'bg-sky-500'
-                        }`}
+                              ? 'bg-purple-600'
+                              : 'bg-sky-500'
+                          }`}
                         title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
                       >
                         {fmt.format}
@@ -140,13 +139,12 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
                     ))
                   ) : book.format && (
                     <span
-                      className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                        book.format.toUpperCase() === 'PDF'
+                      className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF'
                           ? 'bg-red-600'
                           : book.format.toUpperCase() === 'AUDIOBOOK'
-                          ? 'bg-purple-600'
-                          : 'bg-sky-500'
-                      }`}
+                            ? 'bg-purple-600'
+                            : 'bg-sky-500'
+                        }`}
                     >
                       {book.format}
                     </span>

@@ -4,16 +4,16 @@ import { bookRepository } from '../domain/book';
 import { SORT_OPTIONS, useCatalogs, useLocalStorage, useSortedBooks } from '../hooks';
 import { db } from '../services/db';
 import { logger } from '../services/logger';
-import { fetchCatalogContent, filterBooksByAudience, filterBooksByFiction, filterBooksByMedia, getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, groupBooksByMode } from '../services/opds';
+import { fetchCatalogContent, filterBooksByFiction, filterBooksByMedia, getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, groupBooksByMode } from '../services/opds';
 import { proxiedUrl } from '../services/utils';
 import type { AudienceMode, BookMetadata, BookRecord, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry, CategorizationMode, CategoryLane, Collection, CollectionGroup, CollectionMode, CoverAnimationData, FictionMode, MediaMode } from '../types';
 
+import { mebooksBook } from '../assets';
 import { CategoryLaneComponent } from './CategoryLane';
 import { CollectionLane } from './CollectionLane';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import DuplicateBookModal from './DuplicateBookModal';
 import { AdjustmentsVerticalIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, GlobeIcon, LeftArrowIcon, PlusIcon, RightArrowIcon, SettingsIcon, TrashIcon, UploadIcon } from './icons';
-import { mebooksBook } from '../assets';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import Spinner from './Spinner';
 import { UncategorizedLane } from './UncategorizedLane';
@@ -122,7 +122,7 @@ const Library: React.FC<LibraryProps> = ({
     setIsLoading(true);
     try {
       const result = await bookRepository.findAllMetadata();
-      
+
       if (result.success) {
         setBooks(result.data);
       } else {
@@ -265,9 +265,9 @@ const Library: React.FC<LibraryProps> = ({
     const hasSubjects = books.some(book => book.subjects && book.subjects.length > 0);
     const hasCollections = books.some(book => book.collections && book.collections.length > 0);
 
-  // Apply filtering chain: fiction -> media
-  const fictionFilteredBooks = filterBooksByFiction(books, fictionMode);
-  const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
+    // Apply filtering chain: fiction -> media
+    const fictionFilteredBooks = filterBooksByFiction(books, fictionMode);
+    const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
 
     // Use the selected categorization mode
     if (categorizationMode === 'flat') {
@@ -281,7 +281,7 @@ const Library: React.FC<LibraryProps> = ({
       setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
     } else if (categorizationMode === 'subject' && hasSubjects) {
       // Use subjects-based categorization
-  const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, catalogPagination || {}, categorizationMode, undefined, fictionMode, mediaMode, collectionMode);
+      const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, catalogPagination || {}, categorizationMode, undefined, fictionMode, mediaMode, collectionMode);
       setCategoryLanes(lanes);
       setCollectionLinks(collLinks);
       setUncategorizedBooks(uncategorized);
@@ -619,7 +619,7 @@ const Library: React.FC<LibraryProps> = ({
 
     try {
       const result = await bookRepository.delete(bookToDelete.id);
-      
+
       if (result.success) {
         setBooks(prevBooks => prevBooks.filter(b => b.id !== bookToDelete.id));
       } else {
@@ -661,7 +661,7 @@ const Library: React.FC<LibraryProps> = ({
 
     const renderIcon = () => {
       if (isCatalogLink) {
-  return <GlobeIcon className="w-5 h-5 text-sky-500" />;
+        return <GlobeIcon className="w-5 h-5 text-sky-500" />;
       }
       if (link.isLoading) {
         return <Spinner size="small" />;
@@ -685,8 +685,8 @@ const Library: React.FC<LibraryProps> = ({
       <li className="my-1 group/item">
         <div
           className={`flex items-center gap-2 w-full text-left p-2 rounded-md transition-colors pl-[${indentation}rem] ${isActive
-              ? 'bg-sky-700/30 border border-sky-500'
-              : 'hover:bg-slate-600/60'
+            ? 'bg-sky-700/30 border border-sky-500'
+            : 'hover:bg-slate-600/60'
             }`}
         >
           <div className="flex items-center justify-center w-6 h-6 flex-shrink-0">
@@ -694,12 +694,12 @@ const Library: React.FC<LibraryProps> = ({
           </div>
           <button onClick={() => onNavigate(link)} className="flex-grow text-left flex items-center justify-between">
             <span className={`font-semibold transition-colors ${isActive
-                ? 'text-sky-400'
-                : 'text-slate-100 group-hover/item:text-sky-400'
+              ? 'text-sky-400'
+              : 'text-slate-100 group-hover/item:text-sky-400'
               }`}>{link.title}</span>
             <ChevronRightIcon className={`w-4 h-4 transition-opacity mr-2 ${isActive
-                ? 'text-sky-500 opacity-100'
-                : 'text-slate-200 opacity-0 group-hover/item:opacity-100'
+              ? 'text-sky-500 opacity-100'
+              : 'text-slate-200 opacity-0 group-hover/item:opacity-100'
               }`} />
           </button>
           <button
@@ -850,24 +850,22 @@ const Library: React.FC<LibraryProps> = ({
                           <div className="flex gap-1 flex-wrap">
                             {book.alternativeFormats && book.alternativeFormats.length > 0 ? (
                               book.alternativeFormats.map((fmt: any, idx: number) => (
-                                <span 
+                                <span
                                   key={`${book.title}-${fmt.format}-${idx}`}
-                                  className={`inline-block text-slate-50 text-[10px] font-bold px-2 py-0.5 rounded ${
-                                    fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
-                                    fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' : 
-                                    'bg-sky-600'
-                                  }`}
+                                  className={`inline-block text-slate-50 text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                                      fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' :
+                                        'bg-sky-600'
+                                    }`}
                                   title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
                                 >
                                   {fmt.format}
                                 </span>
                               ))
                             ) : book.format && (
-                              <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                                book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                                book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                                'bg-sky-500'
-                              }`}>
+                              <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                                  book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                                    'bg-sky-500'
+                                }`}>
                                 {book.format}
                               </span>
                             )}
@@ -946,24 +944,22 @@ const Library: React.FC<LibraryProps> = ({
                   <div className="flex gap-1 flex-wrap">
                     {(book as any).alternativeFormats && (book as any).alternativeFormats.length > 0 ? (
                       (book as any).alternativeFormats.map((fmt: any, idx: number) => (
-                        <span 
+                        <span
                           key={`${book.title}-${fmt.format}-${idx}`}
-                          className={`inline-block text-slate-50 text-[10px] font-bold px-2 py-0.5 rounded ${
-                            fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' : 
-                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' : 
-                            'bg-sky-600'
-                          }`}
+                          className={`inline-block text-slate-50 text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                              fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' :
+                                'bg-sky-600'
+                            }`}
                           title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
                         >
                           {fmt.format}
                         </span>
                       ))
                     ) : (
-                      <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                        (book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' :
-                        (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                        'bg-sky-500'
-                      }`}>
+                      <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' :
+                          (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                            'bg-sky-500'
+                        }`}>
                         {book.format || 'EPUB'}
                       </span>
                     )}
@@ -1342,8 +1338,8 @@ const Library: React.FC<LibraryProps> = ({
                       key={option.key}
                       onClick={() => handleAudienceChange(option.key)}
                       className={`px-3 py-1 text-sm rounded-md transition-colors ${audienceMode === option.key
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                         }`}
                     >
                       {option.label.replace('All Ages', 'All')}
@@ -1363,8 +1359,8 @@ const Library: React.FC<LibraryProps> = ({
                       key={option.key}
                       onClick={() => handleFictionChange(option.key)}
                       className={`px-3 py-1 text-sm rounded-md transition-colors ${fictionMode === option.key
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                         }`}
                     >
                       {option.label.replace('All Types', 'All')}
@@ -1384,8 +1380,8 @@ const Library: React.FC<LibraryProps> = ({
                       key={option.key}
                       onClick={() => handleMediaChange(option.key)}
                       className={`px-3 py-1 text-sm rounded-md transition-colors ${mediaMode === option.key
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                         }`}
                     >
                       {option.label.replace('All Media', 'All')}
@@ -1441,8 +1437,7 @@ const Library: React.FC<LibraryProps> = ({
                   <nav className="space-y-2">
                     <button
                       onClick={() => handleCollectionChange('all')}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                        (catalogNavPath.length <= 1 && (collectionMode === 'all' || !collectionMode))
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${(catalogNavPath.length <= 1 && (collectionMode === 'all' || !collectionMode))
                           ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
                           : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
                         }`}
@@ -1459,8 +1454,8 @@ const Library: React.FC<LibraryProps> = ({
                           key={`${collection}-${index}`}
                           onClick={() => handleCollectionChange(collection as CollectionMode)}
                           className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border-2 ${isActive
-                              ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500'
-                              : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
+                            ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500'
+                            : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
                             }`}
                         >
                           <span className={isActive ? '📁' : '📂'}>

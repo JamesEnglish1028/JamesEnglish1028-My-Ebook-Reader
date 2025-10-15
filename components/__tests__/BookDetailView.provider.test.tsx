@@ -1,7 +1,7 @@
-import { render, screen, cleanup } from '@testing-library/react';
-import { describe, test, expect, vi, afterEach } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import type { CatalogBook, BookMetadata } from '../../types';
+import type { BookMetadata, CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
 
 // Mock the ToastContext
@@ -46,7 +46,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
     expect(screen.getByText('Provider ID')).toBeInTheDocument();
     expect(screen.getByText('test-123')).toBeInTheDocument();
     expect(screen.getByText('from OAPEN')).toBeInTheDocument();
-    
+
     console.log('✅ Catalog book shows distributor as provider name');
   });
 
@@ -78,10 +78,10 @@ describe('BookDetailView Distributor as Provider Integration', () => {
     expect(screen.getByText('Provider ID')).toBeInTheDocument();
     expect(screen.getByText('lib-456')).toBeInTheDocument();
     expect(screen.getByText('from My Library Provider')).toBeInTheDocument();
-    
+
     // Should NOT show distributor separately since it's a library book
     expect(screen.queryByText('from OAPEN')).not.toBeInTheDocument();
-    
+
     console.log('✅ Library book shows providerName, not distributor');
   });
 
@@ -112,7 +112,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
     expect(screen.getByText('Provider ID')).toBeInTheDocument();
     expect(screen.getByText('no-dist-123')).toBeInTheDocument();
     expect(screen.queryByText(/from/)).not.toBeInTheDocument();
-    
+
     console.log('✅ Catalog book without distributor handled gracefully');
   });
 });

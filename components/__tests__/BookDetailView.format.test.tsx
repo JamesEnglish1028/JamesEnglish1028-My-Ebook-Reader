@@ -1,17 +1,16 @@
-import React from 'react';
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import '@testing-library/jest-dom';
 import type { CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
 
 const baseProps = {
-  onBack: () => {},
-  onReadBook: () => {},
+  onBack: () => { },
+  onReadBook: () => { },
   importStatus: { isLoading: false, message: '', error: null },
-  setImportStatus: () => {},
+  setImportStatus: () => { },
 } as any;
 
 describe('BookDetailView format badge and import button', () => {

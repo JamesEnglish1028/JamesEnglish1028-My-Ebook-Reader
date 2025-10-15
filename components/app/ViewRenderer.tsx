@@ -9,21 +9,21 @@ import LibraryView from '../library/LibraryView';
 
 import type {
   BookMetadata,
-  CatalogBook,
+  BookRecord,
   Catalog,
+  CatalogBook,
   CatalogRegistry,
   CoverAnimationData,
-  BookRecord,
 } from '../../types';
 
 interface ViewRendererProps {
   currentView: 'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about';
-  
+
   // Reader view props
   selectedBookId: number | null;
   coverAnimationData: CoverAnimationData | null;
   onCloseReader: () => void;
-  
+
   // Book detail view props
   detailViewData: {
     book: BookMetadata | CatalogBook;
@@ -33,7 +33,7 @@ interface ViewRendererProps {
   onReturnToLibrary: () => void;
   onReadBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   onImportFromCatalog: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord; existingBook?: BookRecord }>;
-  
+
   // Library view props
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => void;
@@ -54,7 +54,7 @@ interface ViewRendererProps {
   onOpenCloudSyncModal: () => void;
   onOpenLocalStorageModal: () => void;
   onShowAbout: () => void;
-  
+
   // Import status (shared between views)
   importStatus: {
     isLoading: boolean;
@@ -108,7 +108,7 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
           />
         </ErrorBoundary>
       ) : null;
-      
+
     case 'bookDetail':
       return detailViewData ? (
         <ErrorBoundary
@@ -127,10 +127,10 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
           />
         </ErrorBoundary>
       ) : null;
-      
+
     case 'about':
       return <AboutPage onBack={onReturnToLibrary} />;
-      
+
     case 'library':
     default:
       return (

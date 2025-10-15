@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../hooks';
 import { CloseIcon } from './icons';
 
@@ -52,7 +52,7 @@ const CitationModal: React.FC<CitationModalProps> = ({ isOpen, onClose, onSave }
             <CloseIcon className="w-6 h-6" />
           </button>
         </div>
-        
+
         <p className="text-slate-300 mb-4 text-sm">
           A citation for the current location will be created. You can add an optional note below.
         </p>

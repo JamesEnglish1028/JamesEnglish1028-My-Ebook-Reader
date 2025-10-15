@@ -36,7 +36,7 @@ const DuplicateBookModal: React.FC<DuplicateBookModalProps> = ({ isOpen, onClose
             <CloseIcon className="w-6 h-6" />
           </button>
         </div>
-        
+
         <p className="text-slate-300 mb-6 text-sm">
           The book "<strong className="font-semibold text-slate-100">{bookTitle}</strong>" is already in your library. What would you like to do?
         </p>

@@ -1,8 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
-import { useLocalStorage } from './useLocalStorage';
 import { LIBRARY_KEYS } from '../constants';
 import { logger } from '../services/logger';
 import type { Catalog, CatalogRegistry } from '../types';
+import { useLocalStorage } from './useLocalStorage';
 
 /**
  * Query keys for catalog operations
@@ -14,7 +14,7 @@ export const catalogManagementKeys = {
 
 /**
  * React Query mutation hooks for catalog management operations
- * 
+ *
  * Note: These mutations use localStorage directly via useLocalStorage hook
  * since catalogs are stored locally, not in a backend API. The mutations
  * provide a consistent interface and handle error logging.
@@ -22,13 +22,13 @@ export const catalogManagementKeys = {
 
 /**
  * Hook for adding a new catalog
- * 
+ *
  * @returns Mutation hook for adding catalogs
- * 
+ *
  * @example
  * ```tsx
  * const { mutate: addCatalog, isPending } = useAddCatalog();
- * 
+ *
  * addCatalog(
  *   { name: 'Project Gutenberg', url: 'https://...', opdsVersion: 'auto' },
  *   {
@@ -50,10 +50,10 @@ export function useAddCatalog() {
         url,
         opdsVersion,
       };
-      
+
       setCatalogs(prev => [...prev, newCatalog]);
       logger.info('Catalog added:', newCatalog);
-      
+
       return newCatalog;
     },
     onError: (error) => {
@@ -64,13 +64,13 @@ export function useAddCatalog() {
 
 /**
  * Hook for updating an existing catalog
- * 
+ *
  * @returns Mutation hook for updating catalogs
- * 
+ *
  * @example
  * ```tsx
  * const { mutate: updateCatalog } = useUpdateCatalog();
- * 
+ *
  * updateCatalog(
  *   { id: 'catalog-123', updates: { name: 'New Name' } },
  *   {
@@ -87,7 +87,7 @@ export function useUpdateCatalogMutation() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Omit<Catalog, 'id'>> }) => {
       let updatedCatalog: Catalog | undefined;
-      
+
       setCatalogs(prev =>
         prev.map(c => {
           if (c.id === id) {
@@ -97,11 +97,11 @@ export function useUpdateCatalogMutation() {
           return c;
         })
       );
-      
+
       if (!updatedCatalog) {
         throw new Error(`Catalog with id ${id} not found`);
       }
-      
+
       logger.info('Catalog updated:', updatedCatalog);
       return updatedCatalog;
     },
@@ -113,13 +113,13 @@ export function useUpdateCatalogMutation() {
 
 /**
  * Hook for deleting a catalog
- * 
+ *
  * @returns Mutation hook for deleting catalogs
- * 
+ *
  * @example
  * ```tsx
  * const { mutate: deleteCatalog } = useDeleteCatalogMutation();
- * 
+ *
  * deleteCatalog(
  *   'catalog-123',
  *   {
@@ -139,10 +139,10 @@ export function useDeleteCatalogMutation() {
       if (!catalog) {
         throw new Error(`Catalog with id ${id} not found`);
       }
-      
+
       setCatalogs(prev => prev.filter(c => c.id !== id));
       logger.info('Catalog deleted:', catalog);
-      
+
       return catalog;
     },
     onError: (error) => {
@@ -153,13 +153,13 @@ export function useDeleteCatalogMutation() {
 
 /**
  * Hook for adding a new catalog registry
- * 
+ *
  * @returns Mutation hook for adding registries
- * 
+ *
  * @example
  * ```tsx
  * const { mutate: addRegistry } = useAddRegistry();
- * 
+ *
  * addRegistry(
  *   { name: 'OPDS Registry', url: 'https://...' },
  *   {
@@ -180,10 +180,10 @@ export function useAddRegistry() {
         name,
         url,
       };
-      
+
       setRegistries(prev => [...prev, newRegistry]);
       logger.info('Registry added:', newRegistry);
-      
+
       return newRegistry;
     },
     onError: (error) => {
@@ -194,13 +194,13 @@ export function useAddRegistry() {
 
 /**
  * Hook for updating an existing registry
- * 
+ *
  * @returns Mutation hook for updating registries
- * 
+ *
  * @example
  * ```tsx
  * const { mutate: updateRegistry } = useUpdateRegistryMutation();
- * 
+ *
  * updateRegistry(
  *   { id: 'registry-123', updates: { name: 'New Name' } },
  *   {
@@ -217,7 +217,7 @@ export function useUpdateRegistryMutation() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Omit<CatalogRegistry, 'id'>> }) => {
       let updatedRegistry: CatalogRegistry | undefined;
-      
+
       setRegistries(prev =>
         prev.map(r => {
           if (r.id === id) {
@@ -227,11 +227,11 @@ export function useUpdateRegistryMutation() {
           return r;
         })
       );
-      
+
       if (!updatedRegistry) {
         throw new Error(`Registry with id ${id} not found`);
       }
-      
+
       logger.info('Registry updated:', updatedRegistry);
       return updatedRegistry;
     },
@@ -243,13 +243,13 @@ export function useUpdateRegistryMutation() {
 
 /**
  * Hook for deleting a registry
- * 
+ *
  * @returns Mutation hook for deleting registries
- * 
+ *
  * @example
  * ```tsx
  * const { mutate: deleteRegistry } = useDeleteRegistryMutation();
- * 
+ *
  * deleteRegistry(
  *   'registry-123',
  *   {
@@ -269,10 +269,10 @@ export function useDeleteRegistryMutation() {
       if (!registry) {
         throw new Error(`Registry with id ${id} not found`);
       }
-      
+
       setRegistries(prev => prev.filter(r => r.id !== id));
       logger.info('Registry deleted:', registry);
-      
+
       return registry;
     },
     onError: (error) => {

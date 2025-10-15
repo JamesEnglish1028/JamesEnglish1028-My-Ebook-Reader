@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from '../hooks';
 import { maybeProxyForCors } from '../services/utils';
 
@@ -48,7 +48,7 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
     return () => {
       // cleanup on unmount
       if (pollRef.current) {
-        try { window.clearInterval(pollRef.current); } catch (_) {}
+        try { window.clearInterval(pollRef.current); } catch (_) { }
         pollRef.current = null;
       }
     };
@@ -75,30 +75,30 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
             <p className="text-sm text-slate-300">This catalog at <span className="font-mono">{host}</span> requires credentials to access the requested content.</p>
           </div>
 
-        {/* Polling status and auto-retry */}
-        {isPolling && (
-          <div className="mb-3 text-sm text-slate-300">
-            Waiting for provider sign-in to complete... This may take a minute.
-          </div>
-        )}
-        {directAvailable && (
-          <div className="mb-3 text-sm text-emerald-300 flex items-center justify-between">
-            <span>Direct access appears to be available. You can retry the acquisition now.</span>
-            <div className="ml-4">
-              <button
-                onClick={() => {
-                  // stop polling and trigger retry
-                  if (pollRef.current) { try { window.clearInterval(pollRef.current); } catch (_) {} pollRef.current = null; }
-                  setIsPolling(false);
-                  if (typeof onRetry === 'function') onRetry();
-                }}
-                className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
-              >
-                Retry now
-              </button>
+          {/* Polling status and auto-retry */}
+          {isPolling && (
+            <div className="mb-3 text-sm text-slate-300">
+              Waiting for provider sign-in to complete... This may take a minute.
             </div>
-          </div>
-        )}
+          )}
+          {directAvailable && (
+            <div className="mb-3 text-sm text-emerald-300 flex items-center justify-between">
+              <span>Direct access appears to be available. You can retry the acquisition now.</span>
+              <div className="ml-4">
+                <button
+                  onClick={() => {
+                    // stop polling and trigger retry
+                    if (pollRef.current) { try { window.clearInterval(pollRef.current); } catch (_) { } pollRef.current = null; }
+                    setIsPolling(false);
+                    if (typeof onRetry === 'function') onRetry();
+                  }}
+                  className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  Retry now
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         {description && <p className="text-sm text-slate-300 mb-4">{description}</p>}
 
@@ -176,14 +176,14 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
           </div>
         )}
 
-  <label htmlFor="opds-username" className="block text-sm text-slate-300 mb-1">Username</label>
-  <input id="opds-username" aria-label="username" placeholder={authDocument?.username_placeholder || 'Username'} value={username} onChange={(e) => setUsername(e.target.value)} className="w-full mb-3 p-2 rounded bg-slate-900 border border-slate-700 text-white" />
+        <label htmlFor="opds-username" className="block text-sm text-slate-300 mb-1">Username</label>
+        <input id="opds-username" aria-label="username" placeholder={authDocument?.username_placeholder || 'Username'} value={username} onChange={(e) => setUsername(e.target.value)} className="w-full mb-3 p-2 rounded bg-slate-900 border border-slate-700 text-white" />
 
-  <label htmlFor="opds-password" className="block text-sm text-slate-300 mb-1">Password</label>
-  <input id="opds-password" aria-label="password" placeholder={authDocument?.password_placeholder || 'Password'} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full mb-3 p-2 rounded bg-slate-900 border border-slate-700 text-white" />
+        <label htmlFor="opds-password" className="block text-sm text-slate-300 mb-1">Password</label>
+        <input id="opds-password" aria-label="password" placeholder={authDocument?.password_placeholder || 'Password'} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full mb-3 p-2 rounded bg-slate-900 border border-slate-700 text-white" />
 
-    {authDocument?.username_hint && <div className="text-xs text-slate-400 mb-2">Hint: {authDocument.username_hint}</div>}
-    {authDocument?.password_hint && <div className="text-xs text-slate-400 mb-2">Password: {authDocument.password_hint}</div>}
+        {authDocument?.username_hint && <div className="text-xs text-slate-400 mb-2">Hint: {authDocument.username_hint}</div>}
+        {authDocument?.password_hint && <div className="text-xs text-slate-400 mb-2">Password: {authDocument.password_hint}</div>}
 
         <div className="flex items-center gap-2 mb-4">
           <input id="saveCred" type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />

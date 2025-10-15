@@ -1,23 +1,25 @@
 
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { bookmarkService, citationService, positionTracker } from '../domain/reader';
 import { db } from '../services/db';
-import { findSentenceRange, findDomRangeFromCharacterOffsets } from '../services/readAloud';
-import { getEpubViewStateForBook, saveEpubViewStateForBook ,
-  getReaderSettings,
-  saveReaderSettings,
-  performBookSearch,
-  findFirstChapter,
+import { findDomRangeFromCharacterOffsets, findSentenceRange } from '../services/readAloud';
+import {
   buildTocFromSpine,
+  findFirstChapter,
+  getEpubViewStateForBook,
+  getReaderSettings,
+  performBookSearch,
+  saveEpubViewStateForBook,
+  saveReaderSettings,
 } from '../services/readerUtils';
-import { trackEvent, isDebug } from '../services/utils';
-import type { BookRecord, ReaderSettings, TocItem, Bookmark, SearchResult, CoverAnimationData, Citation } from '../types';
+import { isDebug, trackEvent } from '../services/utils';
+import type { Bookmark, BookRecord, Citation, CoverAnimationData, ReaderSettings, SearchResult, TocItem } from '../types';
 
 import BookmarkModal from './BookmarkModal';
 import CitationModal from './CitationModal';
-import { LeftArrowIcon, RightArrowIcon, SettingsIcon, CloseIcon, ListIcon, BookmarkIcon, SearchIcon, AcademicCapIcon, PlayIcon, PauseIcon } from './icons';
+import { AcademicCapIcon, BookmarkIcon, CloseIcon, LeftArrowIcon, ListIcon, PauseIcon, PlayIcon, RightArrowIcon, SearchIcon, SettingsIcon } from './icons';
 import SearchPanel from './SearchPanel';
 import SettingsPanel from './SettingsPanel';
 import ShortcutHelpModal from './ShortcutHelpModal';
@@ -79,7 +81,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       }
     };
   }, [showZoomHud]);
-  
+
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings);
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -161,7 +163,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       // fade out handled by parent opacity class; keep last transform
     }
   }, [animationState, animationData]);
-  
+
   // Fetch book data once, on mount or when bookId changes
   useEffect(() => {
     const fetchBook = async () => {
@@ -181,37 +183,37 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     const setDefaultVoice = () => {
       const currentSettings = getReaderSettings();
       if (currentSettings.readAloud.voiceURI) {
-        return; 
+        return;
       }
-  
+
       const availableVoices = window.speechSynthesis.getVoices();
       if (availableVoices.length === 0) {
         return;
       }
-  
+
       const bestVoice = availableVoices.find(v => v.default) ||
-                      availableVoices.find(v => v.lang === 'en-US' && /google/i.test(v.name)) ||
-                      availableVoices.find(v => v.lang === 'en-US' && /microsoft/i.test(v.name)) ||
-                      availableVoices.find(v => v.lang === 'en-US' && v.localService) ||
-                      availableVoices.find(v => v.lang === 'en-US') ||
-                      null;
-  
+        availableVoices.find(v => v.lang === 'en-US' && /google/i.test(v.name)) ||
+        availableVoices.find(v => v.lang === 'en-US' && /microsoft/i.test(v.name)) ||
+        availableVoices.find(v => v.lang === 'en-US' && v.localService) ||
+        availableVoices.find(v => v.lang === 'en-US') ||
+        null;
+
       if (bestVoice) {
         setSettings(prevSettings => {
           const newReadAloudSettings = { ...prevSettings.readAloud, voiceURI: bestVoice!.voiceURI };
           const newSettings = { ...prevSettings, readAloud: newReadAloudSettings };
-          saveReaderSettings(newSettings); 
+          saveReaderSettings(newSettings);
           return newSettings;
         });
       }
     };
-  
+
     if (window.speechSynthesis.getVoices().length > 0) {
       setDefaultVoice();
     } else {
       window.speechSynthesis.onvoiceschanged = setDefaultVoice;
     }
-    
+
     return () => {
       window.speechSynthesis.onvoiceschanged = null;
     };
@@ -219,192 +221,192 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const saveLastSpokenPosition = useCallback(() => {
     if (lastSpokenCfiRef.current) {
-        // Save TTS position using positionTracker
-        positionTracker.saveSpeechPosition(bookId, lastSpokenCfiRef.current);
+      // Save TTS position using positionTracker
+      positionTracker.saveSpeechPosition(bookId, lastSpokenCfiRef.current);
     }
   }, [bookId]);
 
   const removeHighlight = useCallback(() => {
     if (highlightedCfiRef.current && renditionRef.current) {
-        renditionRef.current.annotations.remove(highlightedCfiRef.current, 'highlight');
-        highlightedCfiRef.current = null;
+      renditionRef.current.annotations.remove(highlightedCfiRef.current, 'highlight');
+      highlightedCfiRef.current = null;
     }
   }, []);
 
   const stopSpeech = useCallback(() => {
-      if (speechStateRef.current !== 'stopped') {
-          saveLastSpokenPosition();
-      }
-      setSpeechState('stopped');
-      window.speechSynthesis.cancel();
-      isAutoPagingRef.current = false;
-      removeHighlight();
-      utteranceRef.current = null;
-      lastSpokenCfiRef.current = null;
-      currentSentenceRef.current = '';
+    if (speechStateRef.current !== 'stopped') {
+      saveLastSpokenPosition();
+    }
+    setSpeechState('stopped');
+    window.speechSynthesis.cancel();
+    isAutoPagingRef.current = false;
+    removeHighlight();
+    utteranceRef.current = null;
+    lastSpokenCfiRef.current = null;
+    currentSentenceRef.current = '';
   }, [removeHighlight, saveLastSpokenPosition]);
-  
+
   const startSpeech = useCallback(() => {
     const currentRendition = renditionRef.current;
     if (!currentRendition) return;
-    
+
     if (speechStateRef.current !== 'stopped') {
-        window.speechSynthesis.cancel();
-        removeHighlight();
+      window.speechSynthesis.cancel();
+      removeHighlight();
     }
 
     const contents = currentRendition.getContents();
     if (!contents || contents.length === 0) return;
-    
+
     const body = contents[0].document?.body;
     if (!body) return;
 
     const rawText = body.textContent || '';
     const normalizedText = rawText.replace(/\s+/g, ' ').trim();
     if (!normalizedText) {
-        if (settingsRef.current.flow === 'paginated' && speechStateRef.current === 'playing') {
-            isAutoPagingRef.current = true;
-            currentRendition.next();
-        }
-        return;
+      if (settingsRef.current.flow === 'paginated' && speechStateRef.current === 'playing') {
+        isAutoPagingRef.current = true;
+        currentRendition.next();
+      }
+      return;
     }
-    
+
     let textToRead = normalizedText;
     let startIndexInNormalized = 0;
     const startCfi = speechStartCfiRef.current;
 
     if (startCfi) {
-        try {
-            const range = contents[0].range(startCfi);
-            if (range) {
-                const textForCfi = range.toString().replace(/\s+/g, ' ').trim();
-                const searchIndex = normalizedText.indexOf(textForCfi);
-                if (searchIndex !== -1) {
-                    startIndexInNormalized = searchIndex;
-                    textToRead = normalizedText.substring(startIndexInNormalized);
-                }
-            }
-        } catch (e) {
-            console.error('Could not find start CFI for speech, starting from beginning.', e);
-        } finally {
-            speechStartCfiRef.current = null;
+      try {
+        const range = contents[0].range(startCfi);
+        if (range) {
+          const textForCfi = range.toString().replace(/\s+/g, ' ').trim();
+          const searchIndex = normalizedText.indexOf(textForCfi);
+          if (searchIndex !== -1) {
+            startIndexInNormalized = searchIndex;
+            textToRead = normalizedText.substring(startIndexInNormalized);
+          }
         }
+      } catch (e) {
+        console.error('Could not find start CFI for speech, starting from beginning.', e);
+      } finally {
+        speechStartCfiRef.current = null;
+      }
     }
 
     speechContextRef.current = { rawText, normalizedText, startIndexInNormalized };
     const utterance = new SpeechSynthesisUtterance(textToRead);
     utteranceRef.current = utterance;
-    
+
     const voices = window.speechSynthesis.getVoices();
     const currentSettings = settingsRef.current;
     const selectedVoice = voices.find(v => v.voiceURI === currentSettings.readAloud.voiceURI);
-    
+
     utterance.voice = selectedVoice || null;
     utterance.rate = currentSettings.readAloud.rate;
     utterance.pitch = currentSettings.readAloud.pitch;
     utterance.volume = currentSettings.readAloud.volume;
-    
+
     utterance.onboundary = (event) => {
-        if (event.name !== 'word' || !renditionRef.current || !body || !speechContextRef.current) return;
-        
-        const { rawText, normalizedText, startIndexInNormalized } = speechContextRef.current;
-        const absoluteCharIndex = event.charIndex + startIndexInNormalized;
-        const sentenceInfo = findSentenceRange(normalizedText, absoluteCharIndex);
-        
-        if (!sentenceInfo || sentenceInfo.sentence === currentSentenceRef.current) {
-            return;
+      if (event.name !== 'word' || !renditionRef.current || !body || !speechContextRef.current) return;
+
+      const { rawText, normalizedText, startIndexInNormalized } = speechContextRef.current;
+      const absoluteCharIndex = event.charIndex + startIndexInNormalized;
+      const sentenceInfo = findSentenceRange(normalizedText, absoluteCharIndex);
+
+      if (!sentenceInfo || sentenceInfo.sentence === currentSentenceRef.current) {
+        return;
+      }
+      currentSentenceRef.current = sentenceInfo.sentence;
+
+      try {
+        const estimatedRawIndex = (absoluteCharIndex / normalizedText.length) * rawText.length;
+
+        let bestMatchIndex = -1;
+        let minDistance = Infinity;
+        let currentIndex = -1;
+
+        while ((currentIndex = rawText.indexOf(sentenceInfo.sentence, currentIndex + 1)) !== -1) {
+          const distance = Math.abs(currentIndex - estimatedRawIndex);
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestMatchIndex = currentIndex;
+          }
         }
-        currentSentenceRef.current = sentenceInfo.sentence;
-        
-        try {
-            const estimatedRawIndex = (absoluteCharIndex / normalizedText.length) * rawText.length;
-            
-            let bestMatchIndex = -1;
-            let minDistance = Infinity;
-            let currentIndex = -1;
 
-            while ((currentIndex = rawText.indexOf(sentenceInfo.sentence, currentIndex + 1)) !== -1) {
-                const distance = Math.abs(currentIndex - estimatedRawIndex);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    bestMatchIndex = currentIndex;
+        if (bestMatchIndex !== -1) {
+          const rawStartOffset = bestMatchIndex;
+          const rawEndOffset = bestMatchIndex + sentenceInfo.sentence.length;
+          const domRange = findDomRangeFromCharacterOffsets(body, rawStartOffset, rawEndOffset);
+
+          if (domRange) {
+            const contents = renditionRef.current.getContents()[0];
+            const cfi = contents.cfiFromRange(domRange);
+            if (cfi) {
+              lastSpokenCfiRef.current = cfi;
+              removeHighlight();
+              renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
+                'fill': 'rgba(0, 191, 255, 0.4)',
+              });
+              highlightedCfiRef.current = cfi;
+
+              if (settingsRef.current.flow === 'scrolled') {
+                const iframe = viewerRef.current?.querySelector('iframe');
+                const elementToScroll = domRange.startContainer.parentElement;
+
+                if (elementToScroll && iframe) {
+                  const elementRect = elementToScroll.getBoundingClientRect();
+                  const iframeRect = iframe.getBoundingClientRect();
+
+                  const elementTopInIframe = elementRect.top - iframeRect.top;
+                  const elementBottomInIframe = elementRect.bottom - iframeRect.top;
+
+                  const iframeVisibleHeight = iframeRect.height;
+                  const safeZoneTop = iframeVisibleHeight * 0.3;
+                  const safeZoneBottom = iframeVisibleHeight * 0.7;
+
+                  if (elementTopInIframe < safeZoneTop || elementBottomInIframe > safeZoneBottom) {
+                    elementToScroll.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center',
+                      inline: 'nearest',
+                    });
+                  }
                 }
+              }
             }
-
-            if (bestMatchIndex !== -1) {
-                const rawStartOffset = bestMatchIndex;
-                const rawEndOffset = bestMatchIndex + sentenceInfo.sentence.length;
-                const domRange = findDomRangeFromCharacterOffsets(body, rawStartOffset, rawEndOffset);
-                
-                if (domRange) {
-                    const contents = renditionRef.current.getContents()[0];
-                    const cfi = contents.cfiFromRange(domRange);
-                    if (cfi) {
-                        lastSpokenCfiRef.current = cfi;
-                        removeHighlight();
-                        renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
-                            'fill': 'rgba(0, 191, 255, 0.4)',
-                        });
-                        highlightedCfiRef.current = cfi;
-                        
-                        if (settingsRef.current.flow === 'scrolled') {
-                            const iframe = viewerRef.current?.querySelector('iframe');
-                            const elementToScroll = domRange.startContainer.parentElement;
-
-                            if (elementToScroll && iframe) {
-                                const elementRect = elementToScroll.getBoundingClientRect();
-                                const iframeRect = iframe.getBoundingClientRect();
-                                
-                                const elementTopInIframe = elementRect.top - iframeRect.top;
-                                const elementBottomInIframe = elementRect.bottom - iframeRect.top;
-                                
-                                const iframeVisibleHeight = iframeRect.height;
-                                const safeZoneTop = iframeVisibleHeight * 0.3;
-                                const safeZoneBottom = iframeVisibleHeight * 0.7;
-
-                                if (elementTopInIframe < safeZoneTop || elementBottomInIframe > safeZoneBottom) {
-                                    elementToScroll.scrollIntoView({
-                                        behavior: 'smooth',
-                                        block: 'center',
-                                        inline: 'nearest',
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('Error during sentence highlighting:', e);
+          }
         }
+      } catch (e) {
+        console.error('Error during sentence highlighting:', e);
+      }
     };
-    
+
     utterance.onend = () => {
-        removeHighlight();
-        
-        // If the speech state is not 'playing' when onend fires, it means
-        // the event was triggered by a manual pause() or cancel() call.
-        // In this case, we should not proceed to the next page.
-        if (speechStateRef.current !== 'playing') {
-            if (speechStateRef.current === 'paused') {
-                return; // Stay in paused state
-            }
-            setSpeechState('stopped'); // Finalize to stopped state
-            return;
-        }
+      removeHighlight();
 
-        // If we get here, speech ended naturally while in the 'playing' state.
-        if (settingsRef.current.flow === 'paginated') {
-            isAutoPagingRef.current = true;
-            renditionRef.current?.next();
-        } else {
-            setSpeechState('stopped');
+      // If the speech state is not 'playing' when onend fires, it means
+      // the event was triggered by a manual pause() or cancel() call.
+      // In this case, we should not proceed to the next page.
+      if (speechStateRef.current !== 'playing') {
+        if (speechStateRef.current === 'paused') {
+          return; // Stay in paused state
         }
+        setSpeechState('stopped'); // Finalize to stopped state
+        return;
+      }
+
+      // If we get here, speech ended naturally while in the 'playing' state.
+      if (settingsRef.current.flow === 'paginated') {
+        isAutoPagingRef.current = true;
+        renditionRef.current?.next();
+      } else {
+        setSpeechState('stopped');
+      }
     };
-    
+
     utterance.onerror = (e) => {
-        console.error('SpeechSynthesisUtterance error', e);
-        stopSpeech();
+      console.error('SpeechSynthesisUtterance error', e);
+      stopSpeech();
     };
 
     window.speechSynthesis.speak(utterance);
@@ -414,7 +416,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   // Initialize epub.js rendition only after animation is finished
   useEffect(() => {
     if (animationState !== 'finished' || !bookData || !viewerRef.current) {
-        return;
+      return;
     }
 
     let isMounted = true;
@@ -426,23 +428,23 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         const ePub = window.ePub;
         const bookInstance = ePub(bookData.epubData);
         bookRef.current = bookInstance;
-        
+
         if (viewerRef.current) {
           viewerRef.current.innerHTML = '';
           viewerRef.current.style.opacity = '0';
         }
-        
+
         const renditionInstance = bookInstance.renderTo(viewerRef.current, {
-            width: '100%',
-            height: '100%',
-            flow: settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
-            manager: 'default',
-            spread: 'auto',
+          width: '100%',
+          height: '100%',
+          flow: settings.flow === 'scrolled' ? 'scrolled-doc' : 'paginated',
+          manager: 'default',
+          spread: 'auto',
         });
         if (!isMounted) return;
         setRendition(renditionInstance);
         renditionRef.current = renditionInstance;
-          
+
         const nav = await bookInstance.loaded.navigation;
         if (!isMounted) return;
         // nav.toc may be undefined for older EPUB2/NCX; build fallback from spine if needed
@@ -490,7 +492,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           if (locationsReadyRef.current && bookRef.current?.locations) {
             const bookLocations = bookRef.current.locations;
             const page = bookLocations.locationFromCfi(location.start.cfi);
-            
+
             if (page > -1) {
               const progress = bookLocations.percentageFromCfi(location.start.cfi);
               setLocationInfo({
@@ -500,13 +502,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
               });
             }
           }
-          
+
           if (isAutoPagingRef.current) {
-              isAutoPagingRef.current = false;
-              startSpeech();
+            isAutoPagingRef.current = false;
+            startSpeech();
           }
         });
-        
+
         await bookInstance.ready;
         if (!isMounted) return;
 
@@ -514,9 +516,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         await bookInstance.locations.generate(1600);
         if (!isMounted) return;
         locationsReadyRef.current = true;
-        
+
         if (bookInstance.locations) {
-            setLocationInfo(prev => ({ ...prev, totalPages: bookInstance.locations.length(), currentPage: 1 }));
+          setLocationInfo(prev => ({ ...prev, totalPages: bookInstance.locations.length(), currentPage: 1 }));
         }
 
         // Load bookmarks using bookmarkService
@@ -524,51 +526,51 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         if (bookmarksResult.success) {
           setBookmarks(bookmarksResult.data);
         }
-        
+
         // Load citations using citationService
         const citationsResult = citationService.findByBookId(bookId);
         if (citationsResult.success) {
           setCitations(citationsResult.data);
         }
-        
+
         // Load last spoken position (TTS) using positionTracker
         const speechPosResult = positionTracker.getSpeechPosition(bookId);
         speechStartCfiRef.current = speechPosResult.success ? speechPosResult.data : null;
-        
+
         // Load last reading position using positionTracker
         const posResult = positionTracker.getPosition(bookId);
         const startLocation = (posResult.success ? posResult.data : null) || await findFirstChapter(bookInstance);
-        
+
         if (!isMounted) return;
-        
-              // Try to display the preferred startLocation, but be defensive: if the section
-              // is missing (common in older/corrupted EPUBs), fall back to the first spine item
-              // or a bare rendition.display() call.
-              if (renditionInstance) {
-                try {
-                  await renditionInstance.display(startLocation || undefined);
-                } catch (err: any) {
-                  console.warn(`rendition.display failed for ${startLocation}. Attempting spine fallback.`, err);
-                  // Try first spine href when possible
-                  try {
-                    const firstSpineHref = bookInstance?.spine?.items && bookInstance.spine.items.length > 0 ? bookInstance.spine.items[0].href : undefined;
-                    if (firstSpineHref) {
-                      await renditionInstance.display(firstSpineHref);
-                    } else {
-                      await renditionInstance.display();
-                    }
-                  } catch (err2) {
-                    console.error('Failed to display book using spine fallback or default', err2);
-                  }
-                }
+
+        // Try to display the preferred startLocation, but be defensive: if the section
+        // is missing (common in older/corrupted EPUBs), fall back to the first spine item
+        // or a bare rendition.display() call.
+        if (renditionInstance) {
+          try {
+            await renditionInstance.display(startLocation || undefined);
+          } catch (err: any) {
+            console.warn(`rendition.display failed for ${startLocation}. Attempting spine fallback.`, err);
+            // Try first spine href when possible
+            try {
+              const firstSpineHref = bookInstance?.spine?.items && bookInstance.spine.items.length > 0 ? bookInstance.spine.items[0].href : undefined;
+              if (firstSpineHref) {
+                await renditionInstance.display(firstSpineHref);
+              } else {
+                await renditionInstance.display();
               }
-        
+            } catch (err2) {
+              console.error('Failed to display book using spine fallback or default', err2);
+            }
+          }
+        }
+
         if (!isMounted) return;
         setIsLoading(false);
-        
+
         if (viewerRef.current) {
-            viewerRef.current.style.transition = 'opacity 0.3s ease-in';
-            viewerRef.current.style.opacity = '1';
+          viewerRef.current.style.transition = 'opacity 0.3s ease-in';
+          viewerRef.current.style.opacity = '1';
         }
         // Restore per-book epub view state (e.g., font size) if available
         try {
@@ -581,51 +583,51 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
         } catch (e) { /* ignore */ }
       } catch (error) {
         if (isMounted) {
-            console.error('Error initializing EPUB:', error);
+          console.error('Error initializing EPUB:', error);
         }
       }
     };
-    
+
     initializeBook();
 
     return () => {
-        isMounted = false;
-        stopSpeech();
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        if (latestCfiRef.current) {
-            positionTracker.savePosition(bookId, latestCfiRef.current);
-        }
-        locationsReadyRef.current = false;
-        setIsNavReady(false);
-        navigationRef.current = null;
-        if (bookRef.current) {
-          bookRef.current.destroy();
-          bookRef.current = null;
-        }
-        renditionRef.current = null;
-        setRendition(null);
+      isMounted = false;
+      stopSpeech();
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (latestCfiRef.current) {
+        positionTracker.savePosition(bookId, latestCfiRef.current);
+      }
+      locationsReadyRef.current = false;
+      setIsNavReady(false);
+      navigationRef.current = null;
+      if (bookRef.current) {
+        bookRef.current.destroy();
+        bookRef.current = null;
+      }
+      renditionRef.current = null;
+      setRendition(null);
     };
   }, [bookId, bookData, settings.flow, animationState, startSpeech, stopSpeech]);
 
   useEffect(() => {
     if (rendition) {
-        if (!(rendition as any).themesRegistered) {
-            const lightTheme = { body: { 'color': '#000', 'background': '#fff' } };
-            const darkTheme = { body: { 'color': '#fff', 'background': '#1f2937' } };
-            rendition.themes.register('light', lightTheme);
-            rendition.themes.register('dark', darkTheme);
-            (rendition as any).themesRegistered = true;
-        }
+      if (!(rendition as any).themesRegistered) {
+        const lightTheme = { body: { 'color': '#000', 'background': '#fff' } };
+        const darkTheme = { body: { 'color': '#fff', 'background': '#1f2937' } };
+        rendition.themes.register('light', lightTheme);
+        rendition.themes.register('dark', darkTheme);
+        (rendition as any).themesRegistered = true;
+      }
 
-        rendition.themes.select(settings.theme);
-        rendition.themes.fontSize(`${settings.fontSize}%`);
-        if (settings.fontFamily === 'Original') {
-            rendition.themes.font('inherit');
-        } else if (settings.fontFamily === 'Serif') {
-            rendition.themes.font('Georgia, "Times New Roman", serif');
-        } else if (settings.fontFamily === 'Sans-Serif') {
-            rendition.themes.font('"Helvetica Neue", Helvetica, Arial, sans-serif');
-        }
+      rendition.themes.select(settings.theme);
+      rendition.themes.fontSize(`${settings.fontSize}%`);
+      if (settings.fontFamily === 'Original') {
+        rendition.themes.font('inherit');
+      } else if (settings.fontFamily === 'Serif') {
+        rendition.themes.font('Georgia, "Times New Roman", serif');
+      } else if (settings.fontFamily === 'Sans-Serif') {
+        rendition.themes.font('"Helvetica Neue", Helvetica, Arial, sans-serif');
+      }
     }
     saveReaderSettings(settings);
   }, [rendition, settings]);
@@ -721,7 +723,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const nextPage = useCallback(() => { rendition?.next(); setControlsVisible(true); stopSpeech(); }, [rendition, stopSpeech]);
   const prevPage = useCallback(() => { rendition?.prev(); setControlsVisible(true); stopSpeech(); }, [rendition, stopSpeech]);
-  
+
   // Keyboard shortcuts for EPUB reader
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -756,14 +758,14 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           description: undefined,
           createdAt: Date.now(),
         };
-        
+
         // Add bookmark using bookmarkService
         const addResult = bookmarkService.add(bookId, {
           cfi: latestCfiRef.current!,
           label: `Page ${locationInfo.currentPage}`,
           chapter: currentChapterLabel,
         });
-        
+
         if (addResult.success) {
           const updated = [...bookmarks, addResult.data];
           setBookmarks(updated);
@@ -774,7 +776,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [prevPage, nextPage, bookmarks, bookId, locationInfo.currentPage, currentChapterLabel]);
-  
+
   useEffect(() => {
     if (!rendition) return;
 
@@ -786,11 +788,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       const clickZone = width * 0.3;
 
       if (settings.flow === 'paginated') {
-          if (x < clickZone) prevPage();
-          else if (x > width - clickZone) nextPage();
-          else setControlsVisible(v => !v);
+        if (x < clickZone) prevPage();
+        else if (x > width - clickZone) nextPage();
+        else setControlsVisible(v => !v);
       } else {
-          setControlsVisible(v => !v);
+        setControlsVisible(v => !v);
       }
     };
     rendition.on('click', clickHandler);
@@ -799,11 +801,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const handleSettingsChange = (newSettings: Partial<ReaderSettings>) => {
     setSettings(prev => {
-        const updated = { ...prev, ...newSettings };
-        if(newSettings.readAloud) {
-            updated.readAloud = { ...prev.readAloud, ...newSettings.readAloud };
-        }
-        return updated;
+      const updated = { ...prev, ...newSettings };
+      if (newSettings.readAloud) {
+        updated.readAloud = { ...prev.readAloud, ...newSettings.readAloud };
+      }
+      return updated;
     });
   };
   const safeDisplay = useCallback(async (loc?: string) => {
@@ -878,7 +880,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
         // Finally try display without args
         await tryDisplay(undefined);
-        } catch (err2) {
+      } catch (err2) {
         console.error('safeDisplay: rendition.display fallback failed', err2);
       }
     }
@@ -898,25 +900,25 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       try {
         const tocItemPromise = navigationRef.current.get(cfi);
         if (tocItemPromise && typeof tocItemPromise.then === 'function') {
-            const tocItem = await tocItemPromise;
-            if (tocItem?.label) {
-              chapter = tocItem.label.trim();
-            }
+          const tocItem = await tocItemPromise;
+          if (tocItem?.label) {
+            chapter = tocItem.label.trim();
+          }
         }
       } catch (e) {
         console.warn('Could not fetch chapter for bookmark, using last known chapter.', e);
       }
     }
-    
+
     const newBookmark: Bookmark = {
-        id: new Date().toISOString(),
-        cfi: cfi,
-        label: `Page ${locationInfo.currentPage} (${locationInfo.progress}%)`,
-        chapter: chapter,
-        description: description || undefined,
-        createdAt: Date.now(),
+      id: new Date().toISOString(),
+      cfi: cfi,
+      label: `Page ${locationInfo.currentPage} (${locationInfo.progress}%)`,
+      chapter: chapter,
+      description: description || undefined,
+      createdAt: Date.now(),
     };
-    
+
     // Add bookmark with custom note using bookmarkService
     const addResult = bookmarkService.add(bookId, {
       cfi: latestCfiRef.current!,
@@ -924,29 +926,29 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       chapter: chapter,
       description: description || undefined,
     });
-    
+
     if (addResult.success) {
       const updatedBookmarks = [...bookmarks, addResult.data];
       setBookmarks(updatedBookmarks);
     }
-    
+
     setShowBookmarkModal(false);
   }, [bookId, bookmarks, locationInfo.currentPage, locationInfo.progress, currentChapterLabel]);
 
 
   const deleteBookmark = useCallback((bookmarkId: string) => {
-      // Delete bookmark using bookmarkService
-      const deleteResult = bookmarkService.delete(bookId, bookmarkId);
-      
-      if (deleteResult.success) {
-        const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
-        setBookmarks(updatedBookmarks);
-      }
+    // Delete bookmark using bookmarkService
+    const deleteResult = bookmarkService.delete(bookId, bookmarkId);
+
+    if (deleteResult.success) {
+      const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
+      setBookmarks(updatedBookmarks);
+    }
   }, [bookId, bookmarks]);
 
   const handleSaveCitation = useCallback(async (note: string) => {
     if (!latestCfiRef.current) return;
-    
+
     const cfi = latestCfiRef.current;
     let chapter = currentChapterLabel;
 
@@ -954,10 +956,10 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       try {
         const tocItemPromise = navigationRef.current.get(cfi);
         if (tocItemPromise && typeof tocItemPromise.then === 'function') {
-            const tocItem = await tocItemPromise;
-            if (tocItem?.label) {
-              chapter = tocItem.label.trim();
-            }
+          const tocItem = await tocItemPromise;
+          if (tocItem?.label) {
+            chapter = tocItem.label.trim();
+          }
         }
       } catch (e) {
         console.warn('Could not fetch chapter for citation, using last known chapter.', e);
@@ -971,55 +973,55 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       pageNumber: locationInfo.currentPage > 0 ? locationInfo.currentPage : undefined,
       chapter: chapter,
     });
-    
+
     if (addResult.success) {
       const updatedCitations = [...citations, addResult.data];
       setCitations(updatedCitations);
     }
-    
+
     setShowCitationModal(false);
   }, [bookId, citations, locationInfo.currentPage, currentChapterLabel]);
 
   const deleteCitation = useCallback((citationId: string) => {
-      // Delete citation using citationService
-      const deleteResult = citationService.delete(bookId, citationId);
-      
-      if (deleteResult.success) {
-        const updatedCitations = citations.filter(c => c.id !== citationId);
-        setCitations(updatedCitations);
-      }
+    // Delete citation using citationService
+    const deleteResult = citationService.delete(bookId, citationId);
+
+    if (deleteResult.success) {
+      const updatedCitations = citations.filter(c => c.id !== citationId);
+      setCitations(updatedCitations);
+    }
   }, [bookId, citations]);
 
   const isCurrentPageBookmarked = useMemo(() => bookmarks.some(b => b.cfi === currentCfi), [bookmarks, currentCfi]);
 
   const toggleBookmark = useCallback(() => {
     if (isCurrentPageBookmarked) {
-        const bookmarkToRemove = bookmarks.find(b => b.cfi === currentCfi);
-        if (bookmarkToRemove) deleteBookmark(bookmarkToRemove.id);
+      const bookmarkToRemove = bookmarks.find(b => b.cfi === currentCfi);
+      if (bookmarkToRemove) deleteBookmark(bookmarkToRemove.id);
     } else {
-        setShowBookmarkModal(true);
+      setShowBookmarkModal(true);
     }
   }, [isCurrentPageBookmarked, deleteBookmark, bookmarks, currentCfi]);
 
   const performSearch = useCallback(async (query: string) => {
     if (!query || !bookRef.current) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
     }
     if (currentHighlightCfi && rendition) {
-        rendition.annotations.remove(currentHighlightCfi, 'highlight');
-        setCurrentHighlightCfi(null);
+      rendition.annotations.remove(currentHighlightCfi, 'highlight');
+      setCurrentHighlightCfi(null);
     }
     try {
-        setIsSearching(true);
-        const results = await performBookSearch(bookRef.current, query);
-        setSearchResults(results);
+      setIsSearching(true);
+      const results = await performBookSearch(bookRef.current, query);
+      setSearchResults(results);
     } catch (err) {
-        console.error('Search failed:', err);
-        setSearchResults([]);
+      console.error('Search failed:', err);
+      setSearchResults([]);
     } finally {
-        setIsSearching(false);
+      setIsSearching(false);
     }
   }, [rendition, currentHighlightCfi]);
 
@@ -1032,7 +1034,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       setIsSearching(false);
       return;
     }
-    
+
     debounceTimeoutRef.current = window.setTimeout(() => {
       performSearch(query);
     }, 500);
@@ -1040,11 +1042,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const handleNavigateToResult = useCallback((cfi: string) => {
     if (!rendition) return;
-  
+
     if (currentHighlightCfi) {
       rendition.annotations.remove(currentHighlightCfi, 'highlight');
     }
-    
+
     stopSpeech();
     setShowSearch(false);
     void safeDisplay(cfi).then(() => {
@@ -1060,11 +1062,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   const handleCloseSearch = () => {
     setShowSearch(false);
     if (currentHighlightCfi && rendition) {
-        rendition.annotations.remove(currentHighlightCfi, 'highlight');
-        setCurrentHighlightCfi(null);
+      rendition.annotations.remove(currentHighlightCfi, 'highlight');
+      setCurrentHighlightCfi(null);
     }
   };
-  
+
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (rendition && bookRef.current?.locations && locationsReadyRef.current) {
       setControlsVisible(true);
@@ -1110,85 +1112,85 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   return (
     <>
       {animationData && animationState !== 'finished' && (
-          <div
-            className={`fixed inset-0 bg-slate-900 z-50 flex justify-center items-center transition-opacity duration-300 ${animationState === 'fading' ? 'opacity-0' : 'opacity-100'}`}
-            onTransitionEnd={() => {
-              if (animationState === 'fading') setAnimationState('finished');
-            }}
-          >
-            {animationData.coverImage && (
-              <img
-                ref={coverRef}
-                src={animationData.coverImage}
-                alt="Expanding book cover"
-                className="object-contain rounded-lg shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]"
-                onTransitionEnd={() => {
-                  if (animationState === 'expanding') {
-                    setTimeout(() => setAnimationState('fading'), 200);
-                  }
-                }}
-              />
-            )}
-          </div>
-        )}
+        <div
+          className={`fixed inset-0 bg-slate-900 z-50 flex justify-center items-center transition-opacity duration-300 ${animationState === 'fading' ? 'opacity-0' : 'opacity-100'}`}
+          onTransitionEnd={() => {
+            if (animationState === 'fading') setAnimationState('finished');
+          }}
+        >
+          {animationData.coverImage && (
+            <img
+              ref={coverRef}
+              src={animationData.coverImage}
+              alt="Expanding book cover"
+              className="object-contain rounded-lg shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]"
+              onTransitionEnd={() => {
+                if (animationState === 'expanding') {
+                  setTimeout(() => setAnimationState('fading'), 200);
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
       <div className={`fixed inset-0 bg-slate-900 flex flex-col select-none transition-opacity duration-500 ${animationState === 'fading' || animationState === 'finished' ? 'opacity-100' : 'opacity-0'}`}>
         <header
           className={`flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-start sm:gap-4 p-2 bg-slate-800 shadow-md z-20 text-white flex-shrink-0 transition-transform duration-300 ease-in-out ${controlsVisible ? 'translate-y-0' : '-translate-y-full'}`}
           onMouseEnter={clearControlsTimeout}
           onMouseLeave={resetControlsTimeout}
         >
-      {/* Fallback TOC banner */}
-      {usedTocFallback && (
-        <div className="absolute left-1/2 transform -translate-x-1/2 top-full mt-2 z-40">
-          <div className="bg-amber-600 text-black px-4 py-2 rounded shadow-md flex items-center gap-4">
-            <span className="text-sm">This book's navigation was incomplete; a fallback contents list was used.</span>
-            <button onClick={() => {
-                const firstHref = bookRef.current?.spine?.items && bookRef.current.spine.items.length > 0 ? bookRef.current.spine.items[0].href : undefined;
-                if (firstHref) void safeDisplay(firstHref);
-                setUsedTocFallback(false);
-              }} className="bg-black/10 hover:bg-black/20 px-3 py-1 rounded text-sm font-semibold">Open first content</button>
-            <button onClick={() => setUsedTocFallback(false)} className="px-2 py-1 text-sm underline">Dismiss</button>
+          {/* Fallback TOC banner */}
+          {usedTocFallback && (
+            <div className="absolute left-1/2 transform -translate-x-1/2 top-full mt-2 z-40">
+              <div className="bg-amber-600 text-black px-4 py-2 rounded shadow-md flex items-center gap-4">
+                <span className="text-sm">This book's navigation was incomplete; a fallback contents list was used.</span>
+                <button onClick={() => {
+                  const firstHref = bookRef.current?.spine?.items && bookRef.current.spine.items.length > 0 ? bookRef.current.spine.items[0].href : undefined;
+                  if (firstHref) void safeDisplay(firstHref);
+                  setUsedTocFallback(false);
+                }} className="bg-black/10 hover:bg-black/20 px-3 py-1 rounded text-sm font-semibold">Open first content</button>
+                <button onClick={() => setUsedTocFallback(false)} className="px-2 py-1 text-sm underline">Dismiss</button>
+              </div>
+            </div>
+          )}
+          {/* Left controls */}
+          <div className="flex items-center gap-2 sm:order-1">
+            <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close Reader">
+              <CloseIcon className="w-6 h-6" />
+            </button>
+            <button onClick={() => setShowNavPanel(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors relative" aria-label="Contents and Bookmarks">
+              <ListIcon className="w-6 h-6" />
+              {(bookmarks.length > 0 || citations.length > 0) && (
+                <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-800" />
+              )}
+            </button>
           </div>
-        </div>
-      )}
-      {/* Left controls */}
-      <div className="flex items-center gap-2 sm:order-1">
-              <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close Reader">
-                  <CloseIcon className="w-6 h-6" />
-              </button>
-              <button onClick={() => setShowNavPanel(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors relative" aria-label="Contents and Bookmarks">
-                  <ListIcon className="w-6 h-6" />
-                   {(bookmarks.length > 0 || citations.length > 0) && (
-                      <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-800" />
-                  )}
-              </button>
-          </div>
-          
+
           {/* Right controls */}
           <div className="flex justify-end items-center gap-2 sm:order-3">
-              <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={speechState === 'playing' ? 'Pause Read Aloud' : 'Start Read Aloud'}>
-                {speechState === 'playing' ? <PauseIcon className="w-6 h-6 text-sky-400" /> : <PlayIcon className="w-6 h-6" />}
-              </button>
-              <button onClick={() => setShowSearch(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Search in book">
-                <SearchIcon className="w-6 h-6" />
-              </button>
-              <button onClick={() => setShowCitationModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Create citation for this page">
-                  <AcademicCapIcon className="w-6 h-6" />
-              </button>
-              <button onClick={toggleBookmark} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={isCurrentPageBookmarked ? 'Remove bookmark from this page' : 'Add bookmark to this page'}>
-                  <BookmarkIcon className="w-6 h-6" filled={isCurrentPageBookmarked} />
-              </button>
-        <button onClick={() => setShowHelp(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Keyboard help">?
-        </button>
-              <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Settings">
-                  <SettingsIcon className="w-6 h-6" />
-              </button>
+            <button onClick={toggleSpeech} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={speechState === 'playing' ? 'Pause Read Aloud' : 'Start Read Aloud'}>
+              {speechState === 'playing' ? <PauseIcon className="w-6 h-6 text-sky-400" /> : <PlayIcon className="w-6 h-6" />}
+            </button>
+            <button onClick={() => setShowSearch(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Search in book">
+              <SearchIcon className="w-6 h-6" />
+            </button>
+            <button onClick={() => setShowCitationModal(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Create citation for this page">
+              <AcademicCapIcon className="w-6 h-6" />
+            </button>
+            <button onClick={toggleBookmark} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label={isCurrentPageBookmarked ? 'Remove bookmark from this page' : 'Add bookmark to this page'}>
+              <BookmarkIcon className="w-6 h-6" filled={isCurrentPageBookmarked} />
+            </button>
+            <button onClick={() => setShowHelp(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Keyboard help">?
+            </button>
+            <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500" aria-label="Settings">
+              <SettingsIcon className="w-6 h-6" />
+            </button>
           </div>
 
           {/* Title/Author - Placed last in DOM for flexbox ordering */}
           <div className="text-center truncate px-2 w-full pt-2 sm:order-2 sm:w-auto sm:flex-grow sm:min-w-0 sm:pt-0">
-              <h2 className="text-lg font-bold">{bookData?.title || 'Loading...'}</h2>
-              <p className="text-sm text-slate-400">{bookData?.author}</p>
+            <h2 className="text-lg font-bold">{bookData?.title || 'Loading...'}</h2>
+            <p className="text-sm text-slate-400">{bookData?.author}</p>
           </div>
         </header>
 
@@ -1211,56 +1213,56 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
           onMouseEnter={clearControlsTimeout}
           onMouseLeave={resetControlsTimeout}
         >
-            {settings.flow === 'paginated' ? (
-                <button onClick={prevPage} className="p-2 rounded-full hover:bg-slate-700 transition-colors flex-shrink-0" aria-label="Previous Page">
-                    <LeftArrowIcon className="w-6 h-6" />
-                </button>
-            ) : <div className="w-10 h-10 flex-shrink-0" /> /* Placeholder to keep layout consistent */}
-            
-      <div className="flex-grow flex flex-col justify-center">
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={locationInfo.progress || 0}
-                    onChange={handleSliderChange}
-                    className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Book progress"
-                    disabled={!locationsReadyRef.current || locationInfo.totalPages === 0}
-                />
-                <div className="text-center text-sm text-slate-300 mt-2" aria-live="polite">
-                    {locationInfo.totalPages > 0 && locationsReadyRef.current ? (
-            <span>Page {locationInfo.currentPage} of {locationInfo.totalPages} &bull; {locationInfo.progress}%</span>
-                    ) : (
-                        <span className="text-slate-400">Calculating progress...</span>
-                    )}
-                </div>
+          {settings.flow === 'paginated' ? (
+            <button onClick={prevPage} className="p-2 rounded-full hover:bg-slate-700 transition-colors flex-shrink-0" aria-label="Previous Page">
+              <LeftArrowIcon className="w-6 h-6" />
+            </button>
+          ) : <div className="w-10 h-10 flex-shrink-0" /> /* Placeholder to keep layout consistent */}
+
+          <div className="flex-grow flex flex-col justify-center">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={locationInfo.progress || 0}
+              onChange={handleSliderChange}
+              className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Book progress"
+              disabled={!locationsReadyRef.current || locationInfo.totalPages === 0}
+            />
+            <div className="text-center text-sm text-slate-300 mt-2" aria-live="polite">
+              {locationInfo.totalPages > 0 && locationsReadyRef.current ? (
+                <span>Page {locationInfo.currentPage} of {locationInfo.totalPages} &bull; {locationInfo.progress}%</span>
+              ) : (
+                <span className="text-slate-400">Calculating progress...</span>
+              )}
             </div>
+          </div>
 
-      {/* Page jump input for quick navigation */}
-      <div className="w-28 flex flex-col items-center text-sm">
-        <label className="text-slate-300 text-xs">Go to</label>
-        <input
-          type="number"
-          min={1}
-          max={locationInfo.totalPages || 9999}
-          value={locationInfo.currentPage || ''}
-          onChange={(e) => {
-          const v = parseInt(e.target.value || '1', 10);
-          if (isNaN(v) || !bookRef.current?.locations) return;
-          const cfi = bookRef.current.locations.cfiFromLocation(v - 1);
-          if (cfi) void safeDisplay(cfi);
-          }}
-          className="w-full text-center rounded-md bg-slate-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-500"
-          aria-label="Jump to page"
-        />
-      </div>
+          {/* Page jump input for quick navigation */}
+          <div className="w-28 flex flex-col items-center text-sm">
+            <label className="text-slate-300 text-xs">Go to</label>
+            <input
+              type="number"
+              min={1}
+              max={locationInfo.totalPages || 9999}
+              value={locationInfo.currentPage || ''}
+              onChange={(e) => {
+                const v = parseInt(e.target.value || '1', 10);
+                if (isNaN(v) || !bookRef.current?.locations) return;
+                const cfi = bookRef.current.locations.cfiFromLocation(v - 1);
+                if (cfi) void safeDisplay(cfi);
+              }}
+              className="w-full text-center rounded-md bg-slate-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              aria-label="Jump to page"
+            />
+          </div>
 
-            {settings.flow === 'paginated' ? (
-                <button onClick={nextPage} className="p-2 rounded-full hover:bg-slate-700 transition-colors flex-shrink-0" aria-label="Next Page">
-                    <RightArrowIcon className="w-6 h-6" />
-                </button>
-            ) : <div className="w-10 h-10 flex-shrink-0" /> /* Placeholder */}
+          {settings.flow === 'paginated' ? (
+            <button onClick={nextPage} className="p-2 rounded-full hover:bg-slate-700 transition-colors flex-shrink-0" aria-label="Next Page">
+              <RightArrowIcon className="w-6 h-6" />
+            </button>
+          ) : <div className="w-10 h-10 flex-shrink-0" /> /* Placeholder */}
         </footer>
 
         <TocPanel

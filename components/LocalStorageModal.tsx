@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFocusTrap } from '../hooks';
 import { db } from '../services/db';
 
@@ -13,7 +13,7 @@ interface LocalStorageModalProps {
 const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }) => {
   const [bookCount, setBookCount] = useState<number | null>(null);
   const confirm = useConfirm();
-  
+
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
     onEscape: onClose
@@ -72,8 +72,8 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
 
       // Clear all app-related localStorage items
       Object.keys(localStorage)
-          .filter(key => key.startsWith('ebook-reader-'))
-          .forEach(key => localStorage.removeItem(key));
+        .filter(key => key.startsWith('ebook-reader-'))
+        .forEach(key => localStorage.removeItem(key));
 
       db.clearAllBooks().then(() => {
         // Reload to apply changes and clear any in-memory state
@@ -93,7 +93,7 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
             <CloseIcon className="w-6 h-6" />
           </button>
         </div>
-        
+
         <div className="space-y-6">
           <div className="bg-slate-900/50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold mb-2 text-slate-200">Library Statistics</h3>
@@ -107,7 +107,7 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
               </span>
             </div>
           </div>
-          
+
           <div className="bg-slate-900/50 p-4 rounded-lg border border-red-500/30">
             <h3 className="text-lg font-semibold mb-2 text-red-400">Danger Zone</h3>
             <p className="text-sm text-slate-400 mb-4">

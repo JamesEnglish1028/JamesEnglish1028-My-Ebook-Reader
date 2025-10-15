@@ -1,13 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCatalogs, useLocalStorage, bookKeys } from '../../hooks';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { mebooksBook } from '../../assets';
+import { bookKeys, useCatalogs, useLocalStorage } from '../../hooks';
 import type { BookMetadata, BookRecord, Catalog, CatalogBook, CatalogRegistry, CoverAnimationData } from '../../types';
-import { LocalLibraryView, SortControls, ImportButton } from './local';
-import { CatalogView } from './catalog';
-import ManageCatalogsModal from '../ManageCatalogsModal';
 import DuplicateBookModal from '../DuplicateBookModal';
 import { ChevronDownIcon, SettingsIcon } from '../icons';
-import { mebooksBook } from '../../assets';
+import ManageCatalogsModal from '../ManageCatalogsModal';
+import { CatalogView } from './catalog';
+import { ImportButton, LocalLibraryView, SortControls } from './local';
 
 interface LibraryViewProps {
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
@@ -35,7 +35,7 @@ interface LibraryViewProps {
 
 /**
  * LibraryView - Main coordinator for library functionality
- * 
+ *
  * Coordinates between local library and catalog browsing views.
  * Manages the header, navigation, and source selection.
  */
@@ -160,7 +160,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
   // Handle file import - NOT using useCallback to prevent recreation issues
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     console.log('[LibraryView] handleFileChange called', event.target.files);
-    
+
     const files = event.target.files;
     if (!files || files.length === 0) {
       console.log('[LibraryView] No file selected');
@@ -174,13 +174,13 @@ const LibraryView: React.FC<LibraryViewProps> = ({
     // This commonly happens with iCloud-synced files on macOS that haven't been downloaded locally
     if (file.size === 0) {
       console.error('[LibraryView] File size is 0 - file object is invalid!');
-      
+
       // Check if this looks like an ebook file that might be stored in iCloud
       const isEbookExtension = /\.(epub|pdf)$/i.test(file.name);
-      const errorMessage = isEbookExtension 
+      const errorMessage = isEbookExtension
         ? 'Unable to access file. If this file is stored in iCloud, right-click it in Finder and select "Download Now" to make it available locally, then try again.'
         : 'Unable to access file. Please try again.';
-      
+
       setImportStatus({ isLoading: false, message: '', error: errorMessage });
       event.target.value = '';
       return;
@@ -190,22 +190,22 @@ const LibraryView: React.FC<LibraryViewProps> = ({
     const fileName = file.name;
     const fileType = file.type;
     const format = fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
-    
+
     // Try to create a stable blob reference immediately
     console.log('[LibraryView] Creating blob from file...');
     const blob = file.slice(0, file.size, file.type);
-    
+
     // Start reading from the blob IMMEDIATELY before any state updates
     const reader = new FileReader();
     console.log('[LibraryView] Starting FileReader.readAsArrayBuffer from blob...');
     reader.readAsArrayBuffer(blob);
-    
+
     // Now update state AFTER we've started reading
     setImportStatus({ isLoading: true, message: 'Reading file...', error: null });
-    
+
     reader.onload = async (e) => {
       const arrayBuffer = e.target?.result as ArrayBuffer;
-      
+
       if (!arrayBuffer) {
         setImportStatus({ isLoading: false, message: '', error: 'Could not read file data.' });
         return;
@@ -226,7 +226,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           console.log('[LibraryView] Invalidating books query cache...');
           await queryClient.invalidateQueries({ queryKey: bookKeys.all });
           console.log('[LibraryView] Books query cache invalidated');
-          
+
           setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
           setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
         } else if (result.existingBook) {
@@ -239,11 +239,11 @@ const LibraryView: React.FC<LibraryViewProps> = ({
         console.error('[LibraryView] Error during processAndSaveBook:', error);
         setImportStatus({ isLoading: false, message: '', error: error.message || 'Failed to import book' });
       }
-      
+
       // Reset input AFTER all processing is complete
       event.target.value = '';
     };
-    
+
     reader.onerror = (e) => {
       console.error('[LibraryView] FileReader error:', {
         error: reader.error,
@@ -279,7 +279,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
               </h1>
               <ChevronDownIcon className={`w-6 h-6 transition-transform flex-shrink-0 mt-1 md:mt-2 ${isCatalogDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
-            
+
             {/* Source Dropdown */}
             {isCatalogDropdownOpen && (
               <div className="absolute top-full mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20">
@@ -301,7 +301,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
                       </li>
                     ))}
                   </>}
-                  
+
                   {registries.length > 0 && <>
                     <li className="px-3 pt-2 pb-1 text-xs font-semibold text-slate-400 uppercase">Registries</li>
                     {registries.map(registry => (
@@ -408,13 +408,13 @@ const LibraryView: React.FC<LibraryViewProps> = ({
       <section aria-label="Library content">
         {isBrowsingOpds && activeOpdsSource ? (
           <CatalogView
-          activeOpdsSource={activeOpdsSource}
-          catalogNavPath={catalogNavPath}
-          setCatalogNavPath={setCatalogNavPath}
-          onShowBookDetail={onShowBookDetail}
-          rootLevelCollections={rootLevelCollections}
-          setRootLevelCollections={setRootLevelCollections}
-        />
+            activeOpdsSource={activeOpdsSource}
+            catalogNavPath={catalogNavPath}
+            setCatalogNavPath={setCatalogNavPath}
+            onShowBookDetail={onShowBookDetail}
+            rootLevelCollections={rootLevelCollections}
+            setRootLevelCollections={setRootLevelCollections}
+          />
         ) : (
           <LocalLibraryView
             onOpenBook={onOpenBook}

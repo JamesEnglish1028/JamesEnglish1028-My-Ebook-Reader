@@ -23,28 +23,28 @@ interface ScreenReaderAnnouncerProps {
 
 /**
  * ScreenReaderAnnouncer Component
- * 
+ *
  * A utility component for announcing dynamic content updates to screen readers.
  * Uses aria-live regions to notify screen reader users of important changes
  * without moving focus or disrupting the user's current task.
- * 
+ *
  * Best Practices:
  * - Use 'polite' for most updates (waits for user to pause)
  * - Use 'assertive' only for critical errors or urgent information
  * - Keep messages concise and clear
  * - Avoid announcing every minor change
- * 
+ *
  * @example
  * ```tsx
  * function MyComponent() {
  *   const [status, setStatus] = useState<string | null>(null);
- *   
+ *
  *   const handleImport = async () => {
  *     setStatus('Importing book...');
  *     await importBook();
  *     setStatus('Book imported successfully');
  *   };
- *   
+ *
  *   return (
  *     <>
  *       <button onClick={handleImport}>Import Book</button>

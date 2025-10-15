@@ -146,7 +146,7 @@ This approach allows for:
 
 #### Result Pattern
 ```typescript
-export type RepositoryResult<T> = 
+export type RepositoryResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 ```
@@ -238,7 +238,7 @@ Two service classes that provide clean interfaces for OPDS parsing and acquisiti
 
 #### OPDSParserService
 - ✅ `parseOPDS1(xmlText, baseUrl)` - Parse OPDS 1 (Atom/XML) feeds
-- ✅ `parseOPDS2(jsonData, baseUrl)` - Parse OPDS 2 (JSON) feeds  
+- ✅ `parseOPDS2(jsonData, baseUrl)` - Parse OPDS 2 (JSON) feeds
 - ✅ `parseOPDS(content, baseUrl)` - Auto-detect version and parse
 - ✅ `detectVersion(content)` - Determine OPDS version ('1', '2', or null)
 
@@ -259,7 +259,7 @@ Instead of extracting 2,352 lines of complex parsing logic immediately, we creat
 
 #### Result Pattern (Consistent with BookRepository)
 ```typescript
-export type ParserResult<T> = 
+export type ParserResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 ```
@@ -377,7 +377,7 @@ A comprehensive service for managing bookmarks across all books.
 
 #### Result Pattern (Consistent)
 ```typescript
-export type BookmarkResult<T> = 
+export type BookmarkResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 ```
@@ -471,7 +471,7 @@ Service wraps existing localStorage implementation from `services/readerUtils.ts
 ## Task 4-7: ⏳ PENDING
 
 Remaining tasks:
-- CitationService  
+- CitationService
 - PositionTracker
 - Update components to use services
 - Final verification
@@ -484,7 +484,7 @@ Remaining tasks:
 
 **Status**: ✅ COMPLETE - All tasks finished, zero regressions
 
-**Deliverables**: 
+**Deliverables**:
 1. ✅ 5 comprehensive service classes (2,274 lines)
 2. ✅ Consistent Result pattern across all services
 3. ✅ Full TypeScript type safety

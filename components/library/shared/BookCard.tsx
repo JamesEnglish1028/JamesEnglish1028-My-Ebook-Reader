@@ -1,6 +1,6 @@
 import React from 'react';
-import type { BookMetadata, CatalogBook } from '../../../types';
 import { proxiedUrl } from '../../../services/utils';
+import type { BookMetadata, CatalogBook } from '../../../types';
 
 interface BookCardProps {
   book: BookMetadata | CatalogBook;
@@ -12,19 +12,19 @@ interface BookCardProps {
 
 /**
  * BookCard - Reusable card component for displaying books
- * 
+ *
  * Displays book cover, title, author, and format badges.
  * Works with both local library books (BookMetadata) and catalog books (CatalogBook).
  */
-const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({ 
-  book, 
-  onClick, 
+const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
+  book,
+  onClick,
   onContextMenu,
   className = '',
   isFocused = false
 }, ref) => {
   const handleClick = () => onClick(book);
-  
+
   const handleContextMenu = (e: React.MouseEvent) => {
     if (onContextMenu) {
       e.preventDefault();
@@ -67,7 +67,7 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
         mediaType: fmt.mediaType,
       }));
     }
-    
+
     // For books with a single format
     if (book.format) {
       return [{
@@ -76,7 +76,7 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
         mediaType: null,
       }];
     }
-    
+
     return [];
   };
 
@@ -91,7 +91,7 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
   };
 
   return (
-    <div 
+    <div
       ref={ref}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -132,7 +132,7 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
         <p className="text-xs text-slate-400 truncate">
           {book.author}
         </p>
-        
+
         {/* Format Badges */}
         {formatBadges.length > 0 && (
           <div className="flex gap-1 flex-wrap">

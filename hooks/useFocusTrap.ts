@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export interface FocusTrapOptions {
   /**
@@ -22,7 +22,7 @@ export interface FocusTrapOptions {
 /**
  * Hook to trap focus within a container (e.g., modal dialog)
  * Implements WCAG 2.1 focus management for modal dialogs
- * 
+ *
  * @example
  * ```tsx
  * function Modal({ isOpen, onClose }) {
@@ -30,7 +30,7 @@ export interface FocusTrapOptions {
  *     isActive: isOpen,
  *     onEscape: onClose
  *   });
- * 
+ *
  *   return (
  *     <div ref={modalRef} role="dialog" aria-modal="true">
  *       {content}
@@ -77,7 +77,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(options: Focus
     // Handle Tab key for focus trap
     if (event.key === 'Tab') {
       const focusableElements = getFocusableElements(containerRef.current);
-      
+
       if (focusableElements.length === 0) {
         event.preventDefault();
         return;
@@ -111,20 +111,24 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(options: Focus
 
     // Focus initial element or first focusable element
     const focusableElements = getFocusableElements(containerRef.current);
-    
+
     if (initialFocusRef?.current) {
       initialFocusRef.current.focus();
     } else if (focusableElements.length > 0) {
       focusableElements[0].focus();
     }
 
-    // Add event listener
-    document.addEventListener('keydown', handleKeyDown);
+    // Add event listener to the container only
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('keydown', handleKeyDown);
+    }
 
     // Cleanup
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-
+      if (container) {
+        container.removeEventListener('keydown', handleKeyDown);
+      }
       // Restore focus to previously focused element
       if (returnFocusRef?.current) {
         returnFocusRef.current.focus();
@@ -140,21 +144,21 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(options: Focus
 /**
  * Hook to manage focus restoration when navigating between views
  * Saves focus position before navigation and restores it when returning
- * 
+ *
  * @example
  * ```tsx
  * function BookList() {
  *   const { saveFocus, restoreFocus } = useFocusManagement('book-list');
- * 
+ *
  *   const handleBookClick = (bookId: string) => {
  *     saveFocus();
  *     navigate(`/book/${bookId}`);
  *   };
- * 
+ *
  *   useEffect(() => {
  *     restoreFocus();
  *   }, []);
- * 
+ *
  *   return <div>{books}</div>;
  * }
  * ```

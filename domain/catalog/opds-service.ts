@@ -1,25 +1,24 @@
 /**
  * OPDS Parser Service
- * 
+ *
  * Service layer for parsing OPDS feeds (both OPDS 1 and OPDS 2).
  * This provides a clean interface over the existing parsing functions
  * and adds proper error handling.
  */
 
-import type { 
-  CatalogBook, 
-  CatalogNavigationLink, 
-  CatalogPagination 
-} from './types';
-import { parseOpds1Xml, parseOpds2Json as parseOpds2JsonV1 } from '../../services/opds';
-import { parseOpds2Json, resolveAcquisitionChain as resolveOpds2 } from '../../services/opds2';
-import { resolveAcquisitionChainOpds1 } from '../../services/opds';
 import { logger } from '../../services/logger';
+import { parseOpds1Xml, resolveAcquisitionChainOpds1 } from '../../services/opds';
+import { parseOpds2Json, resolveAcquisitionChain as resolveOpds2 } from '../../services/opds2';
+import type {
+  CatalogBook,
+  CatalogNavigationLink,
+  CatalogPagination
+} from './types';
 
 /**
  * Result type for parser operations
  */
-export type ParserResult<T> = 
+export type ParserResult<T> =
   | { success: true; data: T }
   | { success: false; error: string; status?: number; proxyUsed?: boolean };
 
@@ -39,13 +38,13 @@ export type OPDSVersion = '1' | '2' | 'auto';
 
 /**
  * OPDS Parser Service
- * 
+ *
  * Handles parsing of OPDS 1 (Atom/XML) and OPDS 2 (JSON) feeds.
  */
 export class OPDSParserService {
   /**
    * Parse an OPDS 1 feed (Atom/XML)
-   * 
+   *
    * @param xmlText - The XML content to parse
    * @param baseUrl - Base URL for resolving relative links
    * @returns Parsed catalog data or error
@@ -53,16 +52,16 @@ export class OPDSParserService {
   async parseOPDS1(xmlText: string, baseUrl: string): Promise<ParserResult<ParsedCatalog>> {
     try {
       logger.info('Parsing OPDS 1 feed', { baseUrl });
-      
+
       const result = parseOpds1Xml(xmlText, baseUrl);
-      
-      logger.info('OPDS 1 parse successful', { 
+
+      logger.info('OPDS 1 parse successful', {
         bookCount: result.books.length,
-        navLinkCount: result.navLinks.length 
+        navLinkCount: result.navLinks.length
       });
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         data: {
           books: result.books,
           navLinks: result.navLinks,
@@ -78,7 +77,7 @@ export class OPDSParserService {
 
   /**
    * Parse an OPDS 2 feed (JSON)
-   * 
+   *
    * @param jsonData - The JSON data to parse (already parsed from string)
    * @param baseUrl - Base URL for resolving relative links
    * @returns Parsed catalog data or error
@@ -86,16 +85,16 @@ export class OPDSParserService {
   async parseOPDS2(jsonData: any, baseUrl: string): Promise<ParserResult<ParsedCatalog>> {
     try {
       logger.info('Parsing OPDS 2 feed', { baseUrl });
-      
+
       const result = parseOpds2Json(jsonData, baseUrl);
-      
-      logger.info('OPDS 2 parse successful', { 
+
+      logger.info('OPDS 2 parse successful', {
         bookCount: result.books.length,
-        navLinkCount: result.navLinks.length 
+        navLinkCount: result.navLinks.length
       });
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         data: {
           books: result.books,
           navLinks: result.navLinks,
@@ -111,7 +110,7 @@ export class OPDSParserService {
 
   /**
    * Auto-detect OPDS version and parse accordingly
-   * 
+   *
    * @param content - The content to parse (string for XML, object for JSON)
    * @param baseUrl - Base URL for resolving relative links
    * @returns Parsed catalog data or error
@@ -125,7 +124,7 @@ export class OPDSParserService {
 
       // If content is a string, check if it's XML or JSON
       const trimmedContent = content.trim();
-      
+
       if (trimmedContent.startsWith('<')) {
         // It's XML - OPDS 1
         return this.parseOPDS1(trimmedContent, baseUrl);
@@ -149,7 +148,7 @@ export class OPDSParserService {
 
   /**
    * Detect OPDS version from content
-   * 
+   *
    * @param content - The content to analyze
    * @returns OPDS version or null if unable to detect
    */
@@ -173,29 +172,29 @@ export class OPDSParserService {
 
 /**
  * OPDS Acquisition Service
- * 
+ *
  * Handles resolving acquisition links to downloadable URLs.
  * OPDS feeds often use indirect acquisition links that need to be resolved.
  */
 export class OPDSAcquisitionService {
   /**
    * Resolve an OPDS 2 acquisition chain
-   * 
+   *
    * @param href - The acquisition link to resolve
    * @param credentials - Optional credentials for authentication
    * @param maxRedirects - Maximum number of redirects to follow (default: 5)
    * @returns Final download URL or error
    */
   async resolveOPDS2(
-    href: string, 
+    href: string,
     credentials?: { username: string; password: string } | null,
     maxRedirects = 5
   ): Promise<ParserResult<string>> {
     try {
       logger.info('Resolving OPDS 2 acquisition chain', { href });
-      
+
       const url = await resolveOpds2(href, credentials, maxRedirects);
-      
+
       if (!url) {
         return { success: false, error: 'Failed to resolve acquisition chain' };
       }
@@ -205,10 +204,10 @@ export class OPDSAcquisitionService {
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error resolving acquisition';
       logger.error('OPDS 2 acquisition error:', errorMessage);
-      
+
       // Preserve error metadata for authentication and proxy detection
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: errorMessage,
         status: error?.status,
         proxyUsed: error?.proxyUsed
@@ -218,7 +217,7 @@ export class OPDSAcquisitionService {
 
   /**
    * Resolve an OPDS 1 acquisition chain
-   * 
+   *
    * @param href - The acquisition link to resolve
    * @param credentials - Optional credentials for authentication
    * @param maxRedirects - Maximum number of redirects to follow (default: 5)
@@ -231,9 +230,9 @@ export class OPDSAcquisitionService {
   ): Promise<ParserResult<string>> {
     try {
       logger.info('Resolving OPDS 1 acquisition chain', { href });
-      
+
       const url = await resolveAcquisitionChainOpds1(href, credentials, maxRedirects);
-      
+
       if (!url) {
         return { success: false, error: 'Failed to resolve acquisition chain' };
       }
@@ -243,10 +242,10 @@ export class OPDSAcquisitionService {
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error resolving acquisition';
       logger.error('OPDS 1 acquisition error:', errorMessage);
-      
+
       // Preserve error metadata for authentication and proxy detection
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: errorMessage,
         status: error?.status,
         proxyUsed: error?.proxyUsed
@@ -256,7 +255,7 @@ export class OPDSAcquisitionService {
 
   /**
    * Resolve an acquisition chain (auto-detect version)
-   * 
+   *
    * @param href - The acquisition link to resolve
    * @param version - OPDS version ('1', '2', or 'auto' to try both)
    * @param credentials - Optional credentials for authentication
@@ -277,7 +276,7 @@ export class OPDSAcquisitionService {
 
     // Auto-detect: Try OPDS 2 first (more common), then fall back to OPDS 1
     logger.info('Auto-detecting OPDS version for acquisition', { href });
-    
+
     const opds2Result = await this.resolveOPDS2(href, credentials, maxRedirects);
     if (opds2Result.success) {
       return opds2Result;

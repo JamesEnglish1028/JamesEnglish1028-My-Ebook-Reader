@@ -1,18 +1,18 @@
 /**
  * Bookmark Service
- * 
+ *
  * Service layer for managing bookmarks across books.
  * Handles storage, retrieval, and manipulation of bookmark data.
  */
 
-import type { Bookmark } from './types';
 import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
+import type { Bookmark } from './types';
 
 /**
  * Result type for bookmark operations
  */
-export type BookmarkResult<T> = 
+export type BookmarkResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
@@ -37,7 +37,7 @@ export interface UpdateBookmarkOptions {
 
 /**
  * Bookmark Service
- * 
+ *
  * Provides centralized bookmark management functionality.
  * Uses localStorage for persistence (matches existing implementation).
  */
@@ -57,18 +57,18 @@ export class BookmarkService {
 
   /**
    * Get all bookmarks for a specific book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with array of bookmarks (empty array if none found)
    */
   findByBookId(bookId: number): BookmarkResult<Bookmark[]> {
     try {
       logger.info('Finding bookmarks for book', { bookId });
-      
+
       const key = getStorageKey.bookmarks(bookId);
       const saved = localStorage.getItem(key);
       const bookmarks = this.safeParse<Bookmark[]>(saved, []);
-      
+
       logger.info('Found bookmarks', { bookId, count: bookmarks.length });
       return { success: true, data: bookmarks };
     } catch (error) {
@@ -80,7 +80,7 @@ export class BookmarkService {
 
   /**
    * Get a specific bookmark by ID
-   * 
+   *
    * @param bookId - The ID of the book
    * @param bookmarkId - The ID of the bookmark
    * @returns Result with bookmark or null if not found
@@ -103,7 +103,7 @@ export class BookmarkService {
 
   /**
    * Add a new bookmark for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @param options - Bookmark creation options
    * @returns Result with the created bookmark
@@ -131,7 +131,7 @@ export class BookmarkService {
       // Add to list and save
       const updatedBookmarks = [...result.data, newBookmark];
       const saveResult = this.saveAll(bookId, updatedBookmarks);
-      
+
       if (!saveResult.success) {
         return { success: false, error: 'Failed to save bookmark' };
       }
@@ -147,7 +147,7 @@ export class BookmarkService {
 
   /**
    * Update an existing bookmark
-   * 
+   *
    * @param bookId - The ID of the book
    * @param bookmarkId - The ID of the bookmark to update
    * @param options - Updated bookmark properties
@@ -166,7 +166,7 @@ export class BookmarkService {
       // Find and update the bookmark
       const bookmarks = result.data;
       const index = bookmarks.findIndex(b => b.id === bookmarkId);
-      
+
       if (index === -1) {
         return { success: false, error: 'Bookmark not found' };
       }
@@ -195,7 +195,7 @@ export class BookmarkService {
 
   /**
    * Delete a specific bookmark
-   * 
+   *
    * @param bookId - The ID of the book
    * @param bookmarkId - The ID of the bookmark to delete
    * @returns Result indicating success or failure
@@ -212,7 +212,7 @@ export class BookmarkService {
 
       // Filter out the bookmark to delete
       const updatedBookmarks = result.data.filter(b => b.id !== bookmarkId);
-      
+
       if (updatedBookmarks.length === result.data.length) {
         return { success: false, error: 'Bookmark not found' };
       }
@@ -234,7 +234,7 @@ export class BookmarkService {
 
   /**
    * Delete all bookmarks for a specific book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result indicating success or failure
    */
@@ -256,7 +256,7 @@ export class BookmarkService {
 
   /**
    * Count bookmarks for a specific book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with bookmark count
    */
@@ -277,7 +277,7 @@ export class BookmarkService {
 
   /**
    * Check if a bookmark exists at a specific CFI
-   * 
+   *
    * @param bookId - The ID of the book
    * @param cfi - The CFI to check
    * @returns Result with boolean indicating if bookmark exists
@@ -300,7 +300,7 @@ export class BookmarkService {
 
   /**
    * Find bookmarks by chapter
-   * 
+   *
    * @param bookId - The ID of the book
    * @param chapter - The chapter name to filter by
    * @returns Result with array of matching bookmarks
@@ -315,7 +315,7 @@ export class BookmarkService {
       }
 
       const filtered = result.data.filter(b => b.chapter === chapter);
-      
+
       logger.info('Found bookmarks by chapter', { bookId, chapter, count: filtered.length });
       return { success: true, data: filtered };
     } catch (error) {
@@ -327,7 +327,7 @@ export class BookmarkService {
 
   /**
    * Get bookmarks sorted by creation date (newest first)
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with sorted array of bookmarks
    */
@@ -349,7 +349,7 @@ export class BookmarkService {
 
   /**
    * Save all bookmarks for a book (internal method)
-   * 
+   *
    * @param bookId - The ID of the book
    * @param bookmarks - Array of bookmarks to save
    * @returns Result indicating success or failure
@@ -368,7 +368,7 @@ export class BookmarkService {
 
   /**
    * Export bookmarks for a book (for backup/export features)
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with JSON string of bookmarks
    */
@@ -391,7 +391,7 @@ export class BookmarkService {
 
   /**
    * Import bookmarks for a book (for backup/import features)
-   * 
+   *
    * @param bookId - The ID of the book
    * @param json - JSON string of bookmarks to import
    * @param merge - If true, merge with existing bookmarks; if false, replace
@@ -402,7 +402,7 @@ export class BookmarkService {
       logger.info('Importing bookmarks', { bookId, merge });
 
       const imported = this.safeParse<Bookmark[]>(json, []);
-      
+
       if (!Array.isArray(imported)) {
         return { success: false, error: 'Invalid bookmark data format' };
       }

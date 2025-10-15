@@ -1,6 +1,6 @@
 /**
  * Catalog Domain Types
- * 
+ *
  * This module defines all types related to OPDS catalogs, browsing, and acquisition.
  * Books in this domain are "available" but not yet owned by the user.
  */
@@ -50,21 +50,21 @@ export interface CatalogBook {
   distributor?: string; // Distribution provider name
   subjects?: string[];
   format?: 'EPUB' | 'PDF' | string;
-  
+
   // OPDS-specific metadata
   acquisitionMediaType?: string; // e.g., application/epub+zip
   mediaType?: string; // e.g., http://schema.org/EBook
   isOpenAccess?: boolean; // True if acquisition link is open-access (no auth required)
-  
+
   // Multiple format options (when book is available in EPUB and PDF)
   alternativeFormats?: AcquisitionFormat[];
-  
+
   // OPDS 1 collections
   collections?: Collection[];
-  
+
   // OPDS 2 series
   series?: Series;
-  
+
   // Palace.io categories
   categories?: Category[];
 }
@@ -119,12 +119,12 @@ export interface CatalogNavigationLink {
   url: string;
   rel: string;
   isCatalog?: boolean;
-  
+
   // Tree view state
   isExpanded?: boolean;
   isLoading?: boolean;
   children?: CatalogNavigationLink[];
-  
+
   // Internal state flags
   _hasFetchedChildren?: boolean;
   _canExpand?: boolean;

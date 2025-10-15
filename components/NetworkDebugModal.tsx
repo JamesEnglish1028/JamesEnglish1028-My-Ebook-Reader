@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useFocusTrap } from '../hooks';
-import { proxiedUrl, maybeProxyForCors, isDebug } from '../services/utils';
+import { isDebug, maybeProxyForCors, proxiedUrl } from '../services/utils';
 
 const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [url, setUrl] = useState<string>('');
@@ -31,7 +31,7 @@ const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         target = maybe;
       }
 
-      const headers: Record<string,string> = {};
+      const headers: Record<string, string> = {};
       if (authHeader) headers['Authorization'] = authHeader;
 
       // Attempt a HEAD probe first, falling back to GET if server returns 405
@@ -118,7 +118,7 @@ const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 <div><strong>Access-Control-Allow-Headers:</strong> {String(result.accessControlAllowHeaders)}</div>
                 <div><strong>Access-Control-Expose-Headers:</strong> {String(result.accessControlExposeHeaders)}</div>
                 <div className="mt-2"><strong>Request headers sent (client-side):</strong>
-                  <pre className="p-2 bg-gray-100 rounded text-xs overflow-auto">{JSON.stringify(result.requestHeaders,null,2)}</pre>
+                  <pre className="p-2 bg-gray-100 rounded text-xs overflow-auto">{JSON.stringify(result.requestHeaders, null, 2)}</pre>
                 </div>
                 <div className="mt-2"><strong>document.cookie (current origin):</strong>
                   <pre className="p-2 bg-gray-100 rounded text-xs overflow-auto">{result.documentCookie || '<none>'}</pre>

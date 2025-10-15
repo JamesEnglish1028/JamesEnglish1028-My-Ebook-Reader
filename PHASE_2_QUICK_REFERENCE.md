@@ -12,10 +12,10 @@ import { bookRepository } from './domain/book';
 import { opdsParserService, opdsAcquisitionService } from './domain/catalog';
 
 // Reader operations
-import { 
-  bookmarkService, 
-  citationService, 
-  positionTracker 
+import {
+  bookmarkService,
+  citationService,
+  positionTracker
 } from './domain/reader';
 ```
 
@@ -253,7 +253,7 @@ describe('Bookmarks', () => {
    ```typescript
    // ✅ Fast
    const result = await bookRepository.findAllMetadata();
-   
+
    // ❌ Slow (loads binary data)
    const result = await bookRepository.findAll();
    ```

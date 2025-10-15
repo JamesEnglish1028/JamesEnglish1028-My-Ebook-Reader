@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { useBooks, useDeleteBook, useSortedBooks, useLocalStorage } from '../../../hooks';
+import { useBooks, useDeleteBook, useLocalStorage, useSortedBooks } from '../../../hooks';
 import type { BookMetadata, CoverAnimationData } from '../../../types';
-import { BookGrid, EmptyState } from '../shared';
-import { Loading, Error as ErrorDisplay } from '../../shared';
-import { SortControls, ImportButton } from '../local';
 import DeleteConfirmationModal from '../../DeleteConfirmationModal';
+import { Error as ErrorDisplay, Loading } from '../../shared';
+import { ImportButton, SortControls } from '../local';
+import { BookGrid, EmptyState } from '../shared';
 
 interface LocalLibraryViewProps {
   /** Callback to open a book for reading */
@@ -19,7 +19,7 @@ interface LocalLibraryViewProps {
 
 /**
  * LocalLibraryView - Container for local book library
- * 
+ *
  * Manages fetching, sorting, and displaying books from the local library.
  * Handles delete operations and book clicks.
  */
@@ -35,7 +35,7 @@ const LocalLibraryView: React.FC<LocalLibraryViewProps> = ({
 
   // Fetch books using React Query
   const { data: books = [], isLoading, error, refetch } = useBooks();
-  
+
   // Delete book mutation
   const { mutate: deleteBook, isPending: isDeleting } = useDeleteBook();
 
@@ -110,5 +110,5 @@ const LocalLibraryView: React.FC<LocalLibraryViewProps> = ({
 };
 
 // Export additional components needed by parent
-export { SortControls, ImportButton };
+export { ImportButton, SortControls };
 export default LocalLibraryView;

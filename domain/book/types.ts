@@ -1,6 +1,6 @@
 /**
  * Book Domain Types
- * 
+ *
  * This module defines all types related to books in the user's library.
  * Books in this domain are "owned" - they exist in the user's collection.
  */

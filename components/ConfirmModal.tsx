@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useFocusTrap } from '../hooks';
 import { CloseIcon } from './icons';
 
@@ -14,10 +14,13 @@ interface ConfirmModalProps {
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title = 'Confirm', message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onClose, onConfirm, variant = 'default' }) => {
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose
+    onEscape: onClose,
+    initialFocusRef: cancelBtnRef
   });
+
 
   if (!isOpen) return null;
   return (
@@ -31,8 +34,21 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title = 'Confirm', 
         </div>
         <p className="text-slate-300 mb-6 text-sm">{message}</p>
         <div className="flex justify-end gap-4">
-          <button onClick={onClose} className="py-2 px-4 rounded-md bg-slate-600 hover:bg-slate-500 transition-colors font-semibold">{cancelLabel}</button>
-          <button onClick={onConfirm} className={`py-2 px-6 rounded-md transition-colors font-bold ${variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-sky-500 hover:bg-sky-600'}`}>{confirmLabel}</button>
+          <button
+            ref={cancelBtnRef}
+            onClick={onClose}
+            className="py-2 px-4 rounded-md bg-slate-600 hover:bg-slate-500 transition-colors font-semibold"
+            tabIndex={0}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`py-2 px-6 rounded-md transition-colors font-bold ${variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-sky-500 hover:bg-sky-600'}`}
+            tabIndex={0}
+          >
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </div>

@@ -13,11 +13,11 @@ This document outlines the domain-driven design for MeBooks, organizing code aro
   - `Book` (formerly BookMetadata) - Book in library with ID
   - `BookRecord` (formerly BookRecord) - Book data for storage with ArrayBuffer
   - `BookFormat` - EPUB | PDF type
-  
+
 - `repository.ts` - Book persistence layer
   - `BookRepository` class wrapping IndexedDB operations
   - Methods: `save()`, `find()`, `findAll()`, `delete()`, `update()`
-  
+
 - `index.ts` - Barrel export
 
 **Key Principles**:
@@ -38,21 +38,21 @@ This document outlines the domain-driven design for MeBooks, organizing code aro
   - `CatalogPagination` - Pagination metadata
   - `Collection`, `Series`, `Category` - OPDS metadata
   - `AuthDocument`, `CredentialPrompt` - Authentication
-  
+
 - `opds-parser.ts` - OPDS feed parsing
   - `parseOPDS()` - Detects version and delegates
   - `parseOPDS1()` - Atom/XML parsing
   - `parseOPDS2()` - JSON parsing
-  
+
 - `acquisition.ts` - Book acquisition logic
   - `resolveAcquisitionChain()` - OPDS 2 acquisition
   - `resolveAcquisitionChainOpds1()` - OPDS 1 acquisition
   - Handles authentication challenges
-  
+
 - `credentials.ts` - Catalog authentication
   - Credential storage and retrieval
   - Per-host authentication management
-  
+
 - `index.ts` - Barrel export
 
 **Key Principles**:
@@ -73,19 +73,19 @@ This document outlines the domain-driven design for MeBooks, organizing code aro
   - `Bookmark` - Saved reading positions
   - `Citation` - Highlighted text with notes
   - `SearchResult` - In-book search results
-  
+
 - `bookmark-service.ts` - Bookmark management
   - `BookmarkService` class
   - Methods: `add()`, `delete()`, `findByBook()`, `navigate()`
-  
+
 - `citation-service.ts` - Citation management
   - `CitationService` class
   - Methods: `add()`, `delete()`, `findByBook()`, `format()` (APA/MLA/Chicago)
-  
+
 - `position-tracker.ts` - Reading position tracking
   - Stores last CFI per book
   - Auto-resume functionality
-  
+
 - `index.ts` - Barrel export
 
 **Key Principles**:
@@ -102,11 +102,11 @@ This document outlines the domain-driven design for MeBooks, organizing code aro
 - `types.ts` - Sync-related types
   - `SyncPayload` - Complete sync data structure
   - `GoogleUser` - User profile
-  
+
 - `google-drive-sync.ts` - Google Drive integration
   - `syncToGoogleDrive()`
   - `restoreFromGoogleDrive()`
-  
+
 - `index.ts` - Barrel export
 
 **Key Principles**:
@@ -224,21 +224,21 @@ This document outlines the domain-driven design for MeBooks, organizing code aro
     types.ts       - Book, BookRecord, BookFormat
     repository.ts  - BookRepository class
     index.ts
-  
+
   /catalog/
     types.ts           - Catalog, CatalogBook, OPDS types
     opds-parser.ts     - parseOPDS, parseOPDS1, parseOPDS2
     acquisition.ts     - resolveAcquisitionChain
     credentials.ts     - Credential management
     index.ts
-  
+
   /reader/
     types.ts              - ReaderSettings, Bookmark, Citation, TocItem
     bookmark-service.ts   - BookmarkService class
     citation-service.ts   - CitationService class
     position-tracker.ts   - Position tracking
     index.ts
-  
+
   /sync/
     types.ts             - SyncPayload, GoogleUser
     google-drive-sync.ts - Sync logic

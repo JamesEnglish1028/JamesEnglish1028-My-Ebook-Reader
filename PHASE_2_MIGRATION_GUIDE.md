@@ -240,9 +240,9 @@ if (result.success) {
 
 **Old Way:**
 ```typescript
-import { 
-  getLastPositionForBook, 
-  saveLastPositionForBook 
+import {
+  getLastPositionForBook,
+  saveLastPositionForBook
 } from '../services/readerUtils';
 
 // Get position
@@ -372,7 +372,7 @@ if (result.data) {
 ```typescript
 const Library: React.FC = () => {
   const [books, setBooks] = useState<BookRecord[]>([]);
-  
+
   useEffect(() => {
     const loadBooks = async () => {
       try {
@@ -384,7 +384,7 @@ const Library: React.FC = () => {
     };
     loadBooks();
   }, []);
-  
+
   const handleDelete = async (bookId: number) => {
     try {
       await deleteBook(bookId);
@@ -394,7 +394,7 @@ const Library: React.FC = () => {
       console.error('Failed to delete book', error);
     }
   };
-  
+
   // ... rest of component
 };
 ```
@@ -405,7 +405,7 @@ import { bookRepository } from '../domain/book';
 
 const Library: React.FC = () => {
   const [books, setBooks] = useState<BookMetadata[]>([]);
-  
+
   useEffect(() => {
     const loadBooks = async () => {
       const result = await bookRepository.findAllMetadata();
@@ -417,21 +417,21 @@ const Library: React.FC = () => {
     };
     loadBooks();
   }, []);
-  
+
   const handleDelete = async (bookId: number) => {
     const deleteResult = await bookRepository.delete(bookId);
     if (!deleteResult.success) {
       console.error('Failed to delete book:', deleteResult.error);
       return;
     }
-    
+
     // Refresh list
     const result = await bookRepository.findAllMetadata();
     if (result.success) {
       setBooks(result.data);
     }
   };
-  
+
   // ... rest of component
 };
 ```
@@ -442,11 +442,11 @@ const Library: React.FC = () => {
 ```typescript
 const ReaderView: React.FC<Props> = ({ bookId }) => {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  
+
   useEffect(() => {
     setBookmarks(getBookmarksForBook(bookId));
   }, [bookId]);
-  
+
   const handleQuickBookmark = () => {
     const newBookmark = {
       id: new Date().toISOString(),
@@ -460,7 +460,7 @@ const ReaderView: React.FC<Props> = ({ bookId }) => {
     setBookmarks(updated);
     saveBookmarksForBook(bookId, updated);
   };
-  
+
   // ... rest of component
 };
 ```
@@ -471,21 +471,21 @@ import { bookmarkService } from '../domain/reader';
 
 const ReaderView: React.FC<Props> = ({ bookId }) => {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  
+
   useEffect(() => {
     const result = bookmarkService.findByBookId(bookId);
     if (result.success) {
       setBookmarks(result.data);
     }
   }, [bookId]);
-  
+
   const handleQuickBookmark = () => {
     const result = bookmarkService.add(bookId, {
       cfi: currentCfi,
       label: `Page ${currentPage}`,
       chapter: currentChapter,
     });
-    
+
     if (result.success) {
       // Refresh bookmarks
       const refreshResult = bookmarkService.findByBookId(bookId);
@@ -494,7 +494,7 @@ const ReaderView: React.FC<Props> = ({ bookId }) => {
       }
     }
   };
-  
+
   // ... rest of component
 };
 ```
@@ -513,39 +513,39 @@ import { bookmarkService } from '../domain/reader';
 
 describe('BookmarkService', () => {
   const testBookId = 999;
-  
+
   afterEach(() => {
     // Clean up test data
     bookmarkService.deleteAll(testBookId);
   });
-  
+
   it('should add and retrieve bookmark', () => {
     const addResult = bookmarkService.add(testBookId, {
       cfi: 'epubcfi(/6/4[chap01]!/4/2)',
       label: 'Test Bookmark',
       chapter: 'Chapter 1',
     });
-    
+
     expect(addResult.success).toBe(true);
     expect(addResult.data).toBeDefined();
-    
+
     const findResult = bookmarkService.findByBookId(testBookId);
     expect(findResult.success).toBe(true);
     expect(findResult.data).toHaveLength(1);
     expect(findResult.data[0].label).toBe('Test Bookmark');
   });
-  
+
   it('should delete bookmark', () => {
     const addResult = bookmarkService.add(testBookId, {
       cfi: 'epubcfi(/6/4[chap01]!/4/2)',
       label: 'Test Bookmark',
     });
-    
+
     const bookmarkId = addResult.data!.id;
     const deleteResult = bookmarkService.delete(testBookId, bookmarkId);
-    
+
     expect(deleteResult.success).toBe(true);
-    
+
     const findResult = bookmarkService.findByBookId(testBookId);
     expect(findResult.data).toHaveLength(0);
   });
@@ -573,14 +573,14 @@ describe('Library Component', () => {
       { id: 1, title: 'Book 1', author: 'Author 1' },
       { id: 2, title: 'Book 2', author: 'Author 2' },
     ];
-    
+
     vi.mocked(bookRepository.findAllMetadata).mockResolvedValue({
       success: true,
       data: mockBooks,
     });
-    
+
     render(<Library />);
-    
+
     expect(await screen.findByText('Book 1')).toBeInTheDocument();
     expect(await screen.findByText('Book 2')).toBeInTheDocument();
   });

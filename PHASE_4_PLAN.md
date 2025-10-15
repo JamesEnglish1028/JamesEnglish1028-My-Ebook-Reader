@@ -1,8 +1,8 @@
 # PHASE 4: Component Decomposition Plan
 
-**Status**: 🎯 READY TO START  
-**Created**: October 14, 2025  
-**Estimated Duration**: 3-4 weeks  
+**Status**: 🎯 READY TO START
+**Created**: October 14, 2025
+**Estimated Duration**: 3-4 weeks
 **Risk Level**: MEDIUM (Structural changes, but non-breaking)
 
 ## 🎯 Goal
@@ -56,20 +56,20 @@ Break down monolithic "God Components" into smaller, focused, maintainable piece
 components/
   library/
     LibraryView.tsx              (~200 lines - main coordinator)
-    
+
     /catalog
       CatalogView.tsx            (~150 lines - OPDS browsing container)
       CatalogNavigation.tsx      (~100 lines - breadcrumbs, pagination)
       CatalogFilters.tsx         (~150 lines - audience, fiction, media filters)
       CatalogBookGrid.tsx        (~100 lines - grid/flat list display)
       CatalogSidebar.tsx         (~100 lines - collections navigation)
-    
+
     /local
       LocalLibraryView.tsx       (~150 lines - local books container)
       BookGrid.tsx               (~100 lines - grid display with sorting)
       SortControls.tsx           (~80 lines - sort dropdown)
       ImportButton.tsx           (~60 lines - file upload handler)
-    
+
     /shared
       BookCard.tsx               (~100 lines - reusable book card)
       LaneView.tsx               (~150 lines - horizontal scrolling lanes)
@@ -118,18 +118,18 @@ components/
 components/
   app/
     AppShell.tsx                 (~150 lines - main router & layout)
-    
+
     /views
       LibraryViewContainer.tsx   (~80 lines - wraps Library with state)
       ReaderViewContainer.tsx    (~80 lines - wraps ReaderView with state)
       BookDetailContainer.tsx    (~80 lines - wraps BookDetailView)
-    
+
     /modals
       ImportStatusModal.tsx      (~60 lines - import progress/errors)
       CredentialsModal.tsx       (~100 lines - OPDS auth)
       SyncModal.tsx              (~150 lines - cloud sync logic)
       LocalStorageModal.tsx      (~80 lines - storage management)
-    
+
     /hooks
       useBookImport.ts           (~150 lines - import logic)
       useCloudSync.ts            (~120 lines - sync logic)
@@ -176,26 +176,26 @@ components/
 components/
   reader/
     ReaderView.tsx               (~200 lines - main coordinator)
-    
+
     /epub
       EpubRenderer.tsx           (~150 lines - iframe & rendering)
       EpubControls.tsx           (~100 lines - prev/next navigation)
       EpubProgress.tsx           (~80 lines - progress bar & chapter info)
-    
+
     /features
       BookmarksPanel.tsx         (already exists - ~200 lines)
       CitationsPanel.tsx         (~150 lines - create/manage citations)
       SearchPanel.tsx            (already exists - ~300 lines)
       TocPanel.tsx               (already exists - ~200 lines)
       ReadAloud.tsx              (~250 lines - TTS functionality)
-    
+
     /ui
       ReaderToolbar.tsx          (~100 lines - top controls)
       SidePanel.tsx              (~80 lines - collapsible panel wrapper)
       SettingsPanel.tsx          (already exists - ~150 lines)
       ShortcutsModal.tsx         (already exists - ~100 lines)
       ZoomHud.tsx                (already exists - ~80 lines)
-    
+
     /hooks
       useEpubNavigation.ts       (~150 lines - navigation logic)
       useBookmarks.ts            (~100 lines - bookmark operations)
@@ -462,13 +462,13 @@ const Library: React.FC<LibraryProps> = ({ /* 20+ props */ }) => {
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // ... 13 more state variables
-  
+
   // 30+ event handlers
   const handleSelectSource = useCallback(() => { /* ... */ }, []);
   const handlePaginationClick = () => { /* ... */ };
   const handleNavLinkClick = () => { /* ... */ };
   // ... 27 more handlers
-  
+
   // Complex rendering logic
   const renderCurrentView = () => {
     if (isCatalogLoading) return <Spinner />;
@@ -476,7 +476,7 @@ const Library: React.FC<LibraryProps> = ({ /* 20+ props */ }) => {
     if (showCollectionView) return <CollectionView />;
     return <FlatView />;
   };
-  
+
   return (
     <div>
       {/* 400+ lines of JSX */}
@@ -498,9 +498,9 @@ const LibraryView: React.FC<LibraryViewProps> = ({
 }) => {
   const [activeSource, setActiveSource] = useState<'library' | Catalog | null>('library');
   const [importStatus, setImportStatus] = useState<ImportStatus>({ isLoading: false, message: '', error: null });
-  
+
   const handleImport = useBookImport({ processAndSaveBook, setImportStatus });
-  
+
   return (
     <div className="h-screen flex flex-col bg-slate-900">
       {/* Header */}
@@ -510,7 +510,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
         onOpenSettings={onOpenCloudSyncModal}
         onShowAbout={onShowAbout}
       />
-      
+
       {/* Main Content */}
       {activeSource === 'library' ? (
         <LocalLibraryView
@@ -525,7 +525,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           onImport={handleImport}
         />
       )}
-      
+
       {/* Import Status Modal */}
       <ImportStatusModal
         status={importStatus}
@@ -555,18 +555,18 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     navigateTo,
     goBack,
   } = useCatalogNavigation(source);
-  
+
   const [filters, setFilters] = useState<CatalogFilters>({
     audience: 'all',
     fiction: 'all',
     media: 'all',
   });
-  
+
   const filteredBooks = useCatalogFilters(books, filters);
-  
+
   if (isLoading) return <Spinner text="Loading catalog..." />;
   if (error) return <ErrorMessage error={error} />;
-  
+
   return (
     <div className="flex gap-6">
       {/* Collections Sidebar */}
@@ -577,7 +577,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
           onSelectCollection={(c) => setFilters({ ...filters, collection: c })}
         />
       )}
-      
+
       {/* Main Content */}
       <div className="flex-1">
         <CatalogNavigation
@@ -586,12 +586,12 @@ const CatalogView: React.FC<CatalogViewProps> = ({
           onNavigate={navigateTo}
           onGoBack={goBack}
         />
-        
+
         <CatalogFilters
           filters={filters}
           onFiltersChange={setFilters}
         />
-        
+
         <CatalogBookGrid
           books={filteredBooks}
           onBookClick={onShowBookDetail}
@@ -618,7 +618,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick, onContextMenu }) => 
     e.preventDefault();
     onContextMenu?.(book, e);
   };
-  
+
   return (
     <div
       className="group cursor-pointer"
@@ -632,7 +632,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick, onContextMenu }) => 
           alt={book.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
         />
-        
+
         {/* Format Badges */}
         {('alternativeFormats' in book) && book.alternativeFormats.length > 0 && (
           <div className="absolute top-2 right-2 flex gap-1">
@@ -642,7 +642,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick, onContextMenu }) => 
           </div>
         )}
       </div>
-      
+
       {/* Book Info */}
       <h3 className="font-medium text-white line-clamp-2 mb-1">
         {book.title}

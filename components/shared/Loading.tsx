@@ -17,25 +17,25 @@ interface LoadingProps {
 
 /**
  * Loading - Unified loading component for all async operations
- * 
+ *
  * Provides consistent loading states across the application with multiple variants:
  * - spinner: Circular spinner (default)
  * - skeleton: Skeleton loader for content placeholders
  * - inline: Small inline loader for buttons/actions
  * - page: Full-page loading overlay
- * 
+ *
  * @example
  * // Spinner variant (default)
  * <Loading message="Loading books..." />
- * 
+ *
  * @example
  * // Skeleton for book grid
  * <Loading variant="skeleton" />
- * 
+ *
  * @example
  * // Inline for button actions
  * <Loading variant="inline" size="small" />
- * 
+ *
  * @example
  * // Full page loader
  * <Loading variant="page" message="Importing book..." />

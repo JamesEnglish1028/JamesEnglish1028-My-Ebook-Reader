@@ -10,38 +10,28 @@ export { SORT_OPTIONS, useSortedBooks } from './useSortedBooks';
 export type { SortOrder } from './useSortedBooks';
 
 // React Query hooks for async data
-export { 
-  useBooks, 
-  useBookMetadata, 
-  useDeleteBook, 
-  useUpdateBook,
-  bookKeys 
+export {
+  bookKeys, useBookMetadata, useBooks, useDeleteBook,
+  useUpdateBook
 } from './useBooks';
 
 export {
-  useCatalogContent,
-  useCatalogRootCollections,
-  catalogKeys
+  catalogKeys, useCatalogContent,
+  useCatalogRootCollections
 } from './useCatalogContent';
 
 // Catalog management mutations
 export {
-  useAddCatalog,
-  useUpdateCatalogMutation,
-  useDeleteCatalogMutation,
-  useAddRegistry,
-  useUpdateRegistryMutation,
-  useDeleteRegistryMutation,
-  catalogManagementKeys
+  catalogManagementKeys, useAddCatalog, useAddRegistry, useDeleteCatalogMutation, useDeleteRegistryMutation, useUpdateCatalogMutation, useUpdateRegistryMutation
 } from './useCatalogMutations';
 
 // Accessibility hooks
-export { useKeyboardNavigation, useGridNavigation } from './useKeyboardNavigation';
-export type { KeyboardNavigationOptions, GridNavigationOptions } from './useKeyboardNavigation';
+export { useGridNavigation, useKeyboardNavigation } from './useKeyboardNavigation';
+export type { GridNavigationOptions, KeyboardNavigationOptions } from './useKeyboardNavigation';
 
-export { useFocusTrap, useFocusManagement } from './useFocusTrap';
+export { useFocusManagement, useFocusTrap } from './useFocusTrap';
 export type { FocusTrapOptions } from './useFocusTrap';
 
-export { useGlobalShortcuts, registerShortcut, unregisterShortcut, getShortcutsByCategory, formatShortcut, shortcutRegistry } from './useGlobalShortcuts';
-export type { ShortcutAction, GlobalShortcutsOptions } from './useGlobalShortcuts';
+export { formatShortcut, getShortcutsByCategory, registerShortcut, shortcutRegistry, unregisterShortcut, useGlobalShortcuts } from './useGlobalShortcuts';
+export type { GlobalShortcutsOptions, ShortcutAction } from './useGlobalShortcuts';
 

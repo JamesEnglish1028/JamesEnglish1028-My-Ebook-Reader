@@ -1,6 +1,6 @@
 /**
  * Sync Domain Types
- * 
+ *
  * This module defines types related to cloud synchronization,
  * primarily for Google Drive integration.
  */
@@ -25,22 +25,22 @@ export interface GoogleUser {
 export interface SyncPayload {
   // Book metadata (without epubData ArrayBuffer)
   library: Omit<BookRecord, 'epubData'>[];
-  
+
   // User's configured catalogs
   catalogs: Catalog[];
-  
+
   // Bookmarks mapped by book ID
   bookmarks: Record<number, Bookmark[]>;
-  
+
   // Citations mapped by book ID
   citations: Record<number, Citation[]>;
-  
+
   // Reading positions mapped by book ID
   positions: Record<number, string | null>;
-  
+
   // Reader settings
   settings: ReaderSettings;
-  
+
   // Sync metadata
   syncedAt?: number; // Unix timestamp
   version?: string; // App version that created the sync

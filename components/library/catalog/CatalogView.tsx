@@ -1,13 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useCatalogContent } from '../../../hooks';
-import { getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, filterBooksByAudience, filterBooksByFiction, filterBooksByMedia, groupBooksByMode } from '../../../services/opds';
-import type { AudienceMode, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry, CollectionMode, FictionMode, MediaMode, CategoryLane, CollectionGroup, CategorizationMode } from '../../../types';
-import { BookGrid, EmptyState } from '../shared';
-import { Loading, Error as ErrorDisplay } from '../../shared';
-import { CatalogNavigation, CatalogSidebar, CatalogFilters } from '../catalog';
+import { filterBooksByAudience, filterBooksByFiction, filterBooksByMedia, getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, groupBooksByMode } from '../../../services/opds';
+import type { AudienceMode, Catalog, CatalogBook, CatalogNavigationLink, CatalogRegistry, CategorizationMode, CategoryLane, CollectionGroup, CollectionMode, FictionMode, MediaMode } from '../../../types';
 import { CategoryLaneComponent } from '../../CategoryLane';
-import { CollectionLane } from '../../CollectionLane';
+import { Error as ErrorDisplay, Loading } from '../../shared';
 import { UncategorizedLane } from '../../UncategorizedLane';
+import { CatalogFilters, CatalogNavigation, CatalogSidebar } from '../catalog';
+import { BookGrid, EmptyState } from '../shared';
 
 interface CatalogViewProps {
   /** Active OPDS source (catalog or registry) */
@@ -26,7 +25,7 @@ interface CatalogViewProps {
 
 /**
  * CatalogView - Container for OPDS catalog browsing
- * 
+ *
  * Handles fetching and displaying OPDS catalog content with navigation,
  * filtering, and multiple display modes (lanes, collections, flat grid).
  */
@@ -54,21 +53,21 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
 
   // Get current URL from navigation path
-  const currentUrl = catalogNavPath.length > 0 
-    ? catalogNavPath[catalogNavPath.length - 1].url 
+  const currentUrl = catalogNavPath.length > 0
+    ? catalogNavPath[catalogNavPath.length - 1].url
     : activeOpdsSource?.url || null;
 
   // Get OPDS version preference
-  const opdsVersion = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) 
-    ? (activeOpdsSource as any).opdsVersion || 'auto' 
+  const opdsVersion = (activeOpdsSource && 'opdsVersion' in activeOpdsSource)
+    ? (activeOpdsSource as any).opdsVersion || 'auto'
     : 'auto';
 
   // Fetch catalog content using React Query
-  const { 
-    data: catalogData, 
-    isLoading, 
+  const {
+    data: catalogData,
+    isLoading,
     error,
-    refetch 
+    refetch
   } = useCatalogContent(
     currentUrl,
     activeOpdsSource?.url || '',
@@ -85,7 +84,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   useEffect(() => {
     if (originalCatalogBooks.length > 0 && catalogNavPath.length <= 1) {
       const rootCollections = new Set<string>();
-      
+
       originalCatalogBooks.forEach(book => {
         if (book.collections && book.collections.length > 0) {
           book.collections.forEach(collection => {
@@ -93,13 +92,13 @@ const CatalogView: React.FC<CatalogViewProps> = ({
           });
         }
       });
-      
+
       catalogNavLinks.forEach(link => {
         if (link.rel === 'collection' || link.rel === 'subsection') {
           rootCollections.add(link.title);
         }
       });
-      
+
       setRootLevelCollections(Array.from(rootCollections));
     }
   }, [originalCatalogBooks, catalogNavLinks, catalogNavPath.length, setRootLevelCollections]);
@@ -128,7 +127,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     // When navigated into a collection feed, the URL itself provides the scoping
     let finalFiltered = mediaFiltered;
     if (collectionMode !== 'all' && catalogNavPath.length <= 1) {
-      finalFiltered = mediaFiltered.filter(book => 
+      finalFiltered = mediaFiltered.filter(book =>
         book.collections?.some(c => c.title === collectionMode)
       );
     }
@@ -170,7 +169,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const handleBreadcrumbClick = (index: number) => {
     const newPath = catalogNavPath.slice(0, index + 1);
     setCatalogNavPath(newPath);
-    
+
     // Reset filters
     setAudienceMode('all');
     setFictionMode('all');
@@ -237,10 +236,10 @@ const CatalogView: React.FC<CatalogViewProps> = ({
 
   // Determine which collections to show in sidebar
   const sidebarCollections = availableCollections.length > 0 ? availableCollections : rootLevelCollections;
-  const showSidebar = 
-    sidebarCollections.length > 0 || 
+  const showSidebar =
+    sidebarCollections.length > 0 ||
     availableGenreCategories.length > 0 ||
-    (catalogNavPath.length > 1 && rootLevelCollections.length > 0) || 
+    (catalogNavPath.length > 1 && rootLevelCollections.length > 0) ||
     (isLoading && rootLevelCollections.length > 0);
 
   if (isLoading) {
@@ -261,7 +260,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const hasBooks = catalogBooks.length > 0 || categoryLanes.length > 0 || uncategorizedBooks.length > 0;
   const hasNavLinks = catalogNavLinks.filter(link => link.rel !== 'collection').length > 0;
   const hasOriginalBooks = originalCatalogBooks.length > 0;
-  
+
   // If there are no books at all (not just filtered out), show full empty state
   if (!hasOriginalBooks && !hasNavLinks && !isLoading) {
     return <EmptyState variant="catalog" />;
@@ -327,14 +326,12 @@ const CatalogView: React.FC<CatalogViewProps> = ({
             <button
               onClick={() => setCategorizationMode(categorizationMode === 'subject' ? 'flat' : 'subject')}
               aria-label={`Switch to ${categorizationMode === 'subject' ? 'grid view' : 'lanes view'}`}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
-                categorizationMode === 'subject' ? 'bg-emerald-600' : 'bg-slate-600'
-              }`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${categorizationMode === 'subject' ? 'bg-emerald-600' : 'bg-slate-600'
+                }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  categorizationMode === 'subject' ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${categorizationMode === 'subject' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
               />
             </button>
             <span className="text-sm text-slate-300">

@@ -1,19 +1,19 @@
 /**
  * Book Repository
- * 
+ *
  * Manages persistence of books in IndexedDB using the Repository pattern.
  * This provides a clean abstraction over database operations and enables
  * easier testing and potential migration to other storage backends.
  */
 
 import { DB_INDEXES, DB_NAME, DB_VERSION, STORE_NAME } from '../../constants';
-import type { BookMetadata, BookRecord, BookQueryFilters, BookSortOptions } from './types';
 import { logger } from '../../services/logger';
+import type { BookMetadata, BookRecord } from './types';
 
 /**
  * Result wrapper for repository operations
  */
-export type RepositoryResult<T> = 
+export type RepositoryResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
@@ -148,7 +148,7 @@ export class BookRepository {
   async findMetadataById(id: number): Promise<RepositoryResult<BookMetadata | null>> {
     try {
       const result = await this.findById(id);
-      
+
       if (!result.success) {
         return { success: false, error: 'Failed to find book metadata' };
       }
@@ -268,7 +268,7 @@ export class BookRepository {
           try {
             const transaction = db.transaction(STORE_NAME, 'readonly');
             const store = transaction.objectStore(STORE_NAME);
-            
+
             if (!store.indexNames.contains(indexName)) {
               resolve(null);
               return;
@@ -378,7 +378,7 @@ export class BookRepository {
   async update(id: number, updates: Partial<BookRecord>): Promise<RepositoryResult<void>> {
     try {
       const result = await this.findById(id);
-      
+
       if (!result.success) {
         return { success: false, error: 'Failed to find book for update' };
       }
@@ -394,7 +394,7 @@ export class BookRepository {
       };
 
       const saveResult = await this.save(updatedBook);
-      
+
       if (!saveResult.success) {
         return { success: false, error: 'Failed to save updated book' };
       }
@@ -414,7 +414,7 @@ export class BookRepository {
    */
   async exists(identifier: string): Promise<RepositoryResult<boolean>> {
     const result = await this.findByIdentifier(identifier);
-    
+
     if (!result.success) {
       return { success: false, error: 'Failed to check if book exists' };
     }

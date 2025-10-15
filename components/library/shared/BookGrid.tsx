@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import type { BookMetadata, CatalogBook } from '../../../types';
-import BookCard from '../shared/BookCard';
-import Spinner from '../../Spinner';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useKeyboardNavigation } from '../../../hooks';
+import type { BookMetadata, CatalogBook } from '../../../types';
+import Spinner from '../../Spinner';
+import BookCard from '../shared/BookCard';
 
 interface BookGridProps {
   /** Books to display */
@@ -19,7 +19,7 @@ interface BookGridProps {
 
 /**
  * BookGrid - Responsive grid layout for displaying books
- * 
+ *
  * Displays books in a responsive grid with loading state.
  * Uses BookCard component for individual book display.
  */

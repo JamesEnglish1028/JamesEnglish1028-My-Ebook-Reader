@@ -30,7 +30,7 @@ interface CatalogFiltersProps {
 
 /**
  * CatalogFilters - Filter controls for OPDS catalog browsing
- * 
+ *
  * Provides genre category navigation and audience/fiction/media filters.
  * Only displays filters that have multiple available options.
  */
@@ -93,11 +93,10 @@ const CatalogFilters: React.FC<CatalogFiltersProps> = ({
                     <button
                       key={option.key}
                       onClick={() => onAudienceChange(option.key)}
-                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                        audienceMode === option.key
+                      className={`px-3 py-1 text-sm rounded-md transition-colors ${audienceMode === option.key
                           ? 'bg-blue-600 text-white font-medium'
                           : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                      }`}
+                        }`}
                     >
                       {option.label.replace('All Ages', 'All')}
                     </button>
@@ -117,11 +116,10 @@ const CatalogFilters: React.FC<CatalogFiltersProps> = ({
                     <button
                       key={option.key}
                       onClick={() => onFictionChange(option.key)}
-                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                        fictionMode === option.key
+                      className={`px-3 py-1 text-sm rounded-md transition-colors ${fictionMode === option.key
                           ? 'bg-purple-600 text-white font-medium'
                           : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                      }`}
+                        }`}
                     >
                       {option.label.replace('All Types', 'All')}
                     </button>
@@ -141,11 +139,10 @@ const CatalogFilters: React.FC<CatalogFiltersProps> = ({
                     <button
                       key={option.key}
                       onClick={() => onMediaChange(option.key)}
-                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                        mediaMode === option.key
+                      className={`px-3 py-1 text-sm rounded-md transition-colors ${mediaMode === option.key
                           ? 'bg-indigo-600 text-white font-medium'
                           : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                      }`}
+                        }`}
                     >
                       {option.label.replace('All Media', 'All')}
                     </button>

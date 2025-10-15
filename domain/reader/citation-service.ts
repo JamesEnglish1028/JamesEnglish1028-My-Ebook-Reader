@@ -1,19 +1,19 @@
 /**
  * Citation Service
- * 
+ *
  * Service layer for managing citations (highlighted text with notes) and
  * generating formatted bibliographic citations in various academic styles.
  */
 
-import type { Citation, CitationFormat, FormattedCitation } from './types';
-import type { BookMetadata } from '../book/types';
 import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
+import type { BookMetadata } from '../book/types';
+import type { Citation, CitationFormat, FormattedCitation } from './types';
 
 /**
  * Result type for citation operations
  */
-export type CitationResult<T> = 
+export type CitationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
@@ -48,7 +48,7 @@ export interface CitationComponents {
 
 /**
  * Citation Service
- * 
+ *
  * Manages citations (reader annotations) and provides bibliographic
  * citation formatting in APA, MLA, and Chicago styles.
  */
@@ -68,18 +68,18 @@ export class CitationService {
 
   /**
    * Get all citations for a specific book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with array of citations (empty array if none found)
    */
   findByBookId(bookId: number): CitationResult<Citation[]> {
     try {
       logger.info('Finding citations for book', { bookId });
-      
+
       const key = getStorageKey.citations(bookId);
       const saved = localStorage.getItem(key);
       const citations = this.safeParse<Citation[]>(saved, []);
-      
+
       logger.info('Found citations', { bookId, count: citations.length });
       return { success: true, data: citations };
     } catch (error) {
@@ -91,7 +91,7 @@ export class CitationService {
 
   /**
    * Get a specific citation by ID
-   * 
+   *
    * @param bookId - The ID of the book
    * @param citationId - The ID of the citation
    * @returns Result with citation or null if not found
@@ -114,7 +114,7 @@ export class CitationService {
 
   /**
    * Add a new citation (annotation) for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @param options - Citation creation options
    * @returns Result with the created citation
@@ -142,7 +142,7 @@ export class CitationService {
       // Add to list and save
       const updatedCitations = [...result.data, newCitation];
       const saveResult = this.saveAll(bookId, updatedCitations);
-      
+
       if (!saveResult.success) {
         return { success: false, error: 'Failed to save citation' };
       }
@@ -158,7 +158,7 @@ export class CitationService {
 
   /**
    * Update an existing citation
-   * 
+   *
    * @param bookId - The ID of the book
    * @param citationId - The ID of the citation to update
    * @param options - Updated citation properties
@@ -177,7 +177,7 @@ export class CitationService {
       // Find and update the citation
       const citations = result.data;
       const index = citations.findIndex(c => c.id === citationId);
-      
+
       if (index === -1) {
         return { success: false, error: 'Citation not found' };
       }
@@ -206,7 +206,7 @@ export class CitationService {
 
   /**
    * Delete a specific citation
-   * 
+   *
    * @param bookId - The ID of the book
    * @param citationId - The ID of the citation to delete
    * @returns Result indicating success or failure
@@ -223,7 +223,7 @@ export class CitationService {
 
       // Filter out the citation to delete
       const updatedCitations = result.data.filter(c => c.id !== citationId);
-      
+
       if (updatedCitations.length === result.data.length) {
         return { success: false, error: 'Citation not found' };
       }
@@ -245,7 +245,7 @@ export class CitationService {
 
   /**
    * Delete all citations for a specific book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result indicating success or failure
    */
@@ -267,7 +267,7 @@ export class CitationService {
 
   /**
    * Count citations for a specific book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with citation count
    */
@@ -288,7 +288,7 @@ export class CitationService {
 
   /**
    * Find citations by chapter
-   * 
+   *
    * @param bookId - The ID of the book
    * @param chapter - The chapter name to filter by
    * @returns Result with array of matching citations
@@ -303,7 +303,7 @@ export class CitationService {
       }
 
       const filtered = result.data.filter(c => c.chapter === chapter);
-      
+
       logger.info('Found citations by chapter', { bookId, chapter, count: filtered.length });
       return { success: true, data: filtered };
     } catch (error) {
@@ -315,7 +315,7 @@ export class CitationService {
 
   /**
    * Get citations sorted by creation date (newest first)
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with sorted array of citations
    */
@@ -337,7 +337,7 @@ export class CitationService {
 
   /**
    * Save all citations for a book (internal method)
-   * 
+   *
    * @param bookId - The ID of the book
    * @param citations - Array of citations to save
    * @returns Result indicating success or failure
@@ -367,7 +367,7 @@ export class CitationService {
 
   /**
    * Format author name for citations
-   * 
+   *
    * @param authorName - Full author name
    * @param format - Citation format
    * @returns Formatted author name
@@ -375,21 +375,21 @@ export class CitationService {
   formatAuthorName(authorName: string, format: CitationFormat): string {
     const words = authorName.split(' ').filter(p => p.trim());
     if (words.length < 2) return authorName;
-    
+
     const lastName = words.pop()!;
     const firstNameParts = words;
-    
+
     if (format === 'apa') {
       const initials = firstNameParts.map(name => (name[0] ? `${name[0]}.` : '')).join(' ');
       return `${lastName}, ${initials}`;
     }
-    
+
     return `${lastName}, ${firstNameParts.join(' ')}`;
   }
 
   /**
    * Generate bibliographic citation components
-   * 
+   *
    * @param book - Book metadata
    * @param format - Citation format (APA, MLA, or Chicago)
    * @returns Citation components for rendering
@@ -410,7 +410,7 @@ export class CitationService {
             post: `. ${publisher}.`,
             isItalic: true
           };
-        
+
         case 'mla':
           return {
             pre: `${formattedAuthor}. `,
@@ -418,7 +418,7 @@ export class CitationService {
             post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
             isItalic: true
           };
-        
+
         case 'chicago':
           return {
             pre: `${formattedAuthor}. `,
@@ -426,7 +426,7 @@ export class CitationService {
             post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
             isItalic: false
           };
-        
+
         default:
           return {
             pre: `${author}. `,
@@ -448,7 +448,7 @@ export class CitationService {
 
   /**
    * Generate formatted citation as plain text
-   * 
+   *
    * @param book - Book metadata
    * @param format - Citation format
    * @returns Formatted citation object
@@ -456,7 +456,7 @@ export class CitationService {
   formatCitation(book: BookMetadata, format: CitationFormat): FormattedCitation {
     const components = this.generateCitation(book, format);
     const text = `${components.pre}${components.title}${components.post}`;
-    
+
     return {
       format,
       text
@@ -465,7 +465,7 @@ export class CitationService {
 
   /**
    * Generate all citation formats for a book
-   * 
+   *
    * @param book - Book metadata
    * @returns Array of formatted citations in all supported formats
    */
@@ -477,7 +477,7 @@ export class CitationService {
   /**
    * Generate RIS format export for citations
    * RIS is a standardized format for bibliographic data
-   * 
+   *
    * @param book - Book metadata
    * @param citations - Array of citations to export
    * @returns RIS formatted string
@@ -492,29 +492,29 @@ export class CitationService {
       citations.forEach(citation => {
         const risRecord: string[] = [];
         risRecord.push('TY  - CHAP'); // Chapter of a book
-        
+
         if (book.author) {
           const formattedAuthor = this.formatAuthorName(book.author, 'apa');
           risRecord.push(`AU  - ${formattedAuthor}`);
         }
-        
+
         if (book.title) risRecord.push(`T2  - ${book.title}`);
         if (book.publisher) risRecord.push(`PB  - ${book.publisher}`);
         if (year !== 'n.d.') risRecord.push(`PY  - ${year}`);
         if (book.isbn) risRecord.push(`SN  - ${book.isbn}`);
         if (citation.chapter) risRecord.push(`TI  - ${citation.chapter}`);
         if (citation.pageNumber) risRecord.push(`SP  - ${citation.pageNumber}`);
-        
+
         // Clean note content (remove line breaks)
         const noteContent = (citation.note || '').replace(/(\r\n|\n|\r)/gm, ' ');
         if (noteContent) risRecord.push(`N1  - ${noteContent}`);
-        
+
         risRecord.push('ER  - '); // End of record
         allRecords.push(risRecord.join('\r\n'));
       });
 
       const risContent = allRecords.join('\r\n\r\n') + '\r\n';
-      
+
       logger.info('RIS export successful', { recordCount: allRecords.length });
       return { success: true, data: risContent };
     } catch (error) {
@@ -526,7 +526,7 @@ export class CitationService {
 
   /**
    * Export citations as JSON
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with JSON string of citations
    */
@@ -549,7 +549,7 @@ export class CitationService {
 
   /**
    * Import citations from JSON
-   * 
+   *
    * @param bookId - The ID of the book
    * @param json - JSON string of citations to import
    * @param merge - If true, merge with existing citations; if false, replace
@@ -560,7 +560,7 @@ export class CitationService {
       logger.info('Importing citations', { bookId, merge });
 
       const imported = this.safeParse<Citation[]>(json, []);
-      
+
       if (!Array.isArray(imported)) {
         return { success: false, error: 'Invalid citation data format' };
       }

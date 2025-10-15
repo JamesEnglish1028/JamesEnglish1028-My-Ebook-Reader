@@ -1,9 +1,9 @@
 import React from 'react';
 import {
-  SettingsModal,
   LocalStorageModal,
-  OpdsCredentialsModal,
   NetworkDebugModal,
+  OpdsCredentialsModal,
+  SettingsModal,
   ShortcutHelpModal,
 } from '..';
 
@@ -23,23 +23,23 @@ interface GlobalModalsProps {
     state: 'idle' | 'syncing' | 'success' | 'error';
     message: string;
   }>>;
-  
+
   // Local storage modal
   isLocalStorageModalOpen: boolean;
   onCloseLocalStorageModal: () => void;
-  
+
   // OPDS credentials modal
   credentialPrompt: CredentialPrompt;
   onCloseCredentialPrompt: () => void;
   onCredentialSubmit: (username: string, password: string, save: boolean) => Promise<void>;
   onOpenAuthLink: (href: string) => void;
   onRetryAfterProviderLogin: () => Promise<void>;
-  
+
   // Network debug modal
   showNetworkDebug: boolean;
   onCloseNetworkDebug: () => void;
   onOpenNetworkDebug: () => void;
-  
+
   // Shortcut help modal
   isShortcutHelpOpen: boolean;
   onCloseShortcutHelp: () => void;
@@ -79,12 +79,12 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
         syncStatus={syncStatus}
         setSyncStatus={setSyncStatus}
       />
-      
+
       <LocalStorageModal
         isOpen={isLocalStorageModalOpen}
         onClose={onCloseLocalStorageModal}
       />
-      
+
       <OpdsCredentialsModal
         isOpen={credentialPrompt.isOpen}
         host={credentialPrompt.host}
@@ -95,18 +95,18 @@ export const GlobalModals: React.FC<GlobalModalsProps> = ({
         onRetry={onRetryAfterProviderLogin}
         probeUrl={credentialPrompt.pendingHref}
       />
-      
+
       <NetworkDebugModal
         isOpen={showNetworkDebug}
         onClose={onCloseNetworkDebug}
       />
-      
+
       <ShortcutHelpModal
         isOpen={isShortcutHelpOpen}
         onClose={onCloseShortcutHelp}
         activeReader={null}
       />
-      
+
       {/* Debug floating button (visible only in debug mode) */}
       {typeof window !== 'undefined' && (window as any).__MEBOOKS_DEBUG__ && (
         <div className="fixed right-3 bottom-3 z-[60]">

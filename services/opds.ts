@@ -1,8 +1,7 @@
-import type { CatalogBook, CatalogNavigationLink, CatalogPagination, Category, CategorizationMode, AudienceMode, FictionMode, MediaMode, CollectionMode, CatalogWithCategories, CatalogWithCollections, CollectionGroup, Series, Collection} from '../types';
-import { CategoryLane } from '../types';
+import type { AudienceMode, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogWithCategories, CatalogWithCollections, CategorizationMode, Category, Collection, CollectionGroup, CollectionMode, FictionMode, MediaMode, Series } from '../types';
 
 import { logger } from './logger';
-import { proxiedUrl, maybeProxyForCors } from './utils';
+import { maybeProxyForCors, proxiedUrl } from './utils';
 // NOTE: prefer a static import for `maybeProxyForCors` instead of a dynamic import
 // because static imports keep bundling deterministic and avoid creating a
 // separate dynamic chunk for a small utility module. This prevents Vite from
@@ -32,7 +31,7 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
     try {
         const cached = responseByteCache.get(resp);
         if (cached) return cached;
-    } catch (_) {}
+    } catch (_) { }
     // Defensive read supporting test mocks (which may not implement clone()/arrayBuffer())
     try {
         // Try arrayBuffer() on the original response first. Some environments
@@ -42,7 +41,7 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
             try {
                 const buf = await resp.arrayBuffer();
                 const result = new Uint8Array(buf);
-                try { responseByteCache.set(resp, result); } catch (_) {}
+                try { responseByteCache.set(resp, result); } catch (_) { }
                 return result;
             } catch (_) {
                 // fallthrough to clone/read logic
@@ -54,7 +53,7 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
             try {
                 const buf = await c.arrayBuffer();
                 const out = new Uint8Array(buf);
-                try { responseByteCache.set(resp, out); } catch (_) {}
+                try { responseByteCache.set(resp, out); } catch (_) { }
                 return out;
             } catch (e) {
                 const reader = c.body && (c.body as any).getReader ? (c.body as any).getReader() : null;
@@ -62,7 +61,7 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
                 const chunks: Uint8Array[] = [];
                 let total = 0;
                 while (true) {
-                     
+
                     const { done, value } = await reader.read();
                     if (done) break;
                     if (value) {
@@ -77,7 +76,7 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
                     out.set(chunk, offset);
                     offset += chunk.length;
                 }
-                try { responseByteCache.set(resp, out); } catch (_) {}
+                try { responseByteCache.set(resp, out); } catch (_) { }
                 return out;
             }
         }
@@ -88,19 +87,19 @@ async function readAllBytes(resp: Response): Promise<Uint8Array> {
             if (typeof TextEncoder !== 'undefined') encoded = new TextEncoder().encode(txt);
             else if (typeof Buffer !== 'undefined') encoded = new Uint8Array(Buffer.from(txt, 'utf-8'));
             else encoded = new Uint8Array();
-            try { responseByteCache.set(resp, encoded); } catch (_) {}
+            try { responseByteCache.set(resp, encoded); } catch (_) { }
             return encoded;
         }
 
         if (resp && resp.body) {
             if (resp.body instanceof Uint8Array) {
-                try { responseByteCache.set(resp, resp.body); } catch (_) {}
+                try { responseByteCache.set(resp, resp.body); } catch (_) { }
                 return resp.body;
             }
             // @ts-ignore
             if (typeof Buffer !== 'undefined' && Buffer.isBuffer(resp.body)) {
                 const out = new Uint8Array(resp.body);
-                try { responseByteCache.set(resp, out); } catch (_) {}
+                try { responseByteCache.set(resp, out); } catch (_) { }
                 return out;
             }
         }
@@ -124,7 +123,7 @@ async function safeReadText(resp: Response): Promise<string> {
         console.warn('safeReadText: fallback decode failed', e);
         try {
             if (resp && typeof resp.text === 'function') return await resp.text();
-        } catch (_) {}
+        } catch (_) { }
         return '';
     }
 }
@@ -164,8 +163,8 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
 
     const errorNode = xmlDoc.querySelector('parsererror');
     if (errorNode) {
-      console.error('XML Parsing Error:', errorNode.textContent);
-      throw new Error('Failed to parse catalog feed. The URL may not point to a valid OPDS feed, or the response was not valid XML.');
+        console.error('XML Parsing Error:', errorNode.textContent);
+        throw new Error('Failed to parse catalog feed. The URL may not point to a valid OPDS feed, or the response was not valid XML.');
     }
 
     // Add check for the root <feed> element to validate it's an Atom feed.
@@ -178,7 +177,7 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     const books: CatalogBook[] = [];
     const navLinks: CatalogNavigationLink[] = [];
     const pagination: CatalogPagination = {};
-    
+
     // Extract pagination links from feed-level link elements
     const feedLinks = Array.from(xmlDoc.querySelectorAll('feed > link'));
     feedLinks.forEach(link => {
@@ -193,145 +192,145 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
         }
     });
 
-        entries.forEach(entry => {
-            const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
-            const allLinks = Array.from(entry.querySelectorAll('link'));
+    entries.forEach(entry => {
+        const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
+        const allLinks = Array.from(entry.querySelectorAll('link'));
 
-            // Check for schema:additionalType to detect audiobooks
-            const schemaType = entry.getAttribute('schema:additionalType');
-            const isAudiobook = schemaType === 'http://bib.schema.org/Audiobook' || schemaType === 'http://schema.org/Audiobook';
+        // Check for schema:additionalType to detect audiobooks
+        const schemaType = entry.getAttribute('schema:additionalType');
+        const isAudiobook = schemaType === 'http://bib.schema.org/Audiobook' || schemaType === 'http://schema.org/Audiobook';
 
-            // Find acquisition links for downloadable books
-            const openAccessLink = allLinks.find(link => {
-                const rel = link.getAttribute('rel') || '';
-                return rel.includes('/open-access') || rel === 'http://opds-spec.org/acquisition/open-access';
-            });
-            const acquisitionLink = openAccessLink || allLinks.find(link => {
-                const rel = link.getAttribute('rel') || '';
-                const type = link.getAttribute('type') || '';
-                return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
-            }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
-            const isOpenAccess = !!openAccessLink;
+        // Find acquisition links for downloadable books
+        const openAccessLink = allLinks.find(link => {
+            const rel = link.getAttribute('rel') || '';
+            return rel.includes('/open-access') || rel === 'http://opds-spec.org/acquisition/open-access';
+        });
+        const acquisitionLink = openAccessLink || allLinks.find(link => {
+            const rel = link.getAttribute('rel') || '';
+            const type = link.getAttribute('type') || '';
+            return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
+        }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
+        const isOpenAccess = !!openAccessLink;
 
-            const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
+        const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
 
 
-            if (acquisitionLink) {
-                // ...existing book parsing logic...
-                const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
-                const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
-                const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
-                const coverImageHref = coverLink?.getAttribute('href');
-                const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
-                const downloadUrlHref = acquisitionLink?.getAttribute('href');
-                const mimeType = acquisitionLink?.getAttribute('type') || '';
-                let format = getFormatFromMimeType(mimeType);
-                if (isAudiobook) {
-                    format = 'AUDIOBOOK';
-                } else if (!format) {
-                    const findIndirectType = (el: Element | null): string | undefined => {
-                        if (!el) return undefined;
-                        for (const child of Array.from(el.children)) {
-                            const local = (child.localName || child.nodeName || '').toLowerCase();
-                            if (local === 'indirectacquisition') {
-                                const t = child.getAttribute('type');
-                                if (t) return t;
-                                const nested = findIndirectType(child);
-                                if (nested) return nested;
-                            } else {
-                                const nested = findIndirectType(child);
-                                if (nested) return nested;
-                            }
+        if (acquisitionLink) {
+            // ...existing book parsing logic...
+            const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
+            const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
+            const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
+            const coverImageHref = coverLink?.getAttribute('href');
+            const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
+            const downloadUrlHref = acquisitionLink?.getAttribute('href');
+            const mimeType = acquisitionLink?.getAttribute('type') || '';
+            let format = getFormatFromMimeType(mimeType);
+            if (isAudiobook) {
+                format = 'AUDIOBOOK';
+            } else if (!format) {
+                const findIndirectType = (el: Element | null): string | undefined => {
+                    if (!el) return undefined;
+                    for (const child of Array.from(el.children)) {
+                        const local = (child.localName || child.nodeName || '').toLowerCase();
+                        if (local === 'indirectacquisition') {
+                            const t = child.getAttribute('type');
+                            if (t) return t;
+                            const nested = findIndirectType(child);
+                            if (nested) return nested;
+                        } else {
+                            const nested = findIndirectType(child);
+                            if (nested) return nested;
                         }
-                        return undefined;
-                    };
-                    const indirect = findIndirectType(acquisitionLink as Element);
-                    if (indirect) format = getFormatFromMimeType(indirect);
+                    }
+                    return undefined;
+                };
+                const indirect = findIndirectType(acquisitionLink as Element);
+                if (indirect) format = getFormatFromMimeType(indirect);
+            }
+            const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
+            let distributor: string | undefined = undefined;
+            try {
+                const distributionElements = entry.getElementsByTagName('bibframe:distribution');
+                if (distributionElements.length > 0) {
+                    const distributorRaw = distributionElements[0].getAttribute('bibframe:ProviderName')?.trim();
+                    distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
                 }
-                const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
-                let distributor: string | undefined = undefined;
+            } catch (error) {
                 try {
-                    const distributionElements = entry.getElementsByTagName('bibframe:distribution');
+                    const distributionElements = entry.getElementsByTagName('distribution');
                     if (distributionElements.length > 0) {
-                        const distributorRaw = distributionElements[0].getAttribute('bibframe:ProviderName')?.trim();
+                        const distributorRaw = distributionElements[0].getAttribute('ProviderName')?.trim();
                         distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
                     }
-                } catch (error) {
-                    try {
-                        const distributionElements = entry.getElementsByTagName('distribution');
-                        if (distributionElements.length > 0) {
-                            const distributorRaw = distributionElements[0].getAttribute('ProviderName')?.trim();
-                            distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
-                        }
-                    } catch (fallbackError) {
-                        console.warn('Could not parse distributor information:', fallbackError);
-                    }
-                }
-                const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
-                const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
-                const providerId = identifiers[0]?.textContent?.trim() || undefined;
-                const categories = Array.from(entry.querySelectorAll('category')).map(cat => {
-                    const scheme = cat.getAttribute('scheme') || 'http://palace.io/subjects';
-                    const term = cat.getAttribute('term')?.trim();
-                    const label = cat.getAttribute('label')?.trim();
-                    if (term) {
-                        return {
-                            scheme,
-                            term,
-                            label: label || term,
-                        };
-                    }
-                    return null;
-                }).filter((category): category is Category => category !== null);
-                const subjects = categories.map(cat => cat.label);
-                const collectionLinks = Array.from(entry.querySelectorAll('link[rel="collection"]'));
-                const collections = collectionLinks.map(link => {
-                    const href = link.getAttribute('href');
-                    const title = link.getAttribute('title');
-                    if (href && title) {
-                        return {
-                            title: title.trim(),
-                            href: new URL(href, baseUrl).href,
-                        };
-                    }
-                    return null;
-                }).filter((collection): collection is { title: string; href: string } => collection !== null);
-                if(downloadUrlHref) {
-                    const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
-                    let finalMediaType = mimeType;
-                    if (isAudiobook) {
-                        finalMediaType = 'http://bib.schema.org/Audiobook';
-                    }
-                    books.push({ 
-                        title, 
-                        author, 
-                        coverImage, 
-                        downloadUrl, 
-                        summary, 
-                        publisher: publisher || undefined, 
-                        publicationDate: publicationDate || undefined, 
-                        providerId, 
-                        distributor: distributor,
-                        subjects: subjects.length > 0 ? subjects : undefined,
-                        categories: categories.length > 0 ? categories : undefined,
-                        format,
-                        acquisitionMediaType: finalMediaType || undefined,
-                        collections: collections.length > 0 ? collections : undefined,
-                        isOpenAccess: isOpenAccess || undefined,
-                    });
-                }
-            } else if (subsectionLink) {
-                const navUrl = subsectionLink.getAttribute('href');
-                if (navUrl) {
-                    navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
+                } catch (fallbackError) {
+                    console.warn('Could not parse distributor information:', fallbackError);
                 }
             }
-        });
+            const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
+            const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
+            const providerId = identifiers[0]?.textContent?.trim() || undefined;
+            const categories = Array.from(entry.querySelectorAll('category')).map(cat => {
+                const scheme = cat.getAttribute('scheme') || 'http://palace.io/subjects';
+                const term = cat.getAttribute('term')?.trim();
+                const label = cat.getAttribute('label')?.trim();
+                if (term) {
+                    return {
+                        scheme,
+                        term,
+                        label: label || term,
+                    };
+                }
+                return null;
+            }).filter((category): category is Category => category !== null);
+            const subjects = categories.map(cat => cat.label);
+            const collectionLinks = Array.from(entry.querySelectorAll('link[rel="collection"]'));
+            const collections = collectionLinks.map(link => {
+                const href = link.getAttribute('href');
+                const title = link.getAttribute('title');
+                if (href && title) {
+                    return {
+                        title: title.trim(),
+                        href: new URL(href, baseUrl).href,
+                    };
+                }
+                return null;
+            }).filter((collection): collection is { title: string; href: string } => collection !== null);
+            if (downloadUrlHref) {
+                const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
+                let finalMediaType = mimeType;
+                if (isAudiobook) {
+                    finalMediaType = 'http://bib.schema.org/Audiobook';
+                }
+                books.push({
+                    title,
+                    author,
+                    coverImage,
+                    downloadUrl,
+                    summary,
+                    publisher: publisher || undefined,
+                    publicationDate: publicationDate || undefined,
+                    providerId,
+                    distributor: distributor,
+                    subjects: subjects.length > 0 ? subjects : undefined,
+                    categories: categories.length > 0 ? categories : undefined,
+                    format,
+                    acquisitionMediaType: finalMediaType || undefined,
+                    collections: collections.length > 0 ? collections : undefined,
+                    isOpenAccess: isOpenAccess || undefined,
+                });
+            }
+        } else if (subsectionLink) {
+            const navUrl = subsectionLink.getAttribute('href');
+            if (navUrl) {
+                navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
+            }
+        }
+    });
 
     // Create navigation links from collections found in books (for Palace Project support)
     if (books.length > 0 && navLinks.length === 0) {
         const collectionMap = new Map<string, string>();
-        
+
         books.forEach(book => {
             if (book.collections) {
                 book.collections.forEach(collection => {
@@ -341,19 +340,24 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
                 });
             }
         });
-        
+
         // Convert unique collections to navigation links
         collectionMap.forEach((href, title) => {
-            navLinks.push({ 
-                title, 
-                url: href, 
-                rel: 'collection', 
+            navLinks.push({
+                title,
+                url: href,
+                rel: 'collection',
             });
         });
     }
 
-    // Add check to see if a valid Atom feed contains no OPDS content.
-    if (entries.length > 0 && books.length === 0 && navLinks.length === 0) {
+
+    // Throw if <feed> has no <entry> elements (empty feed)
+    if (rootNodeName && (rootNodeName.toLowerCase() === 'feed' || rootNodeName.endsWith(':feed')) && entries.length === 0) {
+        throw new Error('This appears to be a valid Atom feed, but it contains no entries. Please ensure the URL points to an OPDS catalog.');
+    }
+    // Throw if <feed> has entries but no OPDS content
+    if (rootNodeName && (rootNodeName.toLowerCase() === 'feed' || rootNodeName.endsWith(':feed')) && entries.length > 0 && books.length === 0 && navLinks.length === 0) {
         throw new Error('This appears to be a valid Atom feed, but it contains no recognizable OPDS book entries or navigation links. Please ensure the URL points to an OPDS catalog.');
     }
 
@@ -389,7 +393,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
             const metadata = pub.metadata || {};
             const title = metadata.title?.trim() || 'Untitled';
             const summary = metadata.description?.trim() || null;
-            
+
             let author = 'Unknown Author';
             if (metadata.author) {
                 if (Array.isArray(metadata.author) && metadata.author.length > 0) {
@@ -405,24 +409,24 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 
             // Find all acquisition links and prefer open-access ones
             const acquisitionLinks = pub.links?.filter((l: any) => l.rel?.includes('opds-spec.org/acquisition')) || [];
-            
+
             // Separate open-access links
-            const openAccessLinks = acquisitionLinks.filter((l: any) => 
+            const openAccessLinks = acquisitionLinks.filter((l: any) =>
                 l.rel?.includes('/open-access') || l.rel === 'http://opds-spec.org/acquisition/open-access'
             );
-            
+
             // Prefer open-access EPUB over PDF as primary (EPUB is generally more reliable)
             let acquisitionLink = openAccessLinks.find((l: any) => l.type?.includes('epub'));
             if (!acquisitionLink) {
                 acquisitionLink = openAccessLinks[0] || acquisitionLinks[0];
             }
-            
+
             const isOpenAccess = openAccessLinks.length > 0;
-            
+
             // Collect all unique formats as alternatives
             const alternativeFormats: any[] = [];
             const seenFormats = new Set<string>();
-            
+
             for (const link of openAccessLinks.length > 0 ? openAccessLinks : acquisitionLinks) {
                 const fmt = getFormatFromMimeType(link.type);
                 if (fmt && !seenFormats.has(fmt)) {
@@ -435,7 +439,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     });
                 }
             }
-            
+
             const coverLink = pub.images?.[0];
 
             if (acquisitionLink?.href) {
@@ -486,15 +490,15 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                     }
                 }
 
-                books.push({ 
-                    title, 
-                    author, 
-                    coverImage, 
-                    downloadUrl, 
-                    summary, 
-                    publisher, 
-                    publicationDate, 
-                    providerId, 
+                books.push({
+                    title,
+                    author,
+                    coverImage,
+                    downloadUrl,
+                    summary,
+                    publisher,
+                    publicationDate,
+                    providerId,
                     subjects: subjects.length > 0 ? subjects : undefined,
                     series,
                     format,
@@ -545,11 +549,11 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
         // primarily for native clients and don't expose CORS consistently. For
         // those hosts we should force requests through our owned proxy so the
         // browser won't be blocked. Detect palace-like hosts and skip the probe.
-    const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
-    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
+        const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
+        const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
 
-    // Log host classification to confirm palace hosts are being forced through owned proxy
-    logger.debug('fetchCatalogContent host classification', { hostname, isPalaceHost, forcedVersion });
+        // Log host classification to confirm palace hosts are being forced through owned proxy
+        logger.debug('fetchCatalogContent host classification', { hostname, isPalaceHost, forcedVersion });
 
         let fetchUrl: string;
         if (isPalaceHost) {
@@ -567,11 +571,11 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             ? 'application/atom+xml;profile=opds-catalog, application/xml, text/xml, */*'
             : 'application/opds+json, application/atom+xml;profile=opds-catalog;q=0.9, application/json;q=0.8, application/xml;q=0.7, */*;q=0.5';
 
-    // FIX: Added specific Accept header to signal preference for OPDS formats.
+        // FIX: Added specific Accept header to signal preference for OPDS formats.
         // Log fetch URL to show whether proxied or direct URL is used
         logger.debug('fetchCatalogContent fetch details', { fetchUrl, acceptHeader });
-    // Determine whether this is a direct fetch (so we can include credentials)
-    const isDirectFetch = fetchUrl === url;
+        // Determine whether this is a direct fetch (so we can include credentials)
+        const isDirectFetch = fetchUrl === url;
         const response = await fetch(fetchUrl, {
             method: 'GET',
             mode: 'cors',
@@ -592,9 +596,9 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
         // If the direct fetch returned a redirect (3xx) or the response lacks CORS
         // headers when we attempted a direct fetch, the browser will block reading
         // the body. In that case, retry the request via the configured proxy.
-    const isRedirect = response.status >= 300 && response.status < 400;
-    const hasCorsHeader = !!response.headers.get('Access-Control-Allow-Origin');
-    if ((isRedirect || (isDirectFetch && !hasCorsHeader)) && proxiedUrl) {
+        const isRedirect = response.status >= 300 && response.status < 400;
+        const hasCorsHeader = !!response.headers.get('Access-Control-Allow-Origin');
+        if ((isRedirect || (isDirectFetch && !hasCorsHeader)) && proxiedUrl) {
             const proxyFetchUrl = proxiedUrl(url);
             const proxiedResp = await fetch(proxyFetchUrl, {
                 method: 'GET',
@@ -625,17 +629,17 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                     throw new Error('The CORS proxy returned an HTML page instead of the catalog feed. This might indicate the proxy service is down or blocking the request. Please try another catalog or check back later.');
                 }
 
-                        // If caller requested a forced version, prefer that parsing path even if Content-Type
-                        // suggests otherwise. Log the decision for diagnostics.
-                        // eslint-disable-next-line no-console
-                        console.debug('[mebooks] proxied response - forcedVersion:', forcedVersion, 'contentType:', contentType, 'url:', url);
-                        if (forcedVersion === '1' && responseText.trim().startsWith('<')) {
-                                    // eslint-disable-next-line no-console
-                                    console.debug('[mebooks] Forcing OPDS1 (XML) parse for proxied response');
-                                    return parseOpds1Xml(responseText, baseUrl);
-                                }
+                // If caller requested a forced version, prefer that parsing path even if Content-Type
+                // suggests otherwise. Log the decision for diagnostics.
+                // eslint-disable-next-line no-console
+                console.debug('[mebooks] proxied response - forcedVersion:', forcedVersion, 'contentType:', contentType, 'url:', url);
+                if (forcedVersion === '1' && responseText.trim().startsWith('<')) {
+                    // eslint-disable-next-line no-console
+                    console.debug('[mebooks] Forcing OPDS1 (XML) parse for proxied response');
+                    return parseOpds1Xml(responseText, baseUrl);
+                }
 
-                        if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+                if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
                     try {
                         const jsonData = JSON.parse(responseText);
                         return parseOpds2Json(jsonData, baseUrl);
@@ -652,7 +656,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                             }
                         }
                         const b64 = await captureFirstBytes(proxiedResp).catch(() => '');
-                         
+
                         console.warn('[mebooks] Failed to JSON.parse proxied response; first bytes (base64):', b64);
                         throw new Error(`Failed to parse proxied JSON response for ${url}. First bytes (base64): ${b64}`);
                     }
@@ -671,13 +675,13 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                         }
                     }
                     if (responseText.trim().startsWith('<')) {
-                         return parseOpds1Xml(responseText, baseUrl);
+                        return parseOpds1Xml(responseText, baseUrl);
                     }
                     throw new Error(`Unsupported or ambiguous catalog format. Content-Type: "${contentType}".`);
                 }
             }
         }
-        
+
         if (!response.ok) {
             const statusInfo = `${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
             let errorMessage = `The catalog server responded with an error (${statusInfo}). Please check the catalog URL.`;
@@ -689,9 +693,9 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             }
             throw new Error(errorMessage);
         }
-        
-    const contentType = response.headers.get('Content-Type') || '';
-    const responseText = await safeReadText(response);
+
+        const contentType = response.headers.get('Content-Type') || '';
+        const responseText = await safeReadText(response);
 
         // If the proxy returned a JSON 403 error body, surface a clearer message
         if (response.status === 403 && contentType.includes('application/json')) {
@@ -707,7 +711,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
 
         // FIX: Add specific check for HTML response from a faulty proxy
         if (contentType.includes('text/html') && responseText.trim().toLowerCase().startsWith('<!doctype html>')) {
-             throw new Error('The CORS proxy returned an HTML page instead of the catalog feed. This might indicate the proxy service is down or blocking the request. Please try another catalog or check back later.');
+            throw new Error('The CORS proxy returned an HTML page instead of the catalog feed. This might indicate the proxy service is down or blocking the request. Please try another catalog or check back later.');
         }
 
         // Respect forcedVersion preference for responses read from the direct fetch path.
@@ -720,8 +724,8 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             return parseOpds1Xml(responseText, baseUrl);
         }
 
-    console.log('[mebooks] About to check JSON condition - forcedVersion:', forcedVersion, 'contentType includes opds+json:', contentType.includes('application/opds+json'), 'contentType includes json:', contentType.includes('application/json'));
-    if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+        console.log('[mebooks] About to check JSON condition - forcedVersion:', forcedVersion, 'contentType includes opds+json:', contentType.includes('application/opds+json'), 'contentType includes json:', contentType.includes('application/json'));
+        if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
             console.log('[mebooks] ENTERED JSON condition block! About to parse JSON...');
             try {
                 console.log('[mebooks] About to call JSON.parse on response, length:', responseText.length);
@@ -742,7 +746,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                     }
                 }
                 const b64 = await captureFirstBytes(response).catch(() => '');
-                 
+
                 console.warn('[mebooks] Failed to JSON.parse response; first bytes (base64):', b64);
                 throw new Error(`Failed to parse JSON response for ${url}. First bytes (base64): ${b64}`);
             }
@@ -757,7 +761,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                 } catch (e) { /* Fall through to XML parsing */ }
             }
             if (responseText.trim().startsWith('<')) {
-                 return parseOpds1Xml(responseText, baseUrl);
+                return parseOpds1Xml(responseText, baseUrl);
             }
             throw new Error(`Unsupported or ambiguous catalog format. Content-Type: "${contentType}".`);
         }
@@ -771,7 +775,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
             } else if (error.message === 'Failed to fetch') {
                 message = 'Network Error: Failed to fetch the content. This could be due to your internet connection, the remote catalog being offline, or the public CORS proxy being temporarily unavailable.';
             } else {
-                 message = `A network error occurred: ${error.message}`;
+                message = `A network error occurred: ${error.message}`;
             }
         } else if (error instanceof SyntaxError) {
             message = 'Failed to parse the catalog feed. The response was not valid JSON or XML.';
@@ -790,39 +794,39 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
     let attempts = 0;
     // Known Palace-related media types that some feeds use for indirect acquisition
     const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
-            // Keep the original href as the canonical base for resolving relative
-            // links returned by the server. We may fetch via a proxied URL (current)
-            // but any relative hrefs in responses should be resolved against the
-            // original upstream href, not the proxy URL.
-            const originalHref = href;
-            // For Palace Project servers (palace.io, palaceproject.io, thepalaceproject.org), force the proxied URL (prefer owned proxy when configured)
-            let current: string;
-            try {
-                const hostname = (() => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } })();
-                const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
-                if (isPalaceHost) {
-                    current = proxiedUrl(href);
-                } else {
-                    current = await maybeProxyForCors(href);
-                }
-            } catch (e) {
-                current = await maybeProxyForCors(href);
-            }
-        // If the probe selected the public proxy and credentials are provided,
-        // fail early with a helpful message so UI can prompt for setting an owned proxy.
-        try {
-            const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
-            if (usingPublicProxy && credentials) {
-                const err: any = new Error('Acquisition would use a public CORS proxy which may strip Authorization or block POST requests. Configure an owned proxy (VITE_OWN_PROXY_URL) to perform authenticated borrows.');
-                err.proxyUsed = true;
-                throw err;
-            }
-        } catch (e) {
-            throw e;
+    // Keep the original href as the canonical base for resolving relative
+    // links returned by the server. We may fetch via a proxied URL (current)
+    // but any relative hrefs in responses should be resolved against the
+    // original upstream href, not the proxy URL.
+    const originalHref = href;
+    // For Palace Project servers (palace.io, palaceproject.io, thepalaceproject.org), force the proxied URL (prefer owned proxy when configured)
+    let current: string;
+    try {
+        const hostname = (() => { try { return new URL(href).hostname.toLowerCase(); } catch { return ''; } })();
+        const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname.endsWith('thepalaceproject.org') || hostname === 'palace.io' || hostname.endsWith('.palace.io') || hostname.endsWith('.thepalaceproject.org');
+        if (isPalaceHost) {
+            current = proxiedUrl(href);
+        } else {
+            current = await maybeProxyForCors(href);
         }
+    } catch (e) {
+        current = await maybeProxyForCors(href);
+    }
+    // If the probe selected the public proxy and credentials are provided,
+    // fail early with a helpful message so UI can prompt for setting an owned proxy.
+    try {
+        const usingPublicProxy = typeof current === 'string' && current.includes('corsproxy.io');
+        if (usingPublicProxy && credentials) {
+            const err: any = new Error('Acquisition would use a public CORS proxy which may strip Authorization or block POST requests. Configure an owned proxy (VITE_OWN_PROXY_URL) to perform authenticated borrows.');
+            err.proxyUsed = true;
+            throw err;
+        }
+    } catch (e) {
+        throw e;
+    }
 
     const makeHeaders = (withCreds = false) => {
-        const h: Record<string,string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
+        const h: Record<string, string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
         if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
         return h;
     };
@@ -887,30 +891,30 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
                 // ignore parse errors
             }
 
-                        // Fallback: if content-type indicates binary, return current
-                        const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
+            // Fallback: if content-type indicates binary, return current
+            const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
             if (ct.includes('application/epub') || ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
                 // Return the canonical upstream URL rather than the proxy URL so
                 // callers can decide whether to proxy the download.
                 return originalHref;
             }
 
-                        // If we received an HTML response (often from a public proxy) and
-                        // the current URL indicates it was proxied through a known public
-                        // CORS proxy, surface a clearer error so the UI can show an actionable
-                        // toast suggesting to use an owned proxy.
-                        try {
-                            const responseText = text || await safeReadText(resp).catch(() => '');
-                            const usedProxy = typeof current === 'string' && (current.includes('corsproxy.io') || current.includes('/proxy?url='));
-                            if (usedProxy && (ct.includes('text/html') || (responseText && responseText.trim().startsWith('<')))) {
-                                const err: any = new Error('Acquisition failed via public CORS proxy. The proxy may block POST requests or strip Authorization headers. Configure an owned proxy (VITE_OWN_PROXY_URL) to preserve credentials and HTTP methods.');
-                                err.status = resp.status;
-                                err.proxyUsed = true;
-                                throw err;
-                            }
-                        } catch (e) {
-                            // ignore and continue
-                        }
+            // If we received an HTML response (often from a public proxy) and
+            // the current URL indicates it was proxied through a known public
+            // CORS proxy, surface a clearer error so the UI can show an actionable
+            // toast suggesting to use an owned proxy.
+            try {
+                const responseText = text || await safeReadText(resp).catch(() => '');
+                const usedProxy = typeof current === 'string' && (current.includes('corsproxy.io') || current.includes('/proxy?url='));
+                if (usedProxy && (ct.includes('text/html') || (responseText && responseText.trim().startsWith('<')))) {
+                    const err: any = new Error('Acquisition failed via public CORS proxy. The proxy may block POST requests or strip Authorization headers. Configure an owned proxy (VITE_OWN_PROXY_URL) to preserve credentials and HTTP methods.');
+                    err.status = resp.status;
+                    err.proxyUsed = true;
+                    throw err;
+                }
+            } catch (e) {
+                // ignore and continue
+            }
         }
 
         // If we attempted a direct fetch and received a 401/403 without
@@ -943,7 +947,7 @@ export const resolveAcquisitionChainOpds1 = async (href: string, credentials?: {
 
                 // Owned proxy exists — retry the request via the owned proxy with same auth headers
                 const makeHeadersForRetry = (withCreds = false) => {
-                    const h: Record<string,string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
+                    const h: Record<string, string> = { 'Accept': 'application/atom+xml, application/xml, text/xml, */*' };
                     if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
                     return h;
                 };
@@ -1044,66 +1048,66 @@ export const filterBooksByAudience = (books: CatalogBook[], audienceMode: Audien
     if (audienceMode === 'all') {
         return books;
     }
-    
+
     return books.filter(book => {
         // Check categories for audience information
         if (book.categories && book.categories.length > 0) {
-            const audienceCategories = book.categories.filter(cat => 
+            const audienceCategories = book.categories.filter(cat =>
                 cat.scheme.includes('audience') || cat.scheme.includes('target-age'),
             );
-            
+
             if (audienceCategories.length > 0) {
                 const hasTargetAudience = audienceCategories.some(cat => {
                     const label = cat.label.toLowerCase();
                     const term = cat.term.toLowerCase();
-                    
+
                     switch (audienceMode) {
                         case 'adult':
-                            return label.includes('adult') && !label.includes('young') || 
-                                   term.includes('adult') && !term.includes('young') ||
-                                   label.includes('18+') || term.includes('18+');
+                            return label.includes('adult') && !label.includes('young') ||
+                                term.includes('adult') && !term.includes('young') ||
+                                label.includes('18+') || term.includes('18+');
                         case 'young-adult':
-                            return label.includes('young adult') || label.includes('teen') || 
-                                   term.includes('young-adult') || term.includes('teen') ||
-                                   label.includes('ya') || term.includes('ya');
+                            return label.includes('young adult') || label.includes('teen') ||
+                                term.includes('young-adult') || term.includes('teen') ||
+                                label.includes('ya') || term.includes('ya');
                         case 'children':
-                            return label.includes('children') || label.includes('child') || 
-                                   label.includes('juvenile') || label.includes('kids') ||
-                                   term.includes('children') || term.includes('child') ||
-                                   term.includes('juvenile') || term.includes('kids');
+                            return label.includes('children') || label.includes('child') ||
+                                label.includes('juvenile') || label.includes('kids') ||
+                                term.includes('children') || term.includes('child') ||
+                                term.includes('juvenile') || term.includes('kids');
                         default:
                             return false;
                     }
                 });
-                
+
                 return hasTargetAudience;
             }
         }
-        
+
         // Check subjects for audience information
         if (book.subjects && book.subjects.length > 0) {
             const hasTargetAudience = book.subjects.some(subject => {
                 const subjectLower = subject.toLowerCase();
-                
+
                 switch (audienceMode) {
                     case 'adult':
                         return subjectLower.includes('adult') && !subjectLower.includes('young');
                     case 'young-adult':
                         return subjectLower.includes('young adult') || subjectLower.includes('teen') ||
-                               subjectLower.includes('ya');
+                            subjectLower.includes('ya');
                     case 'children':
                         return subjectLower.includes('children') || subjectLower.includes('child') ||
-                               subjectLower.includes('juvenile') || subjectLower.includes('kids');
+                            subjectLower.includes('juvenile') || subjectLower.includes('kids');
                     default:
                         return false;
                 }
             });
-            
+
             if (hasTargetAudience) {
                 return true;
             }
         }
-        
+
         // If no audience information found, include in 'adult' by default
         return audienceMode === 'adult';
     });
@@ -1111,7 +1115,7 @@ export const filterBooksByAudience = (books: CatalogBook[], audienceMode: Audien
 
 export const getAvailableAudiences = (books: CatalogBook[]): AudienceMode[] => {
     const audiences: Set<AudienceMode> = new Set(['all']); // Always include 'all'
-    
+
     books.forEach(book => {
         // Check categories for audience information
         if (book.categories && book.categories.length > 0) {
@@ -1119,18 +1123,18 @@ export const getAvailableAudiences = (books: CatalogBook[]): AudienceMode[] => {
                 if (cat.scheme.includes('audience') || cat.scheme.includes('target-age')) {
                     const label = cat.label.toLowerCase();
                     const term = cat.term.toLowerCase();
-                    
-                    if ((label.includes('adult') && !label.includes('young')) || 
+
+                    if ((label.includes('adult') && !label.includes('young')) ||
                         (term.includes('adult') && !term.includes('young')) ||
                         label.includes('18+') || term.includes('18+')) {
                         audiences.add('adult');
                     }
-                    if (label.includes('young adult') || label.includes('teen') || 
+                    if (label.includes('young adult') || label.includes('teen') ||
                         term.includes('young-adult') || term.includes('teen') ||
                         label.includes('ya') || term.includes('ya')) {
                         audiences.add('young-adult');
                     }
-                    if (label.includes('children') || label.includes('child') || 
+                    if (label.includes('children') || label.includes('child') ||
                         label.includes('juvenile') || label.includes('kids') ||
                         term.includes('children') || term.includes('child') ||
                         term.includes('juvenile') || term.includes('kids')) {
@@ -1139,12 +1143,12 @@ export const getAvailableAudiences = (books: CatalogBook[]): AudienceMode[] => {
                 }
             });
         }
-        
+
         // Check subjects for audience information
         if (book.subjects && book.subjects.length > 0) {
             book.subjects.forEach(subject => {
                 const subjectLower = subject.toLowerCase();
-                
+
                 if (subjectLower.includes('adult') && !subjectLower.includes('young')) {
                     audiences.add('adult');
                 }
@@ -1159,7 +1163,7 @@ export const getAvailableAudiences = (books: CatalogBook[]): AudienceMode[] => {
             });
         }
     });
-    
+
     return Array.from(audiences);
 };
 
@@ -1167,60 +1171,60 @@ export const filterBooksByFiction = (books: CatalogBook[], fictionMode: FictionM
     if (fictionMode === 'all') {
         return books;
     }
-    
+
     return books.filter(book => {
         // Check categories for fiction classification
         if (book.categories && book.categories.length > 0) {
-            const fictionCategories = book.categories.filter(cat => 
+            const fictionCategories = book.categories.filter(cat =>
                 cat.scheme.includes('fiction') || cat.scheme.includes('genre') || cat.scheme.includes('bisac'),
             );
-            
+
             if (fictionCategories.length > 0) {
                 const isFiction = fictionCategories.some(cat => {
                     const label = cat.label.toLowerCase();
                     const term = cat.term.toLowerCase();
-                    
+
                     // Check for explicit fiction markers
                     if (label.includes('fiction') || term.includes('fiction')) {
                         return !label.includes('non-fiction') && !term.includes('non-fiction');
                     }
-                    
+
                     // Check for non-fiction markers
                     if (label.includes('non-fiction') || term.includes('non-fiction') ||
                         label.includes('nonfiction') || term.includes('nonfiction')) {
                         return false;
                     }
-                    
+
                     // Check for genre indicators that suggest fiction
-                    const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
-                                          'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                    const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction',
+                        'horror', 'adventure', 'literary', 'drama', 'suspense'];
                     const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
-                                             'self-help', 'health', 'business', 'politics', 'economics'];
-                    
-                    const hasFictionGenre = fictionGenres.some(genre => 
+                        'self-help', 'health', 'business', 'politics', 'economics'];
+
+                    const hasFictionGenre = fictionGenres.some(genre =>
                         label.includes(genre) || term.includes(genre),
                     );
-                    const hasNonFictionGenre = nonFictionGenres.some(genre => 
+                    const hasNonFictionGenre = nonFictionGenres.some(genre =>
                         label.includes(genre) || term.includes(genre),
                     );
-                    
+
                     if (hasNonFictionGenre) return false;
                     if (hasFictionGenre) return true;
-                    
+
                     return null; // Unclear from this category
                 });
-                
+
                 if (isFiction !== null) {
                     return fictionMode === 'fiction' ? isFiction : !isFiction;
                 }
             }
         }
-        
+
         // Check subjects for fiction classification
         if (book.subjects && book.subjects.length > 0) {
             const fictionKeywords = book.subjects.some(subject => {
                 const subjectLower = subject.toLowerCase();
-                
+
                 // Explicit fiction/non-fiction markers
                 if (subjectLower.includes('fiction') && !subjectLower.includes('non-fiction')) {
                     return true;
@@ -1228,27 +1232,27 @@ export const filterBooksByFiction = (books: CatalogBook[], fictionMode: FictionM
                 if (subjectLower.includes('non-fiction') || subjectLower.includes('nonfiction')) {
                     return false;
                 }
-                
+
                 // Genre-based classification
-                const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
-                                      'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction',
+                    'horror', 'adventure', 'literary', 'drama', 'suspense'];
                 const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
-                                         'self-help', 'health', 'business', 'politics', 'economics'];
-                
+                    'self-help', 'health', 'business', 'politics', 'economics'];
+
                 const hasNonFictionGenre = nonFictionGenres.some(genre => subjectLower.includes(genre));
                 if (hasNonFictionGenre) return false;
-                
+
                 const hasFictionGenre = fictionGenres.some(genre => subjectLower.includes(genre));
                 if (hasFictionGenre) return true;
-                
+
                 return null;
             });
-            
+
             if (fictionKeywords !== null) {
                 return fictionMode === 'fiction' ? fictionKeywords : !fictionKeywords;
             }
         }
-        
+
         // If no clear fiction classification, include in both categories by default
         return true;
     });
@@ -1256,10 +1260,10 @@ export const filterBooksByFiction = (books: CatalogBook[], fictionMode: FictionM
 
 export const getAvailableFictionModes = (books: CatalogBook[]): FictionMode[] => {
     const modes: Set<FictionMode> = new Set(['all']); // Always include 'all'
-    
+
     let hasFiction = false;
     let hasNonFiction = false;
-    
+
     books.forEach(book => {
         // Check categories for fiction classification
         if (book.categories && book.categories.length > 0) {
@@ -1267,8 +1271,8 @@ export const getAvailableFictionModes = (books: CatalogBook[]): FictionMode[] =>
                 if (cat.scheme.includes('fiction') || cat.scheme.includes('genre') || cat.scheme.includes('bisac')) {
                     const label = cat.label.toLowerCase();
                     const term = cat.term.toLowerCase();
-                    
-                    if ((label.includes('fiction') && !label.includes('non-fiction')) || 
+
+                    if ((label.includes('fiction') && !label.includes('non-fiction')) ||
                         (term.includes('fiction') && !term.includes('non-fiction'))) {
                         hasFiction = true;
                     }
@@ -1276,56 +1280,56 @@ export const getAvailableFictionModes = (books: CatalogBook[]): FictionMode[] =>
                         label.includes('nonfiction') || term.includes('nonfiction')) {
                         hasNonFiction = true;
                     }
-                    
+
                     // Genre-based inference
-                    const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
-                                          'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                    const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction',
+                        'horror', 'adventure', 'literary', 'drama', 'suspense'];
                     const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
-                                             'self-help', 'health', 'business', 'politics', 'economics'];
-                    
-                    const hasFictionGenre = fictionGenres.some(genre => 
+                        'self-help', 'health', 'business', 'politics', 'economics'];
+
+                    const hasFictionGenre = fictionGenres.some(genre =>
                         label.includes(genre) || term.includes(genre),
                     );
-                    const hasNonFictionGenre = nonFictionGenres.some(genre => 
+                    const hasNonFictionGenre = nonFictionGenres.some(genre =>
                         label.includes(genre) || term.includes(genre),
                     );
-                    
+
                     if (hasFictionGenre) hasFiction = true;
                     if (hasNonFictionGenre) hasNonFiction = true;
                 }
             });
         }
-        
+
         // Check subjects for fiction classification
         if (book.subjects && book.subjects.length > 0) {
             book.subjects.forEach(subject => {
                 const subjectLower = subject.toLowerCase();
-                
+
                 if (subjectLower.includes('fiction') && !subjectLower.includes('non-fiction')) {
                     hasFiction = true;
                 }
                 if (subjectLower.includes('non-fiction') || subjectLower.includes('nonfiction')) {
                     hasNonFiction = true;
                 }
-                
+
                 // Genre-based inference
-                const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction', 
-                                      'horror', 'adventure', 'literary', 'drama', 'suspense'];
+                const fictionGenres = ['romance', 'mystery', 'thriller', 'fantasy', 'science fiction',
+                    'horror', 'adventure', 'literary', 'drama', 'suspense'];
                 const nonFictionGenres = ['biography', 'history', 'science', 'philosophy', 'religion',
-                                         'self-help', 'health', 'business', 'politics', 'economics'];
-                
+                    'self-help', 'health', 'business', 'politics', 'economics'];
+
                 const hasFictionGenre = fictionGenres.some(genre => subjectLower.includes(genre));
                 const hasNonFictionGenre = nonFictionGenres.some(genre => subjectLower.includes(genre));
-                
+
                 if (hasFictionGenre) hasFiction = true;
                 if (hasNonFictionGenre) hasNonFiction = true;
             });
         }
     });
-    
+
     if (hasFiction) modes.add('fiction');
     if (hasNonFiction) modes.add('non-fiction');
-    
+
     return Array.from(modes);
 };
 
@@ -1333,52 +1337,52 @@ export const filterBooksByMedia = (books: CatalogBook[], mediaMode: MediaMode): 
     if (mediaMode === 'all') {
         return books;
     }
-    
+
     return books.filter(book => {
         // Check both mediaType and acquisitionMediaType for compatibility
         const mediaType = (book.mediaType || book.acquisitionMediaType)?.toLowerCase();
         const format = book.format?.toUpperCase();
-        
+
         if (mediaMode === 'ebook') {
             // Match ebooks by media type, format, or default
             return mediaType?.includes('bib.schema.org/book') ||
-                   mediaType?.includes('schema.org/ebook') || 
-                   mediaType?.includes('ebook') ||
-                   format === 'EPUB' ||
-                   format === 'PDF' ||
-                   (!mediaType && format !== 'AUDIOBOOK'); // Default to ebook if no media type and not audiobook
+                mediaType?.includes('schema.org/ebook') ||
+                mediaType?.includes('ebook') ||
+                format === 'EPUB' ||
+                format === 'PDF' ||
+                (!mediaType && format !== 'AUDIOBOOK'); // Default to ebook if no media type and not audiobook
         } else if (mediaMode === 'audiobook') {
             // Match audiobooks by media type or format
             return mediaType?.includes('bib.schema.org/audiobook') ||
-                   mediaType?.includes('audiobook') ||
-                   format === 'AUDIOBOOK';
+                mediaType?.includes('audiobook') ||
+                format === 'AUDIOBOOK';
         }
-        
+
         return false;
     });
 };
 
 export const getAvailableMediaModes = (books: CatalogBook[]): MediaMode[] => {
     const modes: Set<MediaMode> = new Set(['all']); // Always include 'all'
-    
+
     books.forEach((book) => {
         // Check both mediaType and acquisitionMediaType for compatibility
         const mediaType = book.mediaType || book.acquisitionMediaType;
         const mediaTypeLower = mediaType?.toLowerCase();
         const format = book.format?.toUpperCase();
-        
+
         // Check for audiobooks - either by media type or format
-        if (mediaTypeLower?.includes('bib.schema.org/audiobook') || 
+        if (mediaTypeLower?.includes('bib.schema.org/audiobook') ||
             mediaTypeLower?.includes('audiobook') ||
             mediaType === 'http://bib.schema.org/Audiobook' ||
             format === 'AUDIOBOOK') {
             modes.add('audiobook');
         }
-        
+
         // Check for ebooks - by media type, format, or default
-        if (mediaTypeLower?.includes('bib.schema.org/book') || 
-            mediaTypeLower?.includes('schema.org/ebook') || 
-            mediaTypeLower?.includes('ebook') || 
+        if (mediaTypeLower?.includes('bib.schema.org/book') ||
+            mediaTypeLower?.includes('schema.org/ebook') ||
+            mediaTypeLower?.includes('ebook') ||
             mediaType === 'http://bib.schema.org/Book' ||
             mediaType === 'http://schema.org/EBook' ||
             format === 'EPUB' ||
@@ -1387,25 +1391,25 @@ export const getAvailableMediaModes = (books: CatalogBook[]): MediaMode[] => {
             modes.add('ebook');
         }
     });
-    
+
     const result = Array.from(modes);
     return result;
 };
 
 export const filterBooksByCollection = (books: CatalogBook[], collectionMode: CollectionMode, navLinks: CatalogNavigationLink[] = []): CatalogBook[] => {
     if (collectionMode === 'all') return books;
-    
+
     // Check if this collection exists as a navigation link
-    const collectionNavLink = navLinks.find(link => 
+    const collectionNavLink = navLinks.find(link =>
         (link.rel === 'collection' || link.rel === 'subsection') && link.title === collectionMode,
     );
-    
+
     // If it's a navigation-based collection, we should navigate rather than filter
     // For now, just return the books as-is, since navigation will be handled at the component level
     if (collectionNavLink) {
         return books;
     }
-    
+
     // Filter books that have this collection in their metadata
     return books.filter(book => {
         return book.collections?.some(collection => collection.title === collectionMode);
@@ -1414,98 +1418,98 @@ export const filterBooksByCollection = (books: CatalogBook[], collectionMode: Co
 
 export const getAvailableCategories = (books: CatalogBook[], navLinks: CatalogNavigationLink[] = []): string[] => {
     const categories = new Set<string>();
-    
-    // Extract categories from individual books  
+
+    // Extract categories from individual books
     books.forEach(book => {
         if (book.collections && book.collections.length > 0) {
             book.collections.forEach(collection => {
                 // Only include categories (groups) - exclude true collections (feeds)
-                const isCategory = collection.href.includes('/groups/') || 
-                                  collection.title.toLowerCase() === 'fiction' ||
-                                  collection.title.toLowerCase() === 'nonfiction' ||
-                                  collection.title.toLowerCase().includes('young adult') ||
-                                  collection.title.toLowerCase().includes('children');
-                
+                const isCategory = collection.href.includes('/groups/') ||
+                    collection.title.toLowerCase() === 'fiction' ||
+                    collection.title.toLowerCase() === 'nonfiction' ||
+                    collection.title.toLowerCase().includes('young adult') ||
+                    collection.title.toLowerCase().includes('children');
+
                 if (isCategory) {
                     categories.add(collection.title);
                 }
             });
         }
     });
-    
+
     // Extract categories from navigation links
     navLinks.forEach(link => {
         if (link.rel === 'collection' || link.rel === 'subsection') {
             // Only include categories (groups)
-            const isCategory = link.url.includes('/groups/') || 
-                              link.title.toLowerCase() === 'fiction' ||
-                              link.title.toLowerCase() === 'nonfiction' ||
-                              link.title.toLowerCase().includes('young adult') ||
-                              link.title.toLowerCase().includes('children');
-            
+            const isCategory = link.url.includes('/groups/') ||
+                link.title.toLowerCase() === 'fiction' ||
+                link.title.toLowerCase() === 'nonfiction' ||
+                link.title.toLowerCase().includes('young adult') ||
+                link.title.toLowerCase().includes('children');
+
             if (isCategory) {
                 categories.add(link.title);
             }
         }
     });
-    
+
     return Array.from(categories).sort();
 };
 
 export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogNavigationLink[] = []): string[] => {
     const collections = new Set<string>();
-    
+
     // Extract collections from individual books, filtering out categories
     books.forEach(book => {
         if (book.collections && book.collections.length > 0) {
             book.collections.forEach(collection => {
                 // Filter out categories (groups) - only include true collections (feeds)
-                const isCategory = collection.href.includes('/groups/') || 
-                                  collection.title.toLowerCase() === 'fiction' ||
-                                  collection.title.toLowerCase() === 'nonfiction' ||
-                                  collection.title.toLowerCase().includes('young adult') ||
-                                  collection.title.toLowerCase().includes('children');
-                
+                const isCategory = collection.href.includes('/groups/') ||
+                    collection.title.toLowerCase() === 'fiction' ||
+                    collection.title.toLowerCase() === 'nonfiction' ||
+                    collection.title.toLowerCase().includes('young adult') ||
+                    collection.title.toLowerCase().includes('children');
+
                 if (!isCategory) {
                     collections.add(collection.title);
                 }
             });
         }
     });
-    
-    // Extract collections from navigation links BUT exclude category groupings  
+
+    // Extract collections from navigation links BUT exclude category groupings
     // In Palace OPDS: /feed/ URLs are collections, /groups/ URLs are categories
     navLinks.forEach(link => {
         if (link.rel === 'collection' || link.rel === 'subsection') {
             // Distinguish between collections and categories based on URL pattern
-            const isCategory = link.url.includes('/groups/') || 
-                              link.title.toLowerCase() === 'fiction' ||
-                              link.title.toLowerCase() === 'nonfiction' ||
-                              link.title.toLowerCase().includes('young adult') ||
-                              link.title.toLowerCase().includes('children');
-            
+            const isCategory = link.url.includes('/groups/') ||
+                link.title.toLowerCase() === 'fiction' ||
+                link.title.toLowerCase() === 'nonfiction' ||
+                link.title.toLowerCase().includes('young adult') ||
+                link.title.toLowerCase().includes('children');
+
             if (!isCategory) {
                 collections.add(link.title);
             }
         }
     });
-    
+
     return Array.from(collections).sort();
-};export const groupBooksByMode = (books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, mode: CategorizationMode, audienceMode: AudienceMode = 'all', fictionMode: FictionMode = 'all', mediaMode: MediaMode = 'all', collectionMode: CollectionMode = 'all'): CatalogWithCategories => {
+}; export const groupBooksByMode = (books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, mode: CategorizationMode, audienceMode: AudienceMode = 'all', fictionMode: FictionMode = 'all', mediaMode: MediaMode = 'all', collectionMode: CollectionMode = 'all'): CatalogWithCategories => {
     // Apply all filters first
     let filteredBooks = books;
     if (mediaMode !== 'all') {
         filteredBooks = filterBooksByMedia(filteredBooks, mediaMode);
     }
-    
+
     if (fictionMode !== 'all') {
         filteredBooks = filterBooksByFiction(filteredBooks, fictionMode);
     }
-    
+
     if (audienceMode !== 'all') {
         filteredBooks = filterBooksByAudience(filteredBooks, audienceMode);
     }
-    
+
     if (collectionMode !== 'all') {
         filteredBooks = filterBooksByCollection(filteredBooks, collectionMode, navLinks);
     }
@@ -1581,7 +1585,7 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
     const categoryLanes = Array.from(categoryMap.values()).map(categoryGroup => {
         // Sort books within each category lane
         let sortedBooks = categoryGroup.books;
-        
+
         // For series, sort by position if available
         if (categoryGroup.category.scheme === 'http://opds-spec.org/series') {
             sortedBooks = [...categoryGroup.books].sort((a, b) => {
@@ -1590,14 +1594,14 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
                 return aPos - bPos;
             });
         }
-        
+
         return {
             ...categoryGroup,
             books: sortedBooks,
         };
     });
     const collectionLinks = Array.from(collectionLinksSet).map(json => JSON.parse(json));
-    
+
     return {
         books: filteredBooks,
         navLinks,
@@ -1611,7 +1615,7 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
 export const extractCollectionNavigation = (books: CatalogBook[]): Collection[] => {
     // Extract unique collection navigation links from OPDS 1 books
     const collectionMap = new Map<string, Collection>();
-    
+
     books.forEach(book => {
         if (book.collections && book.collections.length > 0) {
             book.collections.forEach(collection => {
@@ -1622,7 +1626,7 @@ export const extractCollectionNavigation = (books: CatalogBook[]): Collection[] 
             });
         }
     });
-    
+
     return Array.from(collectionMap.values());
 };
 
@@ -1631,7 +1635,7 @@ export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogN
     // Simple implementation that groups books by their collection property
     const collectionMap = new Map<string, CatalogBook[]>();
     const uncategorizedBooks: CatalogBook[] = [];
-    
+
     books.forEach(book => {
         if (book.collections && book.collections.length > 0) {
             book.collections.forEach(collection => {
@@ -1645,7 +1649,7 @@ export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogN
             uncategorizedBooks.push(book);
         }
     });
-    
+
     const collections: CollectionGroup[] = Array.from(collectionMap.entries()).map(([title, books]) => ({
         collection: {
             title: title,
@@ -1653,7 +1657,7 @@ export const groupBooksByCollections = (books: CatalogBook[], navLinks: CatalogN
         },
         books,
     }));
-    
+
     return {
         books,
         navLinks,
@@ -1667,10 +1671,10 @@ export const groupBooksByCategories = (books: CatalogBook[], navLinks: CatalogNa
     // Group books by their formal categories
     const categoryMap = new Map<string, { category: Category, books: CatalogBook[] }>();
     const uncategorizedBooks: CatalogBook[] = [];
-    
+
     books.forEach(book => {
         let hasCategory = false;
-        
+
         if (book.categories && book.categories.length > 0) {
             book.categories.forEach(category => {
                 const key = `${category.scheme}|${category.label}`;
@@ -1684,14 +1688,14 @@ export const groupBooksByCategories = (books: CatalogBook[], navLinks: CatalogNa
                 hasCategory = true;
             });
         }
-        
+
         if (!hasCategory) {
             uncategorizedBooks.push(book);
         }
     });
-    
+
     const categoryLanes = Array.from(categoryMap.values());
-    
+
     return {
         books,
         navLinks,
@@ -1711,7 +1715,7 @@ export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: C
     // Alternative implementation that treats collections as category lanes
     const collectionMap = new Map<string, CatalogBook[]>();
     const uncategorizedBooks: CatalogBook[] = [];
-    
+
     books.forEach(book => {
         if (book.collections && book.collections.length > 0) {
             book.collections.forEach(collection => {
@@ -1725,13 +1729,13 @@ export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: C
             uncategorizedBooks.push(book);
         }
     });
-    
+
     const categoryLanes = Array.from(collectionMap.entries()).map(([title, books]) => {
         // Find the first book with collections to get the href for the term
         const firstBookWithCollections = books.find(book => book.collections && book.collections.length > 0);
         const collection = firstBookWithCollections?.collections?.find(c => c.title === title);
         const term = collection?.href || title.toLowerCase().replace(/\s+/g, '-');
-        
+
         return {
             category: {
                 scheme: 'http://opds-spec.org/collection',
@@ -1741,7 +1745,7 @@ export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: C
             books,
         };
     });
-    
+
     // Extract collection links from books
     const collectionLinksMap = new Map<string, { title: string; href: string }>();
     books.forEach(book => {
@@ -1751,9 +1755,9 @@ export const groupBooksByCollectionsAsLanes = (books: CatalogBook[], navLinks: C
             });
         }
     });
-    
+
     const collectionLinks = Array.from(collectionLinksMap.values());
-    
+
     return {
         books,
         navLinks,

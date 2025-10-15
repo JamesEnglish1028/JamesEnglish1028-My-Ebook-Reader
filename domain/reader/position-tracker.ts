@@ -1,19 +1,19 @@
 /**
  * Position Tracker Service
- * 
+ *
  * Service layer for tracking and managing reading positions across books.
  * Handles CFI (Canonical Fragment Identifier) positions, page numbers,
  * reading progress, and text-to-speech positions.
  */
 
-import type { ReadingPosition } from './types';
 import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
+import type { ReadingPosition } from './types';
 
 /**
  * Result type for position operations
  */
-export type PositionResult<T> = 
+export type PositionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
@@ -38,7 +38,7 @@ export interface PositionUpdate {
 
 /**
  * Position Tracker Service
- * 
+ *
  * Manages reading positions for books, including:
  * - Last read position (CFI)
  * - Text-to-speech position
@@ -47,23 +47,23 @@ export interface PositionUpdate {
 export class PositionTrackerService {
   /**
    * Get the last reading position for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with CFI string or null if no position saved
    */
   getPosition(bookId: number): PositionResult<string | null> {
     try {
       logger.info('Getting position for book', { bookId });
-      
+
       const key = getStorageKey.position(bookId);
       const cfi = localStorage.getItem(key);
-      
+
       if (cfi) {
         logger.info('Found position', { bookId, cfi: cfi.substring(0, 50) + '...' });
       } else {
         logger.info('No position found', { bookId });
       }
-      
+
       return { success: true, data: cfi };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error getting position';
@@ -74,7 +74,7 @@ export class PositionTrackerService {
 
   /**
    * Save the current reading position for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @param cfi - The CFI (Canonical Fragment Identifier) position
    * @returns Result indicating success or failure
@@ -82,10 +82,10 @@ export class PositionTrackerService {
   savePosition(bookId: number, cfi: string): PositionResult<void> {
     try {
       logger.info('Saving position for book', { bookId, cfi: cfi.substring(0, 50) + '...' });
-      
+
       const key = getStorageKey.position(bookId);
       localStorage.setItem(key, cfi);
-      
+
       logger.info('Position saved', { bookId });
       return { success: true, data: undefined };
     } catch (error) {
@@ -97,17 +97,17 @@ export class PositionTrackerService {
 
   /**
    * Clear the reading position for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result indicating success or failure
    */
   clearPosition(bookId: number): PositionResult<void> {
     try {
       logger.info('Clearing position for book', { bookId });
-      
+
       const key = getStorageKey.position(bookId);
       localStorage.removeItem(key);
-      
+
       logger.info('Position cleared', { bookId });
       return { success: true, data: undefined };
     } catch (error) {
@@ -119,7 +119,7 @@ export class PositionTrackerService {
 
   /**
    * Check if a book has a saved reading position
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with boolean indicating if position exists
    */
@@ -129,7 +129,7 @@ export class PositionTrackerService {
       if (!result.success) {
         return { success: false, error: 'Failed to check position' };
       }
-      
+
       return { success: true, data: result.data !== null };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error checking position';
@@ -140,7 +140,7 @@ export class PositionTrackerService {
 
   /**
    * Get the last reading position with metadata
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with ReadingPosition or null
    */
@@ -173,23 +173,23 @@ export class PositionTrackerService {
 
   /**
    * Get the last text-to-speech position for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result with CFI string or null if no position saved
    */
   getSpeechPosition(bookId: number): PositionResult<string | null> {
     try {
       logger.info('Getting speech position for book', { bookId });
-      
+
       const key = getStorageKey.spokenPosition(bookId);
       const cfi = localStorage.getItem(key);
-      
+
       if (cfi) {
         logger.info('Found speech position', { bookId, cfi: cfi.substring(0, 50) + '...' });
       } else {
         logger.info('No speech position found', { bookId });
       }
-      
+
       return { success: true, data: cfi };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error getting speech position';
@@ -200,7 +200,7 @@ export class PositionTrackerService {
 
   /**
    * Save the current text-to-speech position for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @param cfi - The CFI position where speech stopped
    * @returns Result indicating success or failure
@@ -208,10 +208,10 @@ export class PositionTrackerService {
   saveSpeechPosition(bookId: number, cfi: string): PositionResult<void> {
     try {
       logger.info('Saving speech position for book', { bookId, cfi: cfi.substring(0, 50) + '...' });
-      
+
       const key = getStorageKey.spokenPosition(bookId);
       localStorage.setItem(key, cfi);
-      
+
       logger.info('Speech position saved', { bookId });
       return { success: true, data: undefined };
     } catch (error) {
@@ -223,17 +223,17 @@ export class PositionTrackerService {
 
   /**
    * Clear the text-to-speech position for a book
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result indicating success or failure
    */
   clearSpeechPosition(bookId: number): PositionResult<void> {
     try {
       logger.info('Clearing speech position for book', { bookId });
-      
+
       const key = getStorageKey.spokenPosition(bookId);
       localStorage.removeItem(key);
-      
+
       logger.info('Speech position cleared', { bookId });
       return { success: true, data: undefined };
     } catch (error) {
@@ -245,21 +245,21 @@ export class PositionTrackerService {
 
   /**
    * Clear all positions for a book (reading and speech)
-   * 
+   *
    * @param bookId - The ID of the book
    * @returns Result indicating success or failure
    */
   clearAllPositions(bookId: number): PositionResult<void> {
     try {
       logger.info('Clearing all positions for book', { bookId });
-      
+
       const positionResult = this.clearPosition(bookId);
       const speechResult = this.clearSpeechPosition(bookId);
-      
+
       if (!positionResult.success || !speechResult.success) {
         return { success: false, error: 'Failed to clear all positions' };
       }
-      
+
       logger.info('All positions cleared', { bookId });
       return { success: true, data: undefined };
     } catch (error) {
@@ -273,7 +273,7 @@ export class PositionTrackerService {
 
   /**
    * Calculate reading progress percentage from page numbers
-   * 
+   *
    * @param currentPage - Current page number (1-indexed)
    * @param totalPages - Total number of pages
    * @returns Progress percentage (0-100)
@@ -286,7 +286,7 @@ export class PositionTrackerService {
 
   /**
    * Create location info object
-   * 
+   *
    * @param currentPage - Current page number
    * @param totalPages - Total number of pages
    * @param progress - Optional progress percentage (calculated if not provided)
@@ -297,8 +297,8 @@ export class PositionTrackerService {
     totalPages: number,
     progress?: number
   ): LocationInfo {
-    const calculatedProgress = progress !== undefined 
-      ? progress 
+    const calculatedProgress = progress !== undefined
+      ? progress
       : this.calculateProgress(currentPage, totalPages);
 
     return {
@@ -310,7 +310,7 @@ export class PositionTrackerService {
 
   /**
    * Format location info as human-readable string
-   * 
+   *
    * @param location - Location information
    * @returns Formatted string like "Page 42 of 100 (42%)"
    */
@@ -320,7 +320,7 @@ export class PositionTrackerService {
 
   /**
    * Format location for bookmark/citation label
-   * 
+   *
    * @param location - Location information
    * @returns Short formatted string like "Page 42"
    */
@@ -330,7 +330,7 @@ export class PositionTrackerService {
 
   /**
    * Format location with progress for bookmark/citation label
-   * 
+   *
    * @param location - Location information
    * @returns Formatted string like "Page 42 (42%)"
    */
@@ -342,16 +342,16 @@ export class PositionTrackerService {
 
   /**
    * Get all book IDs that have saved positions
-   * 
+   *
    * @returns Result with array of book IDs
    */
   getAllBooksWithPositions(): PositionResult<number[]> {
     try {
       logger.info('Getting all books with positions');
-      
+
       const bookIds: number[] = [];
       const prefix = 'reader_position_';
-      
+
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(prefix)) {
@@ -362,7 +362,7 @@ export class PositionTrackerService {
           }
         }
       }
-      
+
       logger.info('Found books with positions', { count: bookIds.length });
       return { success: true, data: bookIds };
     } catch (error) {
@@ -374,24 +374,24 @@ export class PositionTrackerService {
 
   /**
    * Export all positions for backup
-   * 
+   *
    * @returns Result with JSON string of all positions
    */
   exportAllPositions(): PositionResult<string> {
     try {
       logger.info('Exporting all positions');
-      
+
       const booksResult = this.getAllBooksWithPositions();
       if (!booksResult.success) {
         return { success: false, error: 'Failed to export positions' };
       }
 
       const positions: Record<number, { position: string | null; speechPosition: string | null }> = {};
-      
+
       for (const bookId of booksResult.data) {
         const posResult = this.getPosition(bookId);
         const speechResult = this.getSpeechPosition(bookId);
-        
+
         if (posResult.success && speechResult.success) {
           positions[bookId] = {
             position: posResult.data,
@@ -399,7 +399,7 @@ export class PositionTrackerService {
           };
         }
       }
-      
+
       const json = JSON.stringify(positions, null, 2);
       logger.info('Positions exported', { bookCount: Object.keys(positions).length });
       return { success: true, data: json };
@@ -412,7 +412,7 @@ export class PositionTrackerService {
 
   /**
    * Import positions from backup
-   * 
+   *
    * @param json - JSON string of positions
    * @param merge - If true, merge with existing positions; if false, replace
    * @returns Result with number of positions imported
@@ -420,9 +420,9 @@ export class PositionTrackerService {
   importPositions(json: string, merge = false): PositionResult<number> {
     try {
       logger.info('Importing positions', { merge });
-      
+
       const positions = JSON.parse(json) as Record<number, { position: string | null; speechPosition: string | null }>;
-      
+
       if (typeof positions !== 'object' || positions === null) {
         return { success: false, error: 'Invalid positions data format' };
       }
@@ -438,21 +438,21 @@ export class PositionTrackerService {
       }
 
       let importedCount = 0;
-      
+
       for (const [bookIdStr, data] of Object.entries(positions)) {
         const bookId = parseInt(bookIdStr, 10);
         if (isNaN(bookId)) continue;
-        
+
         if (data.position) {
           this.savePosition(bookId, data.position);
           importedCount++;
         }
-        
+
         if (data.speechPosition) {
           this.saveSpeechPosition(bookId, data.speechPosition);
         }
       }
-      
+
       logger.info('Positions imported', { count: importedCount });
       return { success: true, data: importedCount };
     } catch (error) {
@@ -465,27 +465,27 @@ export class PositionTrackerService {
   /**
    * Clear all positions for all books
    * WARNING: This is a destructive operation
-   * 
+   *
    * @returns Result with number of positions cleared
    */
   clearAllBooksPositions(): PositionResult<number> {
     try {
       logger.warn('Clearing all positions for all books');
-      
+
       const booksResult = this.getAllBooksWithPositions();
       if (!booksResult.success) {
         return { success: false, error: 'Failed to clear all positions' };
       }
 
       let clearedCount = 0;
-      
+
       for (const bookId of booksResult.data) {
         const result = this.clearAllPositions(bookId);
         if (result.success) {
           clearedCount++;
         }
       }
-      
+
       logger.info('All positions cleared', { count: clearedCount });
       return { success: true, data: clearedCount };
     } catch (error) {

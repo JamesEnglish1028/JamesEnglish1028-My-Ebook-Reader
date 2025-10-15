@@ -13,7 +13,7 @@ interface EmptyStateProps {
 
 /**
  * EmptyState - Display message when no content is available
- * 
+ *
  * Shows contextual messages for different empty states:
  * - library: No books in local library
  * - catalog: No books/categories in catalog

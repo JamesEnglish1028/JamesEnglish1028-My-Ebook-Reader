@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { CollectionMode, CatalogNavigationLink } from '../../../types';
+import type { CatalogNavigationLink, CollectionMode } from '../../../types';
 
 interface CatalogSidebarProps {
   /** Available collections to display */
@@ -24,7 +24,7 @@ interface CatalogSidebarProps {
 
 /**
  * CatalogSidebar - Navigation sidebar with accordions
- * 
+ *
  * Displays "Navigate By" sections for Categories and Curated Collections.
  * Uses accordions to organize navigation options.
  */
@@ -65,15 +65,14 @@ const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
     <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
       <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
         <h3 className="text-lg font-semibold text-white mb-4">Navigate By</h3>
-        
+
         {/* "All Books" button - always at top */}
         <button
           onClick={() => onCollectionChange('all')}
-          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors mb-4 ${
-            navPathLength <= 1 && (activeCollection === 'all' || !activeCollection)
+          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors mb-4 ${navPathLength <= 1 && (activeCollection === 'all' || !activeCollection)
               ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
               : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
-          }`}
+            }`}
         >
           All Books
         </button>
@@ -137,11 +136,10 @@ const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
                       <button
                         key={`${collection}-${index}`}
                         onClick={() => onCollectionChange(collection as CollectionMode)}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border ${
-                          isActive
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border ${isActive
                             ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500'
                             : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
-                        }`}
+                          }`}
                       >
                         <span>{isActive ? '📁' : '📂'}</span>
                         {collection}

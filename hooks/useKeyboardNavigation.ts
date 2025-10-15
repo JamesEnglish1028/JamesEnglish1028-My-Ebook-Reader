@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 export interface KeyboardNavigationOptions {
   /**
@@ -38,13 +38,13 @@ export interface KeyboardNavigationOptions {
 /**
  * Hook for managing keyboard navigation in components
  * Provides consistent keyboard interaction patterns across the app
- * 
+ *
  * @example
  * ```tsx
  * const handleArrowKey = (direction: 'up' | 'down' | 'left' | 'right') => {
  *   // Handle navigation
  * };
- * 
+ *
  * useKeyboardNavigation({
  *   enableArrowKeys: true,
  *   enableActivation: true,
@@ -134,7 +134,7 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
 /**
  * Hook for managing grid-based keyboard navigation
  * Handles 2D navigation with arrow keys in a grid layout
- * 
+ *
  * @example
  * ```tsx
  * const { focusedIndex, setFocusedIndex } = useGridNavigation({

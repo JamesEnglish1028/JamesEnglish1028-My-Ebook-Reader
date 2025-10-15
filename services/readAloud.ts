@@ -1,6 +1,6 @@
 /**
  * Read Aloud Utilities
- * 
+ *
  * Functions for sentence detection and DOM range manipulation
  * used by the EPUB reader's text-to-speech feature.
  */

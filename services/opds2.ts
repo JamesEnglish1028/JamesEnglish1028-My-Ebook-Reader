@@ -2,7 +2,7 @@ import type { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../t
 
 import credentialsService from './credentials';
 import { logger } from './logger';
-import { proxiedUrl, maybeProxyForCors } from './utils';
+import { maybeProxyForCors, proxiedUrl } from './utils';
 
 // Helper: convert a Uint8Array into a binary string (latin1) without triggering decoding
 function uint8ToBinaryString(u8: Uint8Array): string {
@@ -25,7 +25,7 @@ async function readAllBytes(resp: Response | any): Promise<Uint8Array> {
   try {
     const cached = responseByteCache2.get(resp);
     if (cached) return cached;
-  } catch (_) {}
+  } catch (_) { }
 
   try {
     if (resp && typeof resp.clone === 'function') {
@@ -33,7 +33,7 @@ async function readAllBytes(resp: Response | any): Promise<Uint8Array> {
       try {
         const buf = await c.arrayBuffer();
         const out = new Uint8Array(buf);
-        try { responseByteCache2.set(resp, out); } catch (_) {}
+        try { responseByteCache2.set(resp, out); } catch (_) { }
         return out;
       } catch (e) {
         const reader = c.body && (c.body as any).getReader ? (c.body as any).getReader() : null;
@@ -55,7 +55,7 @@ async function readAllBytes(resp: Response | any): Promise<Uint8Array> {
           out.set(chunk, offset);
           offset += chunk.length;
         }
-        try { responseByteCache2.set(resp, out); } catch (_) {}
+        try { responseByteCache2.set(resp, out); } catch (_) { }
         return out;
       }
     }
@@ -63,7 +63,7 @@ async function readAllBytes(resp: Response | any): Promise<Uint8Array> {
     if (resp && typeof resp.arrayBuffer === 'function') {
       const buf = await resp.arrayBuffer();
       const out = new Uint8Array(buf);
-      try { responseByteCache2.set(resp, out); } catch (_) {}
+      try { responseByteCache2.set(resp, out); } catch (_) { }
       return out;
     }
 
@@ -74,19 +74,19 @@ async function readAllBytes(resp: Response | any): Promise<Uint8Array> {
       // @ts-ignore
       else if (typeof Buffer !== 'undefined') enc = new Uint8Array(Buffer.from(txt, 'utf-8'));
       else enc = new Uint8Array();
-      try { responseByteCache2.set(resp, enc); } catch (_) {}
+      try { responseByteCache2.set(resp, enc); } catch (_) { }
       return enc;
     }
 
     if (resp && resp.body) {
       if (resp.body instanceof Uint8Array) {
-        try { responseByteCache2.set(resp, resp.body); } catch (_) {}
+        try { responseByteCache2.set(resp, resp.body); } catch (_) { }
         return resp.body;
       }
       // @ts-ignore
       if (typeof Buffer !== 'undefined' && Buffer.isBuffer(resp.body)) {
         const out = new Uint8Array(resp.body);
-        try { responseByteCache2.set(resp, out); } catch (_) {}
+        try { responseByteCache2.set(resp, out); } catch (_) { }
         return out;
       }
     }
@@ -111,7 +111,7 @@ async function safeReadText(resp: Response): Promise<string> {
     // Try best-effort text() if available
     try {
       if (resp && typeof resp.text === 'function') return await resp.text();
-    } catch (_) {}
+    } catch (_) { }
     return '';
   }
 }
@@ -164,14 +164,21 @@ function etagKeyFor(url: string) {
 }
 
 export function setCachedEtag(url: string, etag: string) {
-  try { localStorage.setItem(etagKeyFor(url), etag); } catch {}
+  try { localStorage.setItem(etagKeyFor(url), etag); } catch { }
 }
 
 export function getCachedEtag(url: string) {
   try { return localStorage.getItem(etagKeyFor(url)) || undefined; } catch { return undefined; }
 }
 
-export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
+
+export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
+  if (typeof jsonData !== 'object' || jsonData === null) {
+    throw new Error('Invalid OPDS2 catalog format: input is not an object');
+  }
+  if (!jsonData.metadata) {
+    throw new Error('OPDS2 catalog missing required metadata');
+  }
   console.log('[OPDS2] parseOpds2Json CALLED with baseUrl:', baseUrl, 'jsonData keys:', Object.keys(jsonData));
   const books: CatalogBook[] = [];
   const navLinks: CatalogNavigationLink[] = [];
@@ -189,10 +196,10 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         if (rels.includes('previous')) pagination.prev = fullUrl;
         if (rels.includes('first')) pagination.first = fullUrl;
         if (rels.includes('last')) pagination.last = fullUrl;
-        
+
         // Extract navigation links with collection, subsection, or other navigation relations
-        if (link.title && (rels.includes('collection') || rels.includes('subsection') || 
-                          rels.includes('section') || rels.includes('related'))) {
+        if (link.title && (rels.includes('collection') || rels.includes('subsection') ||
+          rels.includes('section') || rels.includes('related'))) {
           navLinks.push({ title: link.title, url: fullUrl, rel: rels[0] || '' });
         }
       }
@@ -313,15 +320,15 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
       // Find acquisition links and pick the most appropriate one.
       const acquisitions: { href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }[] = [];
       const collections: { title: string; href: string }[] = [];
-      
+
       links.forEach((l: any) => {
         if (!l || !l.href) return;
         const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
-        
+
         // If rel contains 'acquisition' or opds acquisition URIs (including open-access), treat as acquisition link
-        const isAcq = rels.some((r: string) => 
-          r.includes('acquisition') || 
-          r === 'http://opds-spec.org/acquisition/borrow' || 
+        const isAcq = rels.some((r: string) =>
+          r.includes('acquisition') ||
+          r === 'http://opds-spec.org/acquisition/borrow' ||
           r === 'http://opds-spec.org/acquisition/loan' ||
           r === 'http://opds-spec.org/acquisition/open-access' ||
           r.includes('/open-access')
@@ -330,7 +337,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
           const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
           acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
         }
-        
+
         // Extract collection links from individual books
         if (l.title && rels.includes('collection')) {
           collections.push({ title: l.title, href: new URL(l.href, baseUrl).href });
@@ -345,7 +352,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         acquisitions.forEach((a, idx) => {
           console.log(`[OPDS2] Acquisition link ${idx} rels:`, a.rels, 'href:', a.href);
         });
-        
+
         // Prefer open-access links (no authentication required)
         const openAccessLink = acquisitions.find(a => a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access'));
         if (openAccessLink) {
@@ -355,7 +362,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
         } else {
           console.log('[OPDS2] No open-access link found, isOpenAccess=false');
         }
-        
+
         if (!openAccessLink) {
           chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
             || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
@@ -414,7 +421,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string) : { books: Catalo
 
 export const fetchOpds2Feed = async (url: string, credentials?: { username: string; password: string } | null) => {
   const proxyUrl = proxiedUrl(url);
-  const headers: Record<string,string> = {
+  const headers: Record<string, string> = {
     'Accept': 'application/opds+json, application/json, application/ld+json, */*',
   };
 
@@ -448,7 +455,7 @@ export const fetchOpds2Feed = async (url: string, credentials?: { username: stri
 
 export const borrowOpds2Work = async (borrowHref: string, credentials?: { username: string; password: string } | null) => {
   const proxyUrl = proxiedUrl(borrowHref);
-  const headers: Record<string,string> = { 'Accept': 'application/json, */*' };
+  const headers: Record<string, string> = { 'Accept': 'application/json, */*' };
   if (credentials) {
     headers['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
     // Warn when using a public CORS proxy that commonly strips Authorization headers
@@ -542,7 +549,7 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     throw e;
   }
   const makeHeaders = (withCreds = false) => {
-    const h: Record<string,string> = { 'Accept': 'application/json, text/json, */*' };
+    const h: Record<string, string> = { 'Accept': 'application/json, text/json, */*' };
     if (withCreds && credentials) h['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
     return h;
   };
@@ -575,7 +582,7 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     if (!resp) return null;
 
     // Treat 3xx + Location as final content URL
-        if (resp.status >= 300 && resp.status < 400) {
+    if (resp.status >= 300 && resp.status < 400) {
       const loc = (resp.headers && typeof resp.headers.get === 'function') ? (resp.headers.get('Location') || resp.headers.get('location')) : null;
       if (loc) {
         return new URL(loc, originalHref).href;
@@ -585,12 +592,12 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     const ok = typeof resp.ok === 'boolean' ? resp.ok : (resp.status >= 200 && resp.status < 300);
     const ct = (resp.headers && typeof resp.headers.get === 'function') ? resp.headers.get('Content-Type') || '' : '';
 
-  if (ok) {
+    if (ok) {
       // OPDS2 servers should return JSON or a Location redirect. Do not
       // attempt to parse XML here; XML acquisition docs belong to OPDS1 and
       // are handled by the OPDS1 resolver. If an OPDS2 endpoint returns XML
       // it is treated as an unsupported response.
-        if (ct.includes('application/json') || ct.includes('text/json') || ct.includes('application/opds+json')) {
+      if (ct.includes('application/json') || ct.includes('text/json') || ct.includes('application/opds+json')) {
         const j = await resp.json().catch(() => null);
         const candidate = j?.url || j?.location || j?.href || j?.contentLocation;
         if (typeof candidate === 'string' && candidate.length > 0) return new URL(candidate, originalHref).href;
@@ -610,7 +617,7 @@ export const resolveAcquisitionChain = async (href: string, credentials?: { user
     // If server demands authentication, surface the auth document when present.
     if (resp.status === 401 || resp.status === 403) {
       // Try to parse an OPDS authentication document
-  const contentText = await safeReadText(resp).catch(() => '');
+      const contentText = await safeReadText(resp).catch(() => '');
       let authDoc: any = null;
       try {
         if ((resp.headers.get && (resp.headers.get('Content-Type') || '').includes('application/vnd.opds.authentication.v1.0+json')) || contentText.trim().startsWith('{')) {

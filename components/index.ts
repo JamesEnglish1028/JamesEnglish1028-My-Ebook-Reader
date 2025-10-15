@@ -38,6 +38,7 @@ export { default as ShortcutHelpModal } from './ShortcutHelpModal';
 
 // OPDS/Catalog components
 export { default as CategoryLaneComponent } from './CategoryLane';
+// DEPRECATED: CollectionLane is no longer used in the current UI and will be removed in a future release.
 export { default as CollectionLane } from './CollectionLane';
 export { default as CollectionNavigation } from './CollectionNavigation';
 export { default as UncategorizedLane } from './UncategorizedLane';
