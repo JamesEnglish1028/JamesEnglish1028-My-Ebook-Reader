@@ -16,6 +16,7 @@ import {
   NetworkDebugModal,
   OpdsCredentialsModal,
   ReaderView,
+  ScreenReaderAnnouncer,
   SettingsModal,
   ShortcutHelpModal,
   SplashScreen,
@@ -696,6 +697,16 @@ const AppInner: React.FC = () => {
         onOpenNetworkDebug={() => setShowNetworkDebug(true)}
         isShortcutHelpOpen={isShortcutHelpOpen}
         onCloseShortcutHelp={() => setIsShortcutHelpOpen(false)}
+      />
+
+      {/* Screen reader announcements for async operations */}
+      <ScreenReaderAnnouncer
+        message={importStatus.isLoading ? importStatus.message : importStatus.error || null}
+        politeness={importStatus.error ? 'assertive' : 'polite'}
+      />
+      <ScreenReaderAnnouncer
+        message={syncStatus.state !== 'idle' ? syncStatus.message : null}
+        politeness={syncStatus.state === 'error' ? 'assertive' : 'polite'}
       />
     </div>
   );

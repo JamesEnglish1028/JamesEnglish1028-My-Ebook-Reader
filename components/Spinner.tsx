@@ -5,9 +5,22 @@ const Spinner: React.FC<{ text?: string, size?: 'small' | 'medium' }> = ({ text,
     const textClasses = size === 'small' ? 'text-sm' : 'text-base';
     
     return (
-        <div className="flex flex-col items-center justify-center space-y-2">
-            <div className={`animate-spin rounded-full border-sky-400 ${sizeClasses}`} />
-            {text && <p className={`text-sky-300 ${textClasses}`}>{text}</p>}
+        <div 
+            className="flex flex-col items-center justify-center space-y-2"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+        >
+            <div 
+                className={`animate-spin rounded-full border-sky-400 ${sizeClasses}`}
+                aria-hidden="true"
+            />
+            {text && (
+                <p className={`text-sky-300 ${textClasses}`}>
+                    {text}
+                </p>
+            )}
+            {!text && <span className="sr-only">Loading...</span>}
         </div>
     );
 };

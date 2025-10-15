@@ -45,6 +45,7 @@ export { default as UncategorizedLane } from './UncategorizedLane';
 // UI components
 export { default as AddedHud } from './AddedHud';
 export { default as ErrorBoundary } from './ErrorBoundary';
+export { default as ScreenReaderAnnouncer } from './ScreenReaderAnnouncer';
 export { default as Spinner } from './Spinner';
 export { default as SplashScreen } from './SplashScreen';
 export { default as Toast } from './Toast';
