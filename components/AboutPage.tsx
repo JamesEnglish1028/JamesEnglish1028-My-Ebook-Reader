@@ -24,6 +24,23 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
 
         <h2>Key Features</h2>
 
+        <h3>Accessibility & A11Y</h3>
+        <ul>
+          <li><strong>WCAG 2.1 AA Compliance:</strong> All UI and content meet or exceed Level AA requirements.</li>
+          <li><strong>Keyboard Navigation:</strong> Every feature is accessible via keyboard, with logical tab order and visible focus indicators.</li>
+          <li><strong>Screen Reader Support:</strong> ARIA labels, live regions, and dynamic announcements for all major actions.</li>
+          <li><strong>High Contrast & Color Blind Friendly:</strong> All text and UI elements use a high-contrast palette and are tested for color blindness.</li>
+          <li><strong>Skip Links & Landmarks:</strong> Quickly jump to main content or navigation.</li>
+          <li><strong>Accessible Modals & Dialogs:</strong> Focus is managed and restored, with ARIA roles and announcements.</li>
+          <li><strong>Global Keyboard Shortcuts:</strong> Discoverable, accessible shortcuts for power users.</li>
+          <li><strong>Adjustable Font Size & Family:</strong> Reader settings allow for easy text customization.</li>
+          <li><strong>Responsive Design:</strong> Works on all devices and screen sizes.</li>
+        </ul>
+
+        <p className="mt-4">
+          <a href="/VPAT.md" target="_blank" rel="noopener noreferrer" className="underline text-sky-400 hover:text-sky-300 font-semibold">View the Accessibility VPAT (Voluntary Product Accessibility Template)</a>
+        </p>
+
         <h3>Library Management</h3>
         <ul>
           <li><strong>Local-First Storage:</strong> Your books and reading data never leave your computer. Book files are stored in IndexedDB, while settings, catalog lists, and annotations are kept in LocalStorage.</li>
