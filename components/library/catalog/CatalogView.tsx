@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchCatalogContent, getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, filterBooksByAudience, filterBooksByFiction, filterBooksByMedia, groupBooksByMode } from '../../../services/opds';
-import { logger } from '../../../services/logger';
+import { useCatalogContent } from '../../../hooks';
+import { getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, filterBooksByAudience, filterBooksByFiction, filterBooksByMedia, groupBooksByMode } from '../../../services/opds';
 import type { AudienceMode, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry, CollectionMode, FictionMode, MediaMode, CategoryLane, CollectionGroup, CategorizationMode } from '../../../types';
 import { BookGrid, EmptyState } from '../shared';
+import { Loading, Error as ErrorDisplay } from '../../shared';
 import { CatalogNavigation, CatalogSidebar, CatalogFilters } from '../catalog';
 import { CategoryLaneComponent } from '../../CategoryLane';
 import { CollectionLane } from '../../CollectionLane';
 import { UncategorizedLane } from '../../UncategorizedLane';
-import Spinner from '../../Spinner';
 
 interface CatalogViewProps {
   /** Active OPDS source (catalog or registry) */
@@ -38,13 +38,6 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   rootLevelCollections,
   setRootLevelCollections,
 }) => {
-  const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
-  const [originalCatalogBooks, setOriginalCatalogBooks] = useState<CatalogBook[]>([]);
-  const [catalogNavLinks, setCatalogNavLinks] = useState<CatalogNavigationLink[]>([]);
-  const [catalogPagination, setCatalogPagination] = useState<CatalogPagination | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   // Filter states
   const [audienceMode, setAudienceMode] = useState<AudienceMode>('all');
   const [fictionMode, setFictionMode] = useState<FictionMode>('all');
@@ -58,65 +51,58 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const [categoryLanes, setCategoryLanes] = useState<CategoryLane[]>([]);
   const [catalogCollections, setCatalogCollections] = useState<CollectionGroup[]>([]);
   const [uncategorizedBooks, setUncategorizedBooks] = useState<CatalogBook[]>([]);
+  const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
 
-  // Fetch catalog content
-  const fetchAndParseSource = useCallback(async (url: string, baseUrl?: string) => {
-    setIsLoading(true);
-    setError(null);
-    setCatalogBooks([]);
-    setOriginalCatalogBooks([]);
-    setCatalogNavLinks([]);
-    setCatalogPagination(null);
-    setCategoryLanes([]);
-    setUncategorizedBooks([]);
-    setShowCategoryView(false);
+  // Get current URL from navigation path
+  const currentUrl = catalogNavPath.length > 0 
+    ? catalogNavPath[catalogNavPath.length - 1].url 
+    : activeOpdsSource?.url || null;
 
-    // Force Palace hosts to use OPDS 1
-    const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
-    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
-    const forcedVersion = isPalaceHost ? '1' : ((activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto');
+  // Get OPDS version preference
+  const opdsVersion = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) 
+    ? (activeOpdsSource as any).opdsVersion || 'auto' 
+    : 'auto';
 
-    const { books, navLinks, pagination, error: fetchError } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
+  // Fetch catalog content using React Query
+  const { 
+    data: catalogData, 
+    isLoading, 
+    error,
+    refetch 
+  } = useCatalogContent(
+    currentUrl,
+    activeOpdsSource?.url || '',
+    opdsVersion,
+    !!activeOpdsSource // Only fetch if source is active
+  );
 
-    if (fetchError) {
-      setError(fetchError);
-    } else {
-      setOriginalCatalogBooks(books);
-      setCatalogBooks(books);
-      setCatalogNavLinks(navLinks);
-      setCatalogPagination(pagination);
+  // Extract data from query result
+  const originalCatalogBooks = catalogData?.books || [];
+  const catalogNavLinks = catalogData?.navLinks || [];
+  const catalogPagination = catalogData?.pagination || null;
 
-      // Capture root collections
-      if (books.length > 0 && catalogNavPath.length <= 1) {
-        const rootCollections = new Set<string>();
-        books.forEach(book => {
-          if (book.collections && book.collections.length > 0) {
-            book.collections.forEach(collection => {
-              rootCollections.add(collection.title);
-            });
-          }
-        });
-        navLinks.forEach(link => {
-          if (link.rel === 'collection' || link.rel === 'subsection') {
-            rootCollections.add(link.title);
-          }
-        });
-        setRootLevelCollections(Array.from(rootCollections));
-      }
-    }
-
-    setIsLoading(false);
-  }, [activeOpdsSource, catalogNavPath.length, setRootLevelCollections]);
-
-  // Fetch initial content
+  // Update root collections when catalog data changes
   useEffect(() => {
-    if (activeOpdsSource) {
-      const initialUrl = catalogNavPath.length > 0 
-        ? catalogNavPath[catalogNavPath.length - 1].url 
-        : activeOpdsSource.url;
-      fetchAndParseSource(initialUrl, activeOpdsSource.url);
+    if (originalCatalogBooks.length > 0 && catalogNavPath.length <= 1) {
+      const rootCollections = new Set<string>();
+      
+      originalCatalogBooks.forEach(book => {
+        if (book.collections && book.collections.length > 0) {
+          book.collections.forEach(collection => {
+            rootCollections.add(collection.title);
+          });
+        }
+      });
+      
+      catalogNavLinks.forEach(link => {
+        if (link.rel === 'collection' || link.rel === 'subsection') {
+          rootCollections.add(link.title);
+        }
+      });
+      
+      setRootLevelCollections(Array.from(rootCollections));
     }
-  }, [activeOpdsSource]); // Only refetch when source changes
+  }, [originalCatalogBooks, catalogNavLinks, catalogNavPath.length, setRootLevelCollections]);
 
   // Calculate available filters
   const { availableAudiences, availableFictionModes, availableMediaModes, availableCollections, availableGenreCategories } = useMemo(() => {
@@ -180,12 +166,10 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     }
   }, [originalCatalogBooks, catalogNavLinks, catalogPagination, audienceMode, fictionMode, mediaMode, collectionMode, categorizationMode, availableGenreCategories.length, catalogNavPath.length]);
 
-  // Handle navigation
+  // Handle navigation - React Query will automatically refetch when catalogNavPath changes
   const handleBreadcrumbClick = (index: number) => {
     const newPath = catalogNavPath.slice(0, index + 1);
     setCatalogNavPath(newPath);
-    const targetUrl = newPath[newPath.length - 1].url;
-    fetchAndParseSource(targetUrl, activeOpdsSource.url);
     
     // Reset filters
     setAudienceMode('all');
@@ -195,7 +179,13 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   };
 
   const handlePaginationClick = (url: string) => {
-    fetchAndParseSource(url, activeOpdsSource.url);
+    // Update the current navigation item's URL for pagination
+    setCatalogNavPath(prev => {
+      if (prev.length === 0) return prev;
+      const newPath = [...prev];
+      newPath[newPath.length - 1] = { ...newPath[newPath.length - 1], url };
+      return newPath;
+    });
   };
 
   const handleCatalogBookClick = (book: CatalogBook) => {
@@ -205,7 +195,6 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const handleCategoryNavigate = (categoryNavLink: CatalogNavigationLink) => {
     if (activeOpdsSource) {
       setCatalogNavPath(prev => [...prev, { name: categoryNavLink.title, url: categoryNavLink.url }]);
-      fetchAndParseSource(categoryNavLink.url, activeOpdsSource.url);
       // Reset filters when navigating to a new feed
       setAudienceMode('all');
       setFictionMode('all');
@@ -219,7 +208,6 @@ const CatalogView: React.FC<CatalogViewProps> = ({
       // If we're deep in navigation, go back to root when selecting "All Books"
       if (catalogNavPath.length > 1 && activeOpdsSource) {
         setCatalogNavPath([{ name: activeOpdsSource.name, url: activeOpdsSource.url }]);
-        fetchAndParseSource(activeOpdsSource.url, activeOpdsSource.url);
       }
       return;
     }
@@ -236,7 +224,6 @@ const CatalogView: React.FC<CatalogViewProps> = ({
         setCatalogNavPath(newPath);
         // Keep collection mode set for sidebar highlighting, but don't filter
         setCollectionMode(mode);
-        fetchAndParseSource(collectionNavLink.url, activeOpdsSource.url);
         // Reset filters when navigating to a new feed
         setAudienceMode('all');
         setFictionMode('all');
@@ -257,15 +244,18 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     (isLoading && rootLevelCollections.length > 0);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center mt-20">
-        <Spinner text="Loading..." />
-      </div>
-    );
+    return <Loading variant="spinner" message="Loading catalog..." />;
   }
 
   if (error) {
-    return <EmptyState variant="error" error={error} />;
+    return (
+      <ErrorDisplay
+        variant="page"
+        title="Failed to Load Catalog"
+        message={error?.message || 'Could not load catalog content.'}
+        onRetry={() => refetch()}
+      />
+    );
   }
 
   const hasBooks = catalogBooks.length > 0 || categoryLanes.length > 0 || uncategorizedBooks.length > 0;

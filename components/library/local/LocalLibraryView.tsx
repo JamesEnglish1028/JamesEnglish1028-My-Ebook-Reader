@@ -1,13 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { bookRepository } from '../../../domain/book';
-import { useSortedBooks, useLocalStorage } from '../../../hooks';
-import { logger } from '../../../services/logger';
+import React, { useCallback, useState } from 'react';
+import { useBooks, useDeleteBook, useSortedBooks, useLocalStorage } from '../../../hooks';
 import type { BookMetadata, CoverAnimationData } from '../../../types';
 import { BookGrid, EmptyState } from '../shared';
+import { Loading, Error as ErrorDisplay } from '../../shared';
 import { SortControls, ImportButton } from '../local';
 import DeleteConfirmationModal from '../../DeleteConfirmationModal';
-import Spinner from '../../Spinner';
-import { TrashIcon } from '../../icons';
 
 interface LocalLibraryViewProps {
   /** Callback to open a book for reading */
@@ -32,35 +29,15 @@ const LocalLibraryView: React.FC<LocalLibraryViewProps> = ({
   onFileChange,
   importStatus,
 }) => {
-  const [books, setBooks] = useState<BookMetadata[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [bookToDelete, setBookToDelete] = useState<BookMetadata | null>(null);
   const [sortOrder, setSortOrder] = useLocalStorage<string>('ebook-sort-order', 'added-desc');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
-  // Fetch books on mount
-  const fetchBooks = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const result = await bookRepository.findAllMetadata();
-      
-      if (result.success) {
-        setBooks(result.data);
-      } else {
-        logger.error('Failed to fetch books from repository:', (result as { success: false; error: string }).error);
-        setBooks([]);
-      }
-    } catch (error) {
-      logger.error('Failed to fetch books:', error);
-      setBooks([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBooks();
-  }, [fetchBooks]);
+  // Fetch books using React Query
+  const { data: books = [], isLoading, error, refetch } = useBooks();
+  
+  // Delete book mutation
+  const { mutate: deleteBook, isPending: isDeleting } = useDeleteBook();
 
   // Sort books using custom hook
   const sortedBooks = useSortedBooks(books, sortOrder as any);
@@ -87,34 +64,35 @@ const LocalLibraryView: React.FC<LocalLibraryViewProps> = ({
   };
 
   // Handle delete confirmation
-  const handleDeleteConfirm = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(() => {
     if (!bookToDelete?.id) return;
 
-    try {
-      const result = await bookRepository.delete(bookToDelete.id);
-      
-      if (result.success) {
-        // Refresh the book list after successful deletion
-        await fetchBooks();
+    deleteBook(bookToDelete.id, {
+      onSuccess: () => {
         setBookToDelete(null);
-      } else {
-        logger.error('Failed to delete book:', (result as { success: false; error: string }).error);
-      }
-    } catch (error) {
-      logger.error('Failed to delete book:', error);
-    }
-  }, [bookToDelete, fetchBooks]);
+      },
+    });
+  }, [bookToDelete, deleteBook]);
 
   // Handle sort change
   const handleSortChange = (newSortOrder: string) => {
     setSortOrder(newSortOrder);
   };
 
+  // Show loading state
   if (isLoading) {
+    return <Loading variant="skeleton" message="Loading library..." />;
+  }
+
+  // Show error state
+  if (error) {
     return (
-      <div className="flex justify-center mt-20">
-        <Spinner />
-      </div>
+      <ErrorDisplay
+        variant="page"
+        title="Failed to Load Library"
+        message={error instanceof Error ? error.message : 'Could not load books from the library.'}
+        onRetry={() => refetch()}
+      />
     );
   }
 

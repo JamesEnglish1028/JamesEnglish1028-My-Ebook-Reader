@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useCatalogs, useLocalStorage } from '../../hooks';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCatalogs, useLocalStorage, bookKeys } from '../../hooks';
 import type { BookMetadata, BookRecord, Catalog, CatalogBook, CatalogRegistry, CoverAnimationData } from '../../types';
 import { LocalLibraryView, SortControls, ImportButton } from './local';
 import { CatalogView } from './catalog';
@@ -51,6 +52,9 @@ const LibraryView: React.FC<LibraryViewProps> = ({
   onOpenLocalStorageModal,
   onShowAbout,
 }) => {
+  // React Query client for cache invalidation
+  const queryClient = useQueryClient();
+
   // Catalog management
   const {
     catalogs,
@@ -152,34 +156,103 @@ const LibraryView: React.FC<LibraryViewProps> = ({
     }
   }, [updateRegistry, activeOpdsSource, setActiveOpdsSource]);
 
-  // Handle file import
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setImportStatus({ isLoading: true, message: 'Reading file...', error: null });
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const fileName = file.name;
-      const format = fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
-
-      const result = await processAndSaveBook(arrayBuffer, fileName, undefined, 'file', undefined, undefined, format);
-
-      if (result.success) {
-        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-        setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
-      } else if (result.existingBook) {
-        setDuplicateBook(result.bookRecord || null);
-        setExistingBook(result.existingBook);
-        setImportStatus({ isLoading: false, message: '', error: null });
-      }
-    } catch (error: any) {
-      setImportStatus({ isLoading: false, message: '', error: error.message || 'Failed to import book' });
+  // Handle file import - NOT using useCallback to prevent recreation issues
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[LibraryView] handleFileChange called', event.target.files);
+    
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      console.log('[LibraryView] No file selected');
+      return;
     }
 
-    // Reset file input
-    event.target.value = '';
+    const file = files[0];
+    console.log('[LibraryView] File selected:', file.name, file.type, file.size);
+
+    // If file size is 0, the file object is already invalid
+    // This commonly happens with iCloud-synced files on macOS that haven't been downloaded locally
+    if (file.size === 0) {
+      console.error('[LibraryView] File size is 0 - file object is invalid!');
+      
+      // Check if this looks like an ebook file that might be stored in iCloud
+      const isEbookExtension = /\.(epub|pdf)$/i.test(file.name);
+      const errorMessage = isEbookExtension 
+        ? 'Unable to access file. If this file is stored in iCloud, right-click it in Finder and select "Download Now" to make it available locally, then try again.'
+        : 'Unable to access file. Please try again.';
+      
+      setImportStatus({ isLoading: false, message: '', error: errorMessage });
+      event.target.value = '';
+      return;
+    }
+
+    // Capture file metadata immediately
+    const fileName = file.name;
+    const fileType = file.type;
+    const format = fileName.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
+    
+    // Try to create a stable blob reference immediately
+    console.log('[LibraryView] Creating blob from file...');
+    const blob = file.slice(0, file.size, file.type);
+    
+    // Start reading from the blob IMMEDIATELY before any state updates
+    const reader = new FileReader();
+    console.log('[LibraryView] Starting FileReader.readAsArrayBuffer from blob...');
+    reader.readAsArrayBuffer(blob);
+    
+    // Now update state AFTER we've started reading
+    setImportStatus({ isLoading: true, message: 'Reading file...', error: null });
+    
+    reader.onload = async (e) => {
+      const arrayBuffer = e.target?.result as ArrayBuffer;
+      
+      if (!arrayBuffer) {
+        setImportStatus({ isLoading: false, message: '', error: 'Could not read file data.' });
+        return;
+      }
+
+      console.log('[LibraryView] File read successfully, calling processAndSaveBook...', {
+        fileName,
+        size: arrayBuffer.byteLength
+      });
+
+      try {
+        const result = await processAndSaveBook(arrayBuffer, fileName, undefined, 'file', undefined, undefined, format);
+
+        console.log('[LibraryView] processAndSaveBook result:', result);
+
+        if (result.success) {
+          // Invalidate books query to refresh the library
+          console.log('[LibraryView] Invalidating books query cache...');
+          await queryClient.invalidateQueries({ queryKey: bookKeys.all });
+          console.log('[LibraryView] Books query cache invalidated');
+          
+          setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+          setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
+        } else if (result.existingBook) {
+          console.log('[LibraryView] Duplicate book detected');
+          setDuplicateBook(result.bookRecord || null);
+          setExistingBook(result.existingBook);
+          setImportStatus({ isLoading: false, message: '', error: null });
+        }
+      } catch (error: any) {
+        console.error('[LibraryView] Error during processAndSaveBook:', error);
+        setImportStatus({ isLoading: false, message: '', error: error.message || 'Failed to import book' });
+      }
+      
+      // Reset input AFTER all processing is complete
+      event.target.value = '';
+    };
+    
+    reader.onerror = (e) => {
+      console.error('[LibraryView] FileReader error:', {
+        error: reader.error,
+        errorName: reader.error?.name,
+        errorMessage: reader.error?.message,
+        event: e
+      });
+      setImportStatus({ isLoading: false, message: '', error: `File read error: ${reader.error?.message || 'Unknown error'}` });
+      event.target.value = '';
+    };
   };
 
   const currentTitle = activeOpdsSource ? activeOpdsSource.name : 'My Library';

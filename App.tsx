@@ -1,4 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider, QueryErrorResetBoundary } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 // Styles required by react-pdf layers
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -61,6 +63,34 @@ import type {
 
 // Lazy-load the PDF reader so its dependencies (react-pdf, pdfjs-dist) are code-split
 const PdfReaderView = lazy(() => import('./components/PdfReaderView'));
+
+// Create a QueryClient instance for React Query
+// Configure default options for queries and mutations
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Stale time: data is fresh for 5 minutes
+      staleTime: 5 * 60 * 1000,
+      // Cache time: unused data is garbage collected after 10 minutes
+      gcTime: 10 * 60 * 1000,
+      // Retry failed queries once
+      retry: 1,
+      // Refetch on window focus for fresh data
+      refetchOnWindowFocus: true,
+      // Don't refetch on mount if data is fresh
+      refetchOnMount: false,
+      // Throw errors to nearest error boundary for critical failures
+      // Set to false by default - individual queries can opt-in
+      throwOnError: false,
+    },
+    mutations: {
+      // Retry mutations once on failure
+      retry: 1,
+      // Don't throw mutation errors to error boundary by default
+      throwOnError: false,
+    },
+  },
+});
 
 
 const AppInner: React.FC = () => {
@@ -624,19 +654,31 @@ const AppInner: React.FC = () => {
 };
 
 const App: React.FC = () => (
-  <BrowserRouter>
-    <Routes>
-      <Route path="/debug/db" element={<DebugDbRoute />} />
-      <Route path="/pdf/:id" element={
-        <Suspense fallback={<div className="w-full h-full flex items-center justify-center">Loading PDF viewer...</div>}>
-          <ErrorBoundary onReset={() => window.location.replace('/')} fallbackMessage="There was an error loading the PDF viewer.">
-            <PdfReaderViewWrapper />
-          </ErrorBoundary>
-        </Suspense>
-      } />
-      <Route path="/*" element={<AppInner />} />
-    </Routes>
-  </BrowserRouter>
+  <QueryClientProvider client={queryClient}>
+    <QueryErrorResetBoundary>
+      {({ reset }) => (
+        <BrowserRouter>
+          <Routes>
+            <Route path="/debug/db" element={<DebugDbRoute />} />
+            <Route path="/pdf/:id" element={
+              <Suspense fallback={<div className="w-full h-full flex items-center justify-center">Loading PDF viewer...</div>}>
+                <ErrorBoundary onReset={() => { reset(); window.location.replace('/'); }} fallbackMessage="There was an error loading the PDF viewer.">
+                  <PdfReaderViewWrapper />
+                </ErrorBoundary>
+              </Suspense>
+            } />
+            <Route path="/*" element={
+              <ErrorBoundary onReset={() => { reset(); window.location.reload(); }} fallbackMessage="There was an error loading the application.">
+                <AppInner />
+              </ErrorBoundary>
+            } />
+          </Routes>
+        </BrowserRouter>
+      )}
+    </QueryErrorResetBoundary>
+    {/* React Query DevTools - only visible in development */}
+    <ReactQueryDevtools initialIsOpen={false} />
+  </QueryClientProvider>
 );
 
 // A small wrapper to render the lazy-loaded PdfReaderView component and pass a close handler via navigation
