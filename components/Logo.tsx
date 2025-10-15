@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { mebooksLogoLight, mebooksLogoDark } from '../assets';
+import { mebooksLogo } from '../assets';
 
 interface LogoProps {
   className?: string;
@@ -49,16 +49,8 @@ export const Logo: React.FC<LogoProps> = ({ className, full = false, alt = 'MeBo
     };
   }, [theme]);
   if (full) {
-    // Choose themed asset. Default is 'auto' which respects prefers-color-scheme.
-    let asset = mebooksLogoLight;
-    if (theme === 'light') {
-      asset = mebooksLogoLight;
-    } else if (theme === 'dark') {
-      asset = mebooksLogoDark;
-    } else {
-      // For 'auto' fallback use the prefersDark state (initialized from matchMedia)
-      asset = prefersDark ? mebooksLogoDark : mebooksLogoLight;
-    }
+    // Use the new single logo for all themes
+    const asset = mebooksLogo;
 
     return (
       <img

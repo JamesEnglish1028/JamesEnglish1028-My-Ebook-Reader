@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Logo } from './Logo';
+import { mebooksLockupStackedDark } from '../assets';
 
 interface SplashScreenProps {
   isVisible: boolean;
@@ -14,7 +14,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ isVisible }) => {
       }`}
     >
       <div className="animate-pulse">
-        <Logo full className="w-64" />
+        <img src={mebooksLockupStackedDark} alt="MeBooks" className="w-64" />
       </div>
     </div>
   );

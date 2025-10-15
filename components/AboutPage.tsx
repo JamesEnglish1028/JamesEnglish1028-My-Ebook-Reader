@@ -16,66 +16,94 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
         </button>
       </header>
 
-      <main className="max-w-4xl mx-auto prose prose-invert prose-headings:text-sky-300 prose-headings:font-semibold prose-a:text-sky-400 hover:prose-a:text-sky-300 prose-strong:text-slate-100 prose-code:bg-slate-700 prose-code:rounded prose-code:px-1.5 prose-code:py-1 prose-code:font-mono prose-li:marker:text-sky-400">
-        <h1>About MeBooks</h1>
-        <p className="text-lg text-slate-300">
-          MeBooks is a custom, browser-based ebook reader inspired by Readium's Thorium. This application allows users to import EPUB and PDF books into a local library and browse online OPDS catalogs. It is built using modern web technologies and focuses on providing a rich, customizable reading experience with robust library management features.
-        </p>
+      <main className="max-w-4xl mx-auto space-y-8">
+        <section className="bg-slate-800/80 rounded-xl shadow-lg p-6 border border-slate-700">
+          <h1 className="text-3xl font-bold text-sky-300 mb-2">About MeBooks</h1>
+          <p className="text-lg text-slate-300 mb-4">
+            <span className="font-semibold text-sky-200">MeBooks</span> is a modern, browser-based ebook reader inspired by the user experience of Readium's Thorium, but built entirely with web technologies. EPUB books are rendered using <span className="font-semibold">epub.js</span>, and PDF books are rendered using an embedded distribution of <span className="font-semibold">pdf.js</span> via <span className="font-semibold">react-pdf</span> and <span className="font-semibold">pdfjs-dist</span>. Import EPUB and PDF books into your local library, or browse and download from online OPDS catalogs. Built with accessibility, privacy, and customization in mind.
+          </p>
+        </section>
 
-        <h2>Key Features</h2>
+        {/* For Developers section moved directly after Technology Stack */}
 
-        <h3>Accessibility & A11Y</h3>
-        <ul>
-          <li><strong>WCAG 2.1 AA Compliance:</strong> All UI and content meet or exceed Level AA requirements.</li>
-          <li><strong>Keyboard Navigation:</strong> Every feature is accessible via keyboard, with logical tab order and visible focus indicators.</li>
-          <li><strong>Screen Reader Support:</strong> ARIA labels, live regions, and dynamic announcements for all major actions.</li>
-          <li><strong>High Contrast & Color Blind Friendly:</strong> All text and UI elements use a high-contrast palette and are tested for color blindness.</li>
-          <li><strong>Skip Links & Landmarks:</strong> Quickly jump to main content or navigation.</li>
-          <li><strong>Accessible Modals & Dialogs:</strong> Focus is managed and restored, with ARIA roles and announcements.</li>
-          <li><strong>Global Keyboard Shortcuts:</strong> Discoverable, accessible shortcuts for power users.</li>
-          <li><strong>Adjustable Font Size & Family:</strong> Reader settings allow for easy text customization.</li>
-          <li><strong>Responsive Design:</strong> Works on all devices and screen sizes.</li>
-        </ul>
+        <section className="grid md:grid-cols-2 gap-6">
+          <div className="bg-slate-800/80 rounded-xl shadow p-6 border border-slate-700 flex flex-col gap-2">
+            <h2 className="text-xl font-semibold text-sky-300 flex items-center gap-2 mb-2">Accessibility & A11Y
+              <span className="bg-sky-900 text-sky-200 text-xs font-bold px-2 py-1 rounded ml-2">WCAG 2.1 AA</span>
+            </h2>
+            <ul className="list-disc list-inside space-y-1 text-slate-200">
+              <li><span className="font-semibold">Keyboard Navigation:</span> Logical tab order, visible focus, and full keyboard support.</li>
+              <li><span className="font-semibold">Screen Reader Support:</span> ARIA labels, live regions, and dynamic announcements.</li>
+              <li><span className="font-semibold">High Contrast & Color Blind Friendly:</span> Tested palette and contrast ratios.</li>
+              <li><span className="font-semibold">Skip Links & Landmarks:</span> Quick navigation for assistive tech users.</li>
+              <li><span className="font-semibold">Accessible Modals & Dialogs:</span> Focus management, ARIA roles, and announcements.</li>
+              <li><span className="font-semibold">Global Keyboard Shortcuts:</span> Discoverable, accessible shortcuts for power users.</li>
+              <li><span className="font-semibold">Adjustable Font Size & Family:</span> Reader settings for easy text customization.</li>
+              <li><span className="font-semibold">Responsive Design:</span> Works on all devices and screen sizes.</li>
+            </ul>
+            <div className="mt-3">
+              <a href="/VPAT.md" target="_blank" rel="noopener noreferrer" className="block bg-sky-900/80 border border-sky-700 rounded px-4 py-2 text-sky-300 font-semibold text-center hover:bg-sky-800 transition">Accessibility VPAT (Voluntary Product Accessibility Template)</a>
+            </div>
+          </div>
+          <div className="bg-slate-800/80 rounded-xl shadow p-6 border border-slate-700 flex flex-col gap-2">
+            <h2 className="text-xl font-semibold text-sky-300 mb-2">Library Management</h2>
+            <ul className="list-disc list-inside space-y-1 text-slate-200">
+              <li><span className="font-semibold">Local-First Storage:</span> Your books and reading data never leave your computer. Book files are stored in IndexedDB, settings and annotations in LocalStorage.</li>
+              <li><span className="font-semibold">EPUB & PDF Import:</span> Build your personal library with <code>.epub</code> and <code>.pdf</code> files.</li>
+              <li><span className="font-semibold">Book Details:</span> View publication info, subjects, and provider IDs.</li>
+              <li><span className="font-semibold">Library Organization:</span> Sort by title, author, publication date, or date added.</li>
+            </ul>
+          </div>
+        </section>
 
-        <p className="mt-4">
-          <a href="/VPAT.md" target="_blank" rel="noopener noreferrer" className="underline text-sky-400 hover:text-sky-300 font-semibold">View the Accessibility VPAT (Voluntary Product Accessibility Template)</a>
-        </p>
+        <section className="grid md:grid-cols-2 gap-6">
+          <div className="bg-slate-800/80 rounded-xl shadow p-6 border border-slate-700 flex flex-col gap-2">
+            <h2 className="text-xl font-semibold text-sky-300 mb-2">Online Catalogs (OPDS)</h2>
+            <ul className="list-disc list-inside space-y-1 text-slate-200">
+              <li><span className="font-semibold">Browse Remote Libraries:</span> Add and manage unlimited public OPDS catalogs.</li>
+              <li><span className="font-semibold">OPDS v1 & v2 Support:</span> Compatible with XML (Atom) and JSON feeds.</li>
+              <li><span className="font-semibold">One-Click Import:</span> Download books directly from catalogs to your library.</li>
+            </ul>
+          </div>
+          <div className="bg-slate-800/80 rounded-xl shadow p-6 border border-slate-700 flex flex-col gap-2">
+            <h2 className="text-xl font-semibold text-sky-300 mb-2">Advanced Reader Experience</h2>
+            <ul className="list-disc list-inside space-y-1 text-slate-200">
+              <li><span className="font-semibold">Browser-Based:</span> No installation needed—runs entirely in your browser.</li>
+              <li><span className="font-semibold">Multi-Format Support:</span> Read EPUB files with <span className="font-semibold">epub.js</span> and PDF files with an embedded <span className="font-semibold">pdf.js</span> engine (<span className="font-semibold">react-pdf</span> + <span className="font-semibold">pdfjs-dist</span>).</li>
+              <li><span className="font-semibold">Advanced Navigation:</span> Both readers support table of contents navigation, page jumping, and keyboard shortcuts for moving between chapters or pages.</li>
+              <li><span className="font-semibold">Full-Text Search:</span> EPUB and PDF readers both support searching the entire book text, with results highlighted and easy navigation between matches.</li>
+              <li><span className="font-semibold">Customizable Reader (EPUB):</span> Adjust font, theme, and reading mode (paginated or scrolled).</li>
+              <li><span className="font-semibold">Rich Tools (EPUB):</span> Bookmarks with notes, academic citation generation, and full-text search.</li>
+              <li><span className="font-semibold">Citation Export (EPUB):</span> Export citations in <code>.ris</code> format for Zotero/EndNote.</li>
+              <li><span className="font-semibold">Read Aloud (EPUB):</span> Text-to-speech with synchronized highlighting.</li>
+            </ul>
+          </div>
+        </section>
 
-        <h3>Library Management</h3>
-        <ul>
-          <li><strong>Local-First Storage:</strong> Your books and reading data never leave your computer. Book files are stored in IndexedDB, while settings, catalog lists, and annotations are kept in LocalStorage.</li>
-          <li><strong>EPUB &amp; PDF Import:</strong> Import <code>.epub</code> and <code>.pdf</code> files to build your personal library.</li>
-          <li><strong>Book Details:</strong> View detailed information for each book, including publication details, subjects, and provider IDs.</li>
-          <li><strong>Library Organization:</strong> Sort your library by title, author, publication date, or the date added.</li>
-        </ul>
+        <section className="bg-slate-800/80 rounded-xl shadow-lg p-6 border border-slate-700">
+          <h2 className="text-xl font-semibold text-sky-300 mb-2">Technology Stack</h2>
+          <ul className="list-disc list-inside space-y-1 text-slate-200">
+            <li><span className="font-semibold">React:</span> Component-based UI library.</li>
+            <li><span className="font-semibold">TypeScript:</span> Static typing for maintainable code.</li>
+            <li><span className="font-semibold">TailwindCSS:</span> Utility-first CSS for rapid styling.</li>
+            <li><span className="font-semibold">epub.js:</span> EPUB parsing and rendering.</li>
+            <li><span className="font-semibold">pdf.js:</span> PDF rendering (via <span className="font-semibold">react-pdf</span> and <span className="font-semibold">pdfjs-dist</span>).</li>
+            <li><span className="font-semibold">JSZip:</span> EPUB unzipping (via <code>epub.js</code>).</li>
+          </ul>
+          <p className="mt-2 text-slate-400">All external dependencies are loaded from a CDN for simplicity.</p>
+        </section>
 
-        <h3>Online Catalog Support (OPDS)</h3>
-        <ul>
-            <li><strong>Browse Remote Libraries:</strong> Add and manage an unlimited number of public OPDS (Open Publication Distribution System) catalogs.</li>
-            <li><strong>OPDS v1 & v2 Support:</strong> Compatible with both XML-based (Atom) and JSON-based OPDS feeds.</li>
-            <li><strong>One-Click Import:</strong> Download books directly from a catalog and add them to your local library.</li>
-        </ul>
-
-        <h3>Advanced Reader Experience</h3>
-        <ul>
-            <li><strong>Entirely Browser-Based:</strong> No installation needed. The app runs completely in your web browser.</li>
-            <li><strong>Multi-Format Support:</strong> Reads both EPUB and PDF files. EPUBs are rendered using a sophisticated JavaScript engine, while PDFs are displayed using your browser's native, built-in PDF viewer for speed and reliability.</li>
-            <li><strong>Customizable Reader (EPUB only):</strong> Adjust font size, font family, theme, and reading mode (paginated or scrolled).</li>
-            <li><strong>Rich Reading Tools (EPUB only):</strong> Create bookmarks with notes, generate academic citations (APA, MLA, Chicago), and perform full-text searches.</li>
-            <li><strong>Citation Export (EPUB only):</strong> Export all citations for a book in the standard <code>.ris</code> format for use in reference managers like Zotero or EndNote.</li>
-            <li><strong>Read Aloud (Text-to-Speech for EPUB only):</strong> Listen to your book with synchronized sentence highlighting.</li>
-        </ul>
-
-        <h2>Technology Stack</h2>
-        <p>The application is a Single Page Application (SPA) built with the following technologies:</p>
-        <ul>
-          <li><strong>React:</strong> The core UI library for building the component-based interface.</li>
-          <li><strong>TypeScript:</strong> Provides static typing for improved code quality and maintainability.</li>
-          <li><strong>TailwindCSS:</strong> A utility-first CSS framework for styling the application.</li>
-          <li><strong>epub.js:</strong> The essential library for parsing, rendering, and interacting with EPUB files.</li>
-          <li><strong>JSZip:</strong> A dependency of <code>epub.js</code> for unzipping EPUB packages.</li>
-        </ul>
-        <p>All external dependencies are loaded directly from a CDN for simplicity.</p>
+        <section className="bg-slate-800/80 rounded-xl shadow-lg p-6 border border-slate-700 mt-8">
+          <h2 className="text-xl font-semibold text-sky-300 mb-2">For Developers</h2>
+          <ul className="list-disc list-inside space-y-1 text-slate-200">
+            <li><span className="font-semibold">Vite:</span> Lightning-fast build tool and dev server for modern web apps.</li>
+            <li><span className="font-semibold">React Router:</span> Declarative routing for SPA navigation.</li>
+            <li><span className="font-semibold">React-PDF:</span> PDF rendering in React using pdf.js.</li>
+            <li><span className="font-semibold">TanStack Query:</span> Powerful data fetching and caching (if used).</li>
+            <li><span className="font-semibold">Other modern libraries:</span> Includes utility packages and accessibility helpers as needed.</li>
+          </ul>
+          <p className="mt-2 text-slate-400">See the <code>package.json</code> for a full list of dependencies and scripts.</p>
+        </section>
       </main>
     </div>
   );

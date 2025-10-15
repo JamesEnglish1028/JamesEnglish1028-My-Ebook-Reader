@@ -6,7 +6,8 @@ import { LocalLibraryView, SortControls, ImportButton } from './local';
 import { CatalogView } from './catalog';
 import ManageCatalogsModal from '../ManageCatalogsModal';
 import DuplicateBookModal from '../DuplicateBookModal';
-import { ChevronDownIcon, MeBooksBookIcon, SettingsIcon } from '../icons';
+import { ChevronDownIcon, SettingsIcon } from '../icons';
+import { mebooksBook } from '../../assets';
 
 interface LibraryViewProps {
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
@@ -264,7 +265,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
       <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         {/* Title with source dropdown */}
         <div className="flex items-center gap-4">
-          <MeBooksBookIcon className="w-10 h-10 text-sky-400 flex-shrink-0" aria-hidden="true" />
+          <img src={mebooksBook} alt="MeBooks Logo" className="w-10 h-10 flex-shrink-0" />
           <div ref={dropdownRef} className="relative">
             <button
               onClick={() => setIsCatalogDropdownOpen(prev => !prev)}

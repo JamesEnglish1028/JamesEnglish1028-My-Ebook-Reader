@@ -193,187 +193,140 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
         }
     });
 
-    entries.forEach(entry => {
-      const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
-      const allLinks = Array.from(entry.querySelectorAll('link'));
-      
-      // Check for schema:additionalType to detect audiobooks - this is how Palace Project
-      // marks audiobooks in their OPDS 1 feeds since they use schema.org vocabulary
-      const schemaType = entry.getAttribute('schema:additionalType');
-      const isAudiobook = schemaType === 'http://bib.schema.org/Audiobook' || 
-                         schemaType === 'http://schema.org/Audiobook';
-      
-      // Find acquisition links for downloadable books - prefer open-access, then specific media types
-      // Open-access links don't require authentication
-      
-      // Debug: Log all link rels
-      allLinks.forEach((link, idx) => {
-        const rel = link.getAttribute('rel') || '';
-        const href = link.getAttribute('href') || '';
-        console.log(`[OPDS1] Link ${idx} rel:`, rel, 'href:', href);
-      });
-      
-      const openAccessLink = allLinks.find(link => {
-          const rel = link.getAttribute('rel') || '';
-          return rel.includes('/open-access') || rel === 'http://opds-spec.org/acquisition/open-access';
-      });
-      
-      if (openAccessLink) {
-        console.log('[OPDS1] Found open-access link:', openAccessLink.getAttribute('href'));
-      }
-      
-      const acquisitionLink = openAccessLink || allLinks.find(link => {
-          const rel = link.getAttribute('rel') || '';
-          const type = link.getAttribute('type') || '';
-          return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
-      }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
-      
-      const isOpenAccess = !!openAccessLink;
+        entries.forEach(entry => {
+            const title = entry.querySelector('title')?.textContent?.trim() || 'Untitled';
+            const allLinks = Array.from(entry.querySelectorAll('link'));
 
-    const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
+            // Check for schema:additionalType to detect audiobooks
+            const schemaType = entry.getAttribute('schema:additionalType');
+            const isAudiobook = schemaType === 'http://bib.schema.org/Audiobook' || schemaType === 'http://schema.org/Audiobook';
 
-      if (acquisitionLink) {
-          const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
-          const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
-          const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
-          
-          const coverImageHref = coverLink?.getAttribute('href');
-          const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
-          
-                    const downloadUrlHref = acquisitionLink?.getAttribute('href');
+            // Find acquisition links for downloadable books
+            const openAccessLink = allLinks.find(link => {
+                const rel = link.getAttribute('rel') || '';
+                return rel.includes('/open-access') || rel === 'http://opds-spec.org/acquisition/open-access';
+            });
+            const acquisitionLink = openAccessLink || allLinks.find(link => {
+                const rel = link.getAttribute('rel') || '';
+                const type = link.getAttribute('type') || '';
+                return rel.includes('opds-spec.org/acquisition') && (type.includes('epub+zip') || type.includes('pdf'));
+            }) || allLinks.find(link => (link.getAttribute('rel') || '').includes('opds-spec.org/acquisition'));
+            const isOpenAccess = !!openAccessLink;
 
-                    // Determine media type for book format detection
-                    const mimeType = acquisitionLink?.getAttribute('type') || '';
-                    let format = getFormatFromMimeType(mimeType);
+            const subsectionLink = entry.querySelector('link[rel="subsection"], link[rel="http://opds-spec.org/subsection"]');
 
-                    // For audiobooks, override format based on schema:additionalType
-                    // This ensures Palace Project audiobooks are properly identified
-                    if (isAudiobook) {
-                        format = 'AUDIOBOOK';
-                    } else if (!format) {
-                        // Recursively search for child elements named 'indirectAcquisition' to find a type
-                        // Some OPDS feeds use this for DRM-protected content or complex acquisition flows
-                        const findIndirectType = (el: Element | null): string | undefined => {
-                            if (!el) return undefined;
-                            for (const child of Array.from(el.children)) {
-                                const local = (child.localName || child.nodeName || '').toLowerCase();
-                                if (local === 'indirectacquisition') {
-                                    const t = child.getAttribute('type');
-                                    if (t) return t;
-                                    const nested = findIndirectType(child);
-                                    if (nested) return nested;
-                                } else {
-                                    const nested = findIndirectType(child);
-                                    if (nested) return nested;
-                                }
+
+            if (acquisitionLink) {
+                // ...existing book parsing logic...
+                const author = entry.querySelector('author > name')?.textContent?.trim() || 'Unknown Author';
+                const summary = entry.querySelector('summary')?.textContent?.trim() || entry.querySelector('content')?.textContent?.trim() || null;
+                const coverLink = entry.querySelector('link[rel="http://opds-spec.org/image"]');
+                const coverImageHref = coverLink?.getAttribute('href');
+                const coverImage = coverImageHref ? new URL(coverImageHref, baseUrl).href : null;
+                const downloadUrlHref = acquisitionLink?.getAttribute('href');
+                const mimeType = acquisitionLink?.getAttribute('type') || '';
+                let format = getFormatFromMimeType(mimeType);
+                if (isAudiobook) {
+                    format = 'AUDIOBOOK';
+                } else if (!format) {
+                    const findIndirectType = (el: Element | null): string | undefined => {
+                        if (!el) return undefined;
+                        for (const child of Array.from(el.children)) {
+                            const local = (child.localName || child.nodeName || '').toLowerCase();
+                            if (local === 'indirectacquisition') {
+                                const t = child.getAttribute('type');
+                                if (t) return t;
+                                const nested = findIndirectType(child);
+                                if (nested) return nested;
+                            } else {
+                                const nested = findIndirectType(child);
+                                if (nested) return nested;
                             }
-                            return undefined;
-                        };
-
-                        const indirect = findIndirectType(acquisitionLink as Element);
-                        if (indirect) format = getFormatFromMimeType(indirect);
+                        }
+                        return undefined;
+                    };
+                    const indirect = findIndirectType(acquisitionLink as Element);
+                    if (indirect) format = getFormatFromMimeType(indirect);
+                }
+                const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
+                let distributor: string | undefined = undefined;
+                try {
+                    const distributionElements = entry.getElementsByTagName('bibframe:distribution');
+                    if (distributionElements.length > 0) {
+                        const distributorRaw = distributionElements[0].getAttribute('bibframe:ProviderName')?.trim();
+                        distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
                     }
-          
-          const publisher = (entry.querySelector('publisher')?.textContent || entry.querySelector('dc\\:publisher')?.textContent)?.trim();
-          
-          // Parse distributor information from bibframe:distribution element
-          // Use getElementsByTagName which is more compatible with namespaced elements
-          let distributor: string | undefined = undefined;
-          
-          try {
-            const distributionElements = entry.getElementsByTagName('bibframe:distribution');
-            if (distributionElements.length > 0) {
-              const distributorRaw = distributionElements[0].getAttribute('bibframe:ProviderName')?.trim();
-              distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
+                } catch (error) {
+                    try {
+                        const distributionElements = entry.getElementsByTagName('distribution');
+                        if (distributionElements.length > 0) {
+                            const distributorRaw = distributionElements[0].getAttribute('ProviderName')?.trim();
+                            distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
+                        }
+                    } catch (fallbackError) {
+                        console.warn('Could not parse distributor information:', fallbackError);
+                    }
+                }
+                const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
+                const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
+                const providerId = identifiers[0]?.textContent?.trim() || undefined;
+                const categories = Array.from(entry.querySelectorAll('category')).map(cat => {
+                    const scheme = cat.getAttribute('scheme') || 'http://palace.io/subjects';
+                    const term = cat.getAttribute('term')?.trim();
+                    const label = cat.getAttribute('label')?.trim();
+                    if (term) {
+                        return {
+                            scheme,
+                            term,
+                            label: label || term,
+                        };
+                    }
+                    return null;
+                }).filter((category): category is Category => category !== null);
+                const subjects = categories.map(cat => cat.label);
+                const collectionLinks = Array.from(entry.querySelectorAll('link[rel="collection"]'));
+                const collections = collectionLinks.map(link => {
+                    const href = link.getAttribute('href');
+                    const title = link.getAttribute('title');
+                    if (href && title) {
+                        return {
+                            title: title.trim(),
+                            href: new URL(href, baseUrl).href,
+                        };
+                    }
+                    return null;
+                }).filter((collection): collection is { title: string; href: string } => collection !== null);
+                if(downloadUrlHref) {
+                    const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
+                    let finalMediaType = mimeType;
+                    if (isAudiobook) {
+                        finalMediaType = 'http://bib.schema.org/Audiobook';
+                    }
+                    books.push({ 
+                        title, 
+                        author, 
+                        coverImage, 
+                        downloadUrl, 
+                        summary, 
+                        publisher: publisher || undefined, 
+                        publicationDate: publicationDate || undefined, 
+                        providerId, 
+                        distributor: distributor,
+                        subjects: subjects.length > 0 ? subjects : undefined,
+                        categories: categories.length > 0 ? categories : undefined,
+                        format,
+                        acquisitionMediaType: finalMediaType || undefined,
+                        collections: collections.length > 0 ? collections : undefined,
+                        isOpenAccess: isOpenAccess || undefined,
+                    });
+                }
+            } else if (subsectionLink) {
+                const navUrl = subsectionLink.getAttribute('href');
+                if (navUrl) {
+                    navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
+                }
             }
-          } catch (error) {
-            // Fallback: look for distribution elements without namespace prefix
-            try {
-              const distributionElements = entry.getElementsByTagName('distribution');
-              if (distributionElements.length > 0) {
-                const distributorRaw = distributionElements[0].getAttribute('ProviderName')?.trim();
-                distributor = distributorRaw && distributorRaw.length > 0 ? distributorRaw : undefined;
-              }
-            } catch (fallbackError) {
-              // If both fail, distributor remains undefined
-              console.warn('Could not parse distributor information:', fallbackError);
-            }
-          }
-          
-          const publicationDate = (entry.querySelector('issued')?.textContent || entry.querySelector('dc\\:issued')?.textContent || entry.querySelector('published')?.textContent)?.trim();
-          const identifiers = Array.from(entry.querySelectorAll('identifier, dc\\:identifier'));
-          const providerId = identifiers[0]?.textContent?.trim() || undefined;
-
-          // Parse category elements into proper Category objects with scheme, term, and label
-          const categories = Array.from(entry.querySelectorAll('category')).map(cat => {
-              const scheme = cat.getAttribute('scheme') || 'http://palace.io/subjects';
-              const term = cat.getAttribute('term')?.trim();
-              const label = cat.getAttribute('label')?.trim();
-              
-              if (term) {
-                  return {
-                      scheme,
-                      term,
-                      label: label || term, // Use label if available, otherwise fall back to term
-                  };
-              }
-              return null;
-          }).filter((category): category is Category => category !== null);
-
-          // Extract subjects as simple strings for backward compatibility
-          const subjects = categories.map(cat => cat.label);
-
-          // Parse collection links - used for Palace Project navigation
-          // Collections are rel="collection" links that point to curated book sets
-          const collectionLinks = Array.from(entry.querySelectorAll('link[rel="collection"]'));
-          const collections = collectionLinks.map(link => {
-              const href = link.getAttribute('href');
-              const title = link.getAttribute('title');
-              if (href && title) {
-                  return {
-                      title: title.trim(),
-                      href: new URL(href, baseUrl).href,
-                  };
-              }
-              return null;
-          }).filter((collection): collection is { title: string; href: string } => collection !== null);
-
-          if(downloadUrlHref) {
-              const downloadUrl = new URL(downloadUrlHref, baseUrl).href;
-              
-              // Determine the correct acquisitionMediaType for proper format detection
-              // For audiobooks, use the schema type; otherwise use the link's mime type
-              let finalMediaType = mimeType;
-              if (isAudiobook) {
-                  finalMediaType = 'http://bib.schema.org/Audiobook';
-              }
-              
-              books.push({ 
-                  title, 
-                  author, 
-                  coverImage, 
-                  downloadUrl, 
-                  summary, 
-                  publisher: publisher || undefined, 
-                  publicationDate: publicationDate || undefined, 
-                  providerId, 
-                  distributor: distributor,
-                  subjects: subjects.length > 0 ? subjects : undefined,
-                  categories: categories.length > 0 ? categories : undefined,
-                  format,
-                  acquisitionMediaType: finalMediaType || undefined,
-                  collections: collections.length > 0 ? collections : undefined,
-                  isOpenAccess: isOpenAccess || undefined,
-              });
-          }
-      } else if (subsectionLink) {
-          // FIX: The variable 'navUrl' was not defined. It should be extracted from the 'href' attribute of the subsectionLink element.
-          const navUrl = subsectionLink.getAttribute('href');
-          if (navUrl) {
-            navLinks.push({ title, url: new URL(navUrl, baseUrl).href, rel: 'subsection' });
-          }
-      }
-    });
+        });
 
     // Create navigation links from collections found in books (for Palace Project support)
     if (books.length > 0 && navLinks.length === 0) {
@@ -1561,9 +1514,12 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
     const collectionLinksSet = new Set<string>();
     const uncategorizedBooks: CatalogBook[] = [];
 
+    // Determine if we are at the root level (no collectionMode or collectionMode === 'all')
+    const atRootLevel = !collectionMode || collectionMode === 'all';
+
     filteredBooks.forEach(book => {
         let hasCategory = false;
-        
+
         // Handle actual categories from OPDS parsing (preferred)
         if (book.categories && book.categories.length > 0) {
             book.categories.forEach(category => {
@@ -1586,7 +1542,7 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
                     term: subject.toLowerCase().replace(/\s+/g, '-'),
                     label: subject,
                 };
-                
+
                 const key = `${syntheticCategory.scheme}|${syntheticCategory.label}`;
                 if (!categoryMap.has(key)) {
                     categoryMap.set(key, {
@@ -1598,27 +1554,29 @@ export const getAvailableCollections = (books: CatalogBook[], navLinks: CatalogN
                 hasCategory = true;
             });
         }
-        
-        // Extract collection links for navigation (from original books, not filtered)
-        if (book.collections && book.collections.length > 0) {
+
+        // Only add collection links to the sidebar if at root level
+        if (atRootLevel && book.collections && book.collections.length > 0) {
             book.collections.forEach(collection => {
                 collectionLinksSet.add(JSON.stringify(collection));
             });
         }
-        
+
         if (!hasCategory) {
             uncategorizedBooks.push(book);
         }
     });
 
-    // Use original books for collection link extraction (not filtered)
-    books.forEach(book => {
-        if (book.collections && book.collections.length > 0) {
-            book.collections.forEach(collection => {
-                collectionLinksSet.add(JSON.stringify(collection));
-            });
-        }
-    });
+    // Only add root-level collections from the original books if at root level
+    if (atRootLevel) {
+        books.forEach(book => {
+            if (book.collections && book.collections.length > 0) {
+                book.collections.forEach(collection => {
+                    collectionLinksSet.add(JSON.stringify(collection));
+                });
+            }
+        });
+    }
 
     const categoryLanes = Array.from(categoryMap.values()).map(categoryGroup => {
         // Sort books within each category lane

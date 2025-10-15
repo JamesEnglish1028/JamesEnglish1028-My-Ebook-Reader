@@ -42,19 +42,9 @@ const LocalLibraryView: React.FC<LocalLibraryViewProps> = ({
   // Sort books using custom hook
   const sortedBooks = useSortedBooks(books, sortOrder as any);
 
-  // Handle book click - open for reading
-  const handleLocalBookClick = async (book: BookMetadata) => {
-    if (!book.id) return;
-
-    const coverElement = document.querySelector(`[data-book-id="${book.id}"]`) as HTMLElement;
-    const animationData: CoverAnimationData = coverElement
-      ? {
-          rect: coverElement.getBoundingClientRect(),
-          coverImage: book.coverImage || null,
-        }
-      : { rect: new DOMRect(), coverImage: null };
-
-    onOpenBook(book.id, animationData, book.format);
+  // Handle book click - open Book Detail modal
+  const handleLocalBookClick = (book: BookMetadata) => {
+    onShowBookDetail(book, 'library');
   };
 
   // Handle context menu - show delete option

@@ -12,7 +12,8 @@ import { CategoryLaneComponent } from './CategoryLane';
 import { CollectionLane } from './CollectionLane';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import DuplicateBookModal from './DuplicateBookModal';
-import { AdjustmentsVerticalIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, GlobeIcon, LeftArrowIcon, MeBooksBookIcon, PlusIcon, RightArrowIcon, SettingsIcon, TrashIcon, UploadIcon } from './icons';
+import { AdjustmentsVerticalIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, GlobeIcon, LeftArrowIcon, PlusIcon, RightArrowIcon, SettingsIcon, TrashIcon, UploadIcon } from './icons';
+import { mebooksBook } from '../assets';
 import ManageCatalogsModal from './ManageCatalogsModal';
 import Spinner from './Spinner';
 import { UncategorizedLane } from './UncategorizedLane';
@@ -87,6 +88,8 @@ const Library: React.FC<LibraryProps> = ({
   const [categoryLanes, setCategoryLanes] = useState<CategoryLane[]>([]);
   const [collectionLinks, setCollectionLinks] = useState<Collection[]>([]);
   const [showCategoryView, setShowCategoryView] = useState(false);
+  // Audience navigation links for sidebar
+  const [audienceLinks, setAudienceLinks] = useState<CatalogNavigationLink[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [categorizationMode, setCategorizationMode] = useState<CategorizationMode>('subject');
   const [audienceMode, setAudienceMode] = useState<AudienceMode>('all');
@@ -256,15 +259,15 @@ const Library: React.FC<LibraryProps> = ({
     const books = originalCatalogBooks;
     const finalNavLinks = catalogNavLinks;
 
+
     // Check for category-based organization first (preferred)
     const hasCategories = books.some(book => book.categories && book.categories.length > 0);
     const hasSubjects = books.some(book => book.subjects && book.subjects.length > 0);
     const hasCollections = books.some(book => book.collections && book.collections.length > 0);
 
-    // Apply filtering chain: audience -> fiction -> media
-    const audienceFilteredBooks = filterBooksByAudience(books, audienceMode);
-    const fictionFilteredBooks = filterBooksByFiction(audienceFilteredBooks, fictionMode);
-    const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
+  // Apply filtering chain: fiction -> media
+  const fictionFilteredBooks = filterBooksByFiction(books, fictionMode);
+  const finalFilteredBooks = filterBooksByMedia(fictionFilteredBooks, mediaMode);
 
     // Use the selected categorization mode
     if (categorizationMode === 'flat') {
@@ -278,7 +281,7 @@ const Library: React.FC<LibraryProps> = ({
       setCatalogBooks(finalFilteredBooks); // Set the filtered books for flat view
     } else if (categorizationMode === 'subject' && hasSubjects) {
       // Use subjects-based categorization
-      const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, catalogPagination || {}, categorizationMode, audienceMode, fictionMode, mediaMode, collectionMode);
+  const { categoryLanes: lanes, collectionLinks: collLinks, uncategorizedBooks: uncategorized } = groupBooksByMode(finalFilteredBooks, finalNavLinks, catalogPagination || {}, categorizationMode, undefined, fictionMode, mediaMode, collectionMode);
       setCategoryLanes(lanes);
       setCollectionLinks(collLinks);
       setUncategorizedBooks(uncategorized);
@@ -1102,7 +1105,7 @@ const Library: React.FC<LibraryProps> = ({
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div className="flex items-center gap-4">
-          <MeBooksBookIcon className="w-10 h-10 text-sky-400 flex-shrink-0" />
+          <img src={mebooksBook} alt="MeBooks Logo" className="w-10 h-10 flex-shrink-0" />
           <div ref={dropdownRef} className="relative">
             <button
               onClick={() => setIsCatalogDropdownOpen(prev => !prev)}
@@ -1428,47 +1431,47 @@ const Library: React.FC<LibraryProps> = ({
               - At root: Show if current feed has collections
               - Inside collection/category: Show preserved root collections for navigation back
               - During loading: Keep visible if we had collections before */}
-          {(availableCollections.length > 0 || (catalogNavPath.length > 1 && rootLevelCollections.length > 0) || (isCatalogLoading && rootLevelCollections.length > 0)) && (
+          {(availableCollections.length > 0 || (catalogNavPath.length > 1 && rootLevelCollections.length > 0) || (isCatalogLoading && rootLevelCollections.length > 0) || audienceLinks.length > 0) && (
             <aside className="w-full lg:w-64 lg:flex-shrink-0 order-2 lg:order-1">
               <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
-                <h3 className="text-lg font-semibold text-white mb-4">Collections</h3>
-                <nav className="space-y-2">
-                  <button
-                    onClick={() => handleCollectionChange('all')}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                      // Active if at root level and collectionMode is 'all', or no specific collection selected
-                      (catalogNavPath.length <= 1 && (collectionMode === 'all' || !collectionMode))
-                        ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
-                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
-                      }`}
-                  >
-                    All Books
-                  </button>
-                  {(availableCollections.length > 0 ? availableCollections : rootLevelCollections).map((collection, index) => {
-                    // Collection is active if:
-                    // 1. We're navigating deeper AND current navigation item matches this collection
-                    // 2. OR collectionMode matches this collection (for client-side filtering)
-                    const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
-                    const isActiveByMode = catalogNavPath.length <= 1 && collectionMode === collection;
-                    const isActive = isActiveByPath || isActiveByMode;
+                <h3 className="text-lg font-semibold text-white mb-4">Navigation By</h3>
+                {/* Collections Accordion */}
+                <div className="mt-4">
+                  <div className="sidebar-accordion-header">Collections</div>
+                  <nav className="space-y-2">
+                    <button
+                      onClick={() => handleCollectionChange('all')}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                        (catalogNavPath.length <= 1 && (collectionMode === 'all' || !collectionMode))
+                          ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
+                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
+                        }`}
+                    >
+                      All Books
+                    </button>
+                    {(availableCollections.length > 0 ? availableCollections : rootLevelCollections).map((collection, index) => {
+                      const isActiveByPath = catalogNavPath.length > 1 && catalogNavPath[catalogNavPath.length - 1].name === collection;
+                      const isActiveByMode = catalogNavPath.length <= 1 && collectionMode === collection;
+                      const isActive = isActiveByPath || isActiveByMode;
 
-                    return (
-                      <button
-                        key={`${collection}-${index}`}
-                        onClick={() => handleCollectionChange(collection as CollectionMode)}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border-2 ${isActive
-                            ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500'
-                            : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
-                          }`}
-                      >
-                        <span className={isActive ? '📁' : '📂'}>
-                          {isActive ? '📁' : '📂'}
-                        </span>
-                        {collection}
-                      </button>
-                    );
-                  })}
-                </nav>
+                      return (
+                        <button
+                          key={`${collection}-${index}`}
+                          onClick={() => handleCollectionChange(collection as CollectionMode)}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 border-2 ${isActive
+                              ? 'bg-sky-600 text-white font-medium shadow-lg border-sky-500'
+                              : 'bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border-transparent hover:border-sky-600/30'
+                            }`}
+                        >
+                          <span className={isActive ? '📁' : '📂'}>
+                            {isActive ? '📁' : '📂'}
+                          </span>
+                          {collection}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
               </div>
             </aside>
           )}
