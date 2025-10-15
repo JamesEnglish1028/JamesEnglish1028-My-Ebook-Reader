@@ -1,5 +1,5 @@
 import React from 'react';
-
+import { useFocusTrap } from '../hooks';
 import { CloseIcon } from './icons';
 
 interface ConfirmModalProps {
@@ -14,10 +14,15 @@ interface ConfirmModalProps {
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title = 'Confirm', message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onClose, onConfirm, variant = 'default' }) => {
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose
+  });
+
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 text-white" onClick={(e) => e.stopPropagation()}>
+      <div ref={modalRef} className="bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 text-white" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
           <h2 className={`text-xl font-bold ${variant === 'danger' ? 'text-red-300' : 'text-sky-300'}`}>{title}</h2>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close">

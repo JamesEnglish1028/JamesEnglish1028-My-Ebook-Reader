@@ -1,5 +1,5 @@
 import React from 'react';
-
+import { useFocusTrap } from '../hooks';
 import { CloseIcon, TrashIcon } from './icons';
 
 interface DeleteConfirmationModalProps {
@@ -10,6 +10,11 @@ interface DeleteConfirmationModalProps {
 }
 
 const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ isOpen, onClose, onConfirm, bookTitle }) => {
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose
+  });
+
   if (!isOpen) return null;
 
   return (
@@ -20,6 +25,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ isOpe
       role="dialog"
     >
       <div
+        ref={modalRef}
         className="bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 text-white"
         onClick={(e) => e.stopPropagation()}
       >

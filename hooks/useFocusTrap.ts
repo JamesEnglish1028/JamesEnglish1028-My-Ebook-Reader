@@ -39,9 +39,9 @@ export interface FocusTrapOptions {
  * }
  * ```
  */
-export function useFocusTrap(options: FocusTrapOptions) {
+export function useFocusTrap<T extends HTMLElement = HTMLElement>(options: FocusTrapOptions) {
   const { isActive, initialFocusRef, returnFocusRef, onEscape } = options;
-  const containerRef = useRef<HTMLElement>(null);
+  const containerRef = useRef<T>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
   // Get all focusable elements within container

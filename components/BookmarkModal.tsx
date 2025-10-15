@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-
+import React, { useState, useEffect, useRef } from 'react';
+import { useFocusTrap } from '../hooks';
 import { CloseIcon } from './icons';
 
 interface BookmarkModalProps {
@@ -11,6 +11,13 @@ interface BookmarkModalProps {
 const BookmarkModal: React.FC<BookmarkModalProps> = ({ isOpen, onClose, onSave }) => {
   const [note, setNote] = useState('');
   const charLimit = 200;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    initialFocusRef: textareaRef,
+    onEscape: onClose
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -34,6 +41,7 @@ const BookmarkModal: React.FC<BookmarkModalProps> = ({ isOpen, onClose, onSave }
       role="dialog"
     >
       <div
+        ref={modalRef}
         className="bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 text-white"
         onClick={(e) => e.stopPropagation()}
       >
@@ -53,6 +61,7 @@ const BookmarkModal: React.FC<BookmarkModalProps> = ({ isOpen, onClose, onSave }
             Note (optional)
           </label>
           <textarea
+            ref={textareaRef}
             id="bookmark-note"
             rows={4}
             value={note}
@@ -63,7 +72,6 @@ const BookmarkModal: React.FC<BookmarkModalProps> = ({ isOpen, onClose, onSave }
             }}
             className="w-full bg-slate-700 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             placeholder="Add a brief note..."
-            autoFocus
           />
           <p className={`text-xs mt-1 text-right ${remainingChars < 20 ? 'text-red-400' : 'text-slate-500'}`}>
             {remainingChars} characters remaining
