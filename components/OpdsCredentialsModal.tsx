@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
+import { useFocusTrap } from '../hooks';
 import { maybeProxyForCors } from '../services/utils';
 
 interface Props {
@@ -54,6 +54,11 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
     };
   }, []);
 
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose
+  });
+
   if (!isOpen) return null;
 
   const realmFromAuth = authDocument?.realm || authDocument?.title || null;
@@ -62,7 +67,7 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
   const links: any[] = Array.isArray(authDocument?.links) ? authDocument.links : [];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-4">
-      <div className="bg-slate-800 p-6 rounded-lg max-w-md w-full text-white">
+      <div ref={modalRef} className="bg-slate-800 p-6 rounded-lg max-w-md w-full text-white">
         <div className="flex items-start gap-4 mb-2">
           {logo && <img src={logo} alt="provider logo" className="w-12 h-12 object-contain" />}
           <div>

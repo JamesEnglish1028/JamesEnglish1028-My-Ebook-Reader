@@ -1,5 +1,5 @@
 import React from 'react';
-
+import { useFocusTrap } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 
 import { CloseIcon, UploadIcon, DownloadIcon } from './icons';
@@ -40,6 +40,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onUpload
     }
   };
 
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: handleClose
+  });
+
   if (!isOpen) return null;
 
   const lastSyncDate = localStorage.getItem('ebook-reader-last-sync');
@@ -48,7 +53,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onUpload
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={handleClose} aria-modal="true" role="dialog">
-      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-white" onClick={(e) => e.stopPropagation()}>
+      <div ref={modalRef} className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-white" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-sky-300">Cloud Sync</h2>
           <button onClick={handleClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close" disabled={isSyncing}>

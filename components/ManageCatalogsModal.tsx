@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-
+import { useFocusTrap } from '../hooks';
 import type { Catalog, CatalogRegistry } from '../types';
 
 import { CloseIcon, GlobeIcon, PlusIcon, TrashIcon, PencilIcon, CheckIcon } from './icons';
@@ -36,6 +36,11 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editedName, setEditedName] = useState('');
   const [activeTab, setActiveTab] = useState<'catalogs' | 'registries'>('catalogs');
+
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose
+  });
 
   if (!isOpen) return null;
 
@@ -87,7 +92,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
   
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose} aria-modal="true" role="dialog">
-      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-white" onClick={(e) => e.stopPropagation()}>
+      <div ref={modalRef} className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-white" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-sky-300">Manage Sources</h2>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close">

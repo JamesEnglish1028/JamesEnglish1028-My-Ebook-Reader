@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-
+import React, { useRef } from 'react';
+import { useFocusTrap } from '../hooks';
 import { PlusIcon, MinusIcon, AdjustmentsVerticalIcon } from './icons';
 import Tooltip from './Tooltip';
 
@@ -15,58 +15,13 @@ interface Props {
 }
 
 const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomOut, onToggleFit, activeReader = null }) => {
-  const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const previousActiveRef = useRef<Element | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    previousActiveRef.current = document.activeElement;
-
-    // Move focus into the dialog
-    const focusable = getFocusableElements(dialogRef.current);
-    const first = focusable[0] as HTMLElement | undefined;
-    (first || closeButtonRef.current)?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (e.key === 'Tab') {
-        // focus trap
-        const elements = getFocusableElements(dialogRef.current);
-        if (elements.length === 0) {
-          e.preventDefault();
-          return;
-        }
-        const firstEl = elements[0] as HTMLElement;
-        const lastEl = elements[elements.length - 1] as HTMLElement;
-
-        if (e.shiftKey) {
-          if (document.activeElement === firstEl) {
-            e.preventDefault();
-            lastEl.focus();
-          }
-        } else {
-          if (document.activeElement === lastEl) {
-            e.preventDefault();
-            firstEl.focus();
-          }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      // restore focus
-      try { (previousActiveRef.current as HTMLElement | null)?.focus(); } catch (e) { /* ignore */ }
-    };
-  }, [isOpen, onClose]);
+  const dialogRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    initialFocusRef: closeButtonRef,
+    onEscape: onClose
+  });
 
   if (!isOpen) return null;
 
@@ -122,13 +77,5 @@ const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomO
     </div>
   );
 };
-
-function getFocusableElements(root: Element | null) {
-  if (!root) return [] as Element[];
-  const nodes = root.querySelectorAll<HTMLElement>(
-    'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-  );
-  return Array.from(nodes).filter((n) => n.offsetWidth > 0 || n.offsetHeight > 0);
-}
 
 export default ShortcutHelpModal;

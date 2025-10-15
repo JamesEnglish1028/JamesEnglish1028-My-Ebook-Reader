@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import { useFocusTrap } from '../hooks';
 import { db } from '../services/db';
 
 import { useConfirm } from './ConfirmContext';
@@ -14,6 +14,11 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
   const [bookCount, setBookCount] = useState<number | null>(null);
   const confirm = useConfirm();
   
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose
+  });
+
   useEffect(() => {
     if (isOpen) {
       db.getBooksMetadata().then(books => {
@@ -81,7 +86,7 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose} aria-modal="true" role="dialog">
-      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-white" onClick={(e) => e.stopPropagation()}>
+      <div ref={modalRef} className="bg-slate-800 rounded-lg shadow-xl w-full max-w-lg p-6 text-white" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-sky-300">Local Storage Management</h2>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-700 transition-colors" aria-label="Close">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-
+import { useFocusTrap } from '../hooks';
 import { proxiedUrl, maybeProxyForCors, isDebug } from '../services/utils';
 
 const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -8,6 +8,11 @@ const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const [includeCreds, setIncludeCreds] = useState<boolean>(true);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  const modalRef = useFocusTrap<HTMLDivElement>({
+    isActive: isOpen,
+    onEscape: onClose
+  });
 
   if (!isDebug()) return null;
 
@@ -73,7 +78,7 @@ const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-6">
-      <div className="w-full max-w-2xl bg-white rounded shadow-lg overflow-auto" style={{ maxHeight: '80vh' }}>
+      <div ref={modalRef} className="w-full max-w-2xl bg-white rounded shadow-lg overflow-auto" style={{ maxHeight: '80vh' }}>
         <div className="p-4 border-b flex items-center justify-between">
           <strong>Network Debug</strong>
           <div>
