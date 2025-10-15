@@ -35,3 +35,10 @@ export {
   catalogManagementKeys
 } from './useCatalogMutations';
 
+// Accessibility hooks
+export { useKeyboardNavigation, useGridNavigation } from './useKeyboardNavigation';
+export type { KeyboardNavigationOptions, GridNavigationOptions } from './useKeyboardNavigation';
+
+export { useFocusTrap, useFocusManagement } from './useFocusTrap';
+export type { FocusTrapOptions } from './useFocusTrap';
+

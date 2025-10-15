@@ -7,6 +7,7 @@ interface BookCardProps {
   onClick: (book: BookMetadata | CatalogBook) => void;
   onContextMenu?: (book: BookMetadata | CatalogBook, e: React.MouseEvent) => void;
   className?: string;
+  isFocused?: boolean;
 }
 
 /**
@@ -15,18 +16,26 @@ interface BookCardProps {
  * Displays book cover, title, author, and format badges.
  * Works with both local library books (BookMetadata) and catalog books (CatalogBook).
  */
-const BookCard: React.FC<BookCardProps> = ({ 
+const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({ 
   book, 
   onClick, 
   onContextMenu,
-  className = ''
-}) => {
+  className = '',
+  isFocused = false
+}, ref) => {
   const handleClick = () => onClick(book);
   
   const handleContextMenu = (e: React.MouseEvent) => {
     if (onContextMenu) {
       e.preventDefault();
       onContextMenu(book, e);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(book);
     }
   };
 
@@ -83,9 +92,13 @@ const BookCard: React.FC<BookCardProps> = ({
 
   return (
     <div 
+      ref={ref}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      className={`cursor-pointer group relative ${className}`}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      aria-label={`${book.title} by ${book.author}`}
+      className={`cursor-pointer group relative focus:outline-none ${isFocused ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-slate-900' : ''} ${className}`}
     >
       {/* Book Cover */}
       <div className="aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden shadow-lg transform group-hover:scale-105 transition-transform duration-300 book-cover-container">
@@ -137,6 +150,8 @@ const BookCard: React.FC<BookCardProps> = ({
       </div>
     </div>
   );
-};
+});
+
+BookCard.displayName = 'BookCard';
 
 export default BookCard;
