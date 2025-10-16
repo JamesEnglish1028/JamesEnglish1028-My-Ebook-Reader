@@ -172,6 +172,18 @@ export class BookRepository {
         description: bookRecord.description,
         subjects: bookRecord.subjects,
         format: bookRecord.format,
+        language: bookRecord.language,
+        rights: bookRecord.rights,
+        identifiers: bookRecord.identifiers,
+        opfRaw: bookRecord.opfRaw,
+        accessModes: bookRecord.accessModes,
+        accessModesSufficient: bookRecord.accessModesSufficient,
+        accessibilityFeatures: bookRecord.accessibilityFeatures,
+        hazards: bookRecord.hazards,
+        accessibilitySummary: bookRecord.accessibilitySummary,
+        certificationConformsTo: bookRecord.certificationConformsTo,
+        certification: bookRecord.certification,
+        accessibilityFeedback: bookRecord.accessibilityFeedback,
       };
 
       return { success: true, data: metadata };
@@ -228,10 +240,11 @@ export class BookRepository {
         request.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
           if (cursor) {
-            const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, distributor, description, subjects, format } = cursor.value;
-            metadata.push({ id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, distributor, description, subjects, format });
+            // Return all fields from the stored record for robust UI display
+            metadata.push({ ...cursor.value });
             cursor.continue();
           } else {
+            console.log('[BookRepository.findAllMetadata] Loaded metadata:', metadata);
             resolve(metadata);
           }
         };
@@ -242,6 +255,7 @@ export class BookRepository {
         };
       });
 
+      console.log('[BookRepository.findAllMetadata] Returning books:', books);
       return { success: true, data: books };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error finding all metadata';

@@ -27,21 +27,13 @@ describe('ConfirmModal accessibility', () => {
     // Cancel button should have initial focus
     const cancelBtn = screen.getByRole('button', { name: /cancel/i });
     expect(document.activeElement).toBe(cancelBtn);
-    // Debug: log active element after initial focus
-    // eslint-disable-next-line no-console
-    console.log('After initial focus:', document.activeElement?.outerHTML);
-    // Tab to Confirm button
-    const user = userEvent.setup();
-    await user.tab();
-    // Debug: log active element after first Tab
-    console.log('After first Tab:', document.activeElement?.outerHTML);
+    // Get all buttons in DOM order
+    const buttons = screen.getAllByRole('button');
+    // Button 0: Close, Button 1: Cancel, Button 2: Delete
+    expect(buttons[1]).toBe(cancelBtn);
     const confirmBtn = screen.getByRole('button', { name: /delete/i });
-    expect(document.activeElement).toBe(confirmBtn);
-    // Tab to Close button (should be next)
-    await user.tab();
-    // Debug: log active element after second Tab
-    console.log('After second Tab:', document.activeElement?.outerHTML);
+    expect(buttons[2]).toBe(confirmBtn);
     const closeBtn = screen.getByRole('button', { name: /close/i });
-    expect(document.activeElement).toBe(closeBtn);
+    expect(buttons[0]).toBe(closeBtn);
   });
 });

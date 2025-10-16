@@ -25,7 +25,6 @@ import { useGlobalShortcuts } from './hooks';
 // Service imports - using barrel exports
 import { useAuth } from './contexts/AuthContext';
 import {
-  blobUrlToBase64,
   db,
   downloadLibraryFromDrive,
   findCredentialForUrl,
@@ -36,6 +35,8 @@ import {
   saveOpdsCredential,
   uploadLibraryToDrive
 } from './services';
+import { extractBookMetadataFromOpf } from './services/epubParser';
+import { extractOpfXmlFromEpub } from './services/epubZipUtils';
 
 // Domain service imports
 import { opdsAcquisitionService } from './domain/catalog';
@@ -287,39 +288,78 @@ const AppInner: React.FC = () => {
       }
     }
 
-    // Existing EPUB processing logic
-    setImportStatus({ isLoading: true, message: 'Parsing EPUB...', error: null });
+    // Enhanced EPUB processing logic with OPF and accessibility metadata extraction
+    setImportStatus({ isLoading: true, message: 'Extracting EPUB metadata...', error: null });
+    let opfXml: string | undefined = undefined;
+    let opfMetadata: any = undefined;
+    let extractedCoverImage: string | null = null;
     try {
-      const ePub = window.ePub;
-      const book = ePub(bookData);
-      const metadata = await book.loaded.metadata;
 
-      setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
-      if (!finalCoverImage) {
-        const coverUrl = await book.coverUrl();
-        if (coverUrl) {
-          finalCoverImage = await blobUrlToBase64(coverUrl);
+      // 1. Extract OPF XML from EPUB
+      try {
+        opfXml = await extractOpfXmlFromEpub(bookData);
+        console.log('[processAndSaveBook] OPF XML extracted:', opfXml?.slice(0, 200));
+      } catch (opfErr) {
+        console.error('[processAndSaveBook] Failed to extract OPF XML:', opfErr);
+        setImportStatus({ isLoading: false, message: '', error: 'Failed to extract EPUB metadata (OPF not found). Importing with minimal info.' });
+      }
+
+      // 2. Parse OPF and accessibility metadata
+      if (opfXml) {
+        try {
+          opfMetadata = extractBookMetadataFromOpf(opfXml);
+          console.log('[processAndSaveBook] OPF metadata extracted:', opfMetadata);
+        } catch (parseErr) {
+          console.error('[processAndSaveBook] Failed to parse OPF metadata:', parseErr);
+          setImportStatus({ isLoading: false, message: '', error: 'Failed to parse EPUB metadata. Importing with minimal info.' });
         }
       }
 
-      const subjectsRaw = metadata.subject || metadata.subjects;
-      const subjects = subjectsRaw ? (Array.isArray(subjectsRaw) ? subjectsRaw.map(s => typeof s === 'object' ? s.name : s) : [subjectsRaw]) : [];
+      setImportStatus(prev => ({ ...prev, message: 'Extracting cover...' }));
+      if (!finalCoverImage) {
+        try {
+          const { extractCoverImageFromEpub } = await import('./services/epubZipUtils');
+          extractedCoverImage = await extractCoverImageFromEpub(bookData);
+          if (extractedCoverImage) {
+            finalCoverImage = extractedCoverImage;
+            console.log('[processAndSaveBook] Cover image extracted from EPUB.');
+          } else {
+            console.log('[processAndSaveBook] No cover image found in EPUB.');
+          }
+        } catch (coverErr) {
+          console.error('[processAndSaveBook] Failed to extract cover image:', coverErr);
+        }
+      }
 
-      const finalProviderId = providerId || metadata.identifier;
+      const finalProviderId = providerId || opfMetadata?.identifiers?.[0];
 
+      // Fallback to minimal metadata if OPF extraction/parsing failed
       const newBook: BookRecord = {
-        title: metadata.title || fileName,
-        author: metadata.creator || 'Unknown Author',
+        title: opfMetadata?.title || fileName,
+        author: opfMetadata?.author || authorName || 'Unknown Author',
         coverImage: finalCoverImage,
         epubData: bookData,
-        publisher: metadata.publisher,
-        publicationDate: metadata.pubdate,
+        publisher: opfMetadata?.publisher,
+        publicationDate: opfMetadata?.publicationDate,
         providerId: finalProviderId,
         providerName: providerName,
-        description: metadata.description,
-        subjects: subjects,
+        description: opfMetadata?.description,
+        subjects: opfMetadata?.subjects,
         format: 'EPUB',
+        language: opfMetadata?.language,
+        rights: opfMetadata?.rights,
+        identifiers: opfMetadata?.identifiers,
+        opfRaw: opfXml,
+        accessModes: opfMetadata?.accessModes,
+        accessModesSufficient: opfMetadata?.accessModesSufficient,
+        accessibilityFeatures: opfMetadata?.accessibilityFeatures,
+        hazards: opfMetadata?.hazards,
+        accessibilitySummary: opfMetadata?.accessibilitySummary,
+        certificationConformsTo: opfMetadata?.certificationConformsTo,
+        certification: opfMetadata?.certification,
+        accessibilityFeedback: opfMetadata?.accessibilityFeedback,
       };
+      console.log('[processAndSaveBook] BookRecord to save:', newBook);
 
       if (finalProviderId) {
         const existing = await db.findBookByIdentifier(finalProviderId);
@@ -331,6 +371,7 @@ const AppInner: React.FC = () => {
 
       setImportStatus(prev => ({ ...prev, message: 'Saving to library...' }));
       await db.saveBook(newBook);
+      console.log('[processAndSaveBook] Book saved successfully');
 
       setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
       setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
@@ -633,6 +674,7 @@ const AppInner: React.FC = () => {
   };
 
 
+  console.log('[AppInner] render', { currentView, activeOpdsSource });
   return (
     <div className="min-h-screen bg-slate-900 font-sans">
       {/* Skip link for keyboard navigation */}

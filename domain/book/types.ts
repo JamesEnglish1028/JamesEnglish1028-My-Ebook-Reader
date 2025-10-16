@@ -28,6 +28,24 @@ export interface BookMetadata {
   description?: string;
   subjects?: string[];
   format?: BookFormat;
+
+  // --- OPF/EPUB metadata extensions ---
+  language?: string;
+  rights?: string;
+  identifiers?: string[];
+  opfRaw?: string; // Raw OPF XML (optional, for debugging)
+
+  // --- Accessibility metadata (from OPF) ---
+  accessModes?: string[];
+  accessModesSufficient?: string[];
+  accessibilityFeatures?: string[];
+  hazards?: string[];
+  accessibilitySummary?: string;
+  certificationConformsTo?: string[];
+  certification?: string;
+
+  // --- User-friendly accessibility feedback (mapped) ---
+  accessibilityFeedback?: string;
 }
 
 /**
@@ -49,6 +67,24 @@ export interface BookRecord {
   description?: string;
   subjects?: string[];
   format?: BookFormat;
+
+  // --- OPF/EPUB metadata extensions ---
+  language?: string;
+  rights?: string;
+  identifiers?: string[];
+  opfRaw?: string; // Raw OPF XML (optional, for debugging)
+
+  // --- Accessibility metadata (from OPF) ---
+  accessModes?: string[];
+  accessModesSufficient?: string[];
+  accessibilityFeatures?: string[];
+  hazards?: string[];
+  accessibilitySummary?: string;
+  certificationConformsTo?: string[];
+  certification?: string;
+
+  // --- User-friendly accessibility feedback (mapped) ---
+  accessibilityFeedback?: string;
 }
 
 /**

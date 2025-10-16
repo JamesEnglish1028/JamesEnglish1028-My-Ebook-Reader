@@ -485,8 +485,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                               // Show all alternative formats with color coding
                               catalogBook.alternativeFormats.map((fmt: any, idx: number) => (
                                 <span key={idx} className={`text-white text-xs font-medium px-2 py-1 rounded-md ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                                    fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                                      'bg-sky-500'
+                                  fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                                    'bg-sky-500'
                                   }`}>
                                   {fmt.format}
                                 </span>
@@ -517,6 +517,59 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogNa
                   ))}
                 </div>
               </section>
+            )}
+
+            {/* Accessibility & OPF Metadata Section (only for library books) */}
+            {isLibraryBook(book) && (
+              (book.accessibilityFeedback || book.accessModes || book.accessibilityFeatures || book.hazards || book.accessibilitySummary || book.language || book.rights) && (
+                <section>
+                  <h3 className="text-lg font-semibold text-slate-200 mb-3">Accessibility & Metadata</h3>
+                  <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4 space-y-2">
+                    {book.accessibilityFeedback && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Summary</span>
+                        <span className="text-slate-200 text-sm">{book.accessibilityFeedback}</span>
+                      </div>
+                    )}
+                    {book.accessModes && book.accessModes.length > 0 && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Access Modes</span>
+                        <span className="text-slate-200 text-sm">{book.accessModes.join(', ')}</span>
+                      </div>
+                    )}
+                    {book.accessibilityFeatures && book.accessibilityFeatures.length > 0 && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Features</span>
+                        <span className="text-slate-200 text-sm">{book.accessibilityFeatures.join(', ')}</span>
+                      </div>
+                    )}
+                    {book.hazards && book.hazards.length > 0 && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Hazards</span>
+                        <span className="text-slate-200 text-sm">{book.hazards.join(', ')}</span>
+                      </div>
+                    )}
+                    {book.accessibilitySummary && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Notes</span>
+                        <span className="text-slate-200 text-sm">{book.accessibilitySummary}</span>
+                      </div>
+                    )}
+                    {book.language && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Language</span>
+                        <span className="text-slate-200 text-sm">{book.language}</span>
+                      </div>
+                    )}
+                    {book.rights && (
+                      <div>
+                        <span className="block text-sky-400 font-semibold mb-1">Rights</span>
+                        <span className="text-slate-200 text-sm">{book.rights}</span>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )
             )}
           </div>
         </article>

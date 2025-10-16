@@ -3,12 +3,28 @@ import type { BookMetadata, BookRecord } from '../types';
 
 import { logger } from './logger';
 
-let dbInstance: IDBDatabase | null = null;
+
+type DBApi = {
+  dbInstance: IDBDatabase | null;
+  init?: typeof init;
+  saveBook?: typeof saveBook;
+  getBooksMetadata?: typeof getBooksMetadata;
+  getAllBooks?: typeof getAllBooks;
+  getBook?: typeof getBook;
+  getBookMetadata?: typeof getBookMetadata;
+  findBookByIdentifier?: typeof findBookByIdentifier;
+  deleteBook?: typeof deleteBook;
+  clearAllBooks?: typeof clearAllBooks;
+};
+
+export const db: DBApi = {
+  dbInstance: null,
+};
 
 const init = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
-    if (dbInstance) {
-      resolve(dbInstance);
+    if (db.dbInstance) {
+      resolve(db.dbInstance);
       return;
     }
     if (typeof indexedDB === 'undefined') {
@@ -23,14 +39,14 @@ const init = (): Promise<IDBDatabase> => {
       reject(request.error);
     };
     request.onsuccess = () => {
-      dbInstance = request.result;
-      resolve(dbInstance);
+      db.dbInstance = request.result;
+      resolve(db.dbInstance);
     };
     request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
+      const dbInstance = (event.target as IDBOpenDBRequest).result;
       let store: IDBObjectStore;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+        store = dbInstance.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
         store.createIndex(DB_INDEXES.TITLE, DB_INDEXES.TITLE, { unique: false });
       } else {
         const transaction = (event.target as IDBOpenDBRequest).transaction;
@@ -56,9 +72,14 @@ const init = (): Promise<IDBDatabase> => {
 };
 
 const saveBook = async (book: BookRecord): Promise<number> => {
-  const db = await init();
+  let dbInstance: IDBDatabase;
+  try {
+    dbInstance = await init();
+  } catch (err) {
+    return Promise.reject(err);
+  }
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.put(book);
 
@@ -74,9 +95,9 @@ const saveBook = async (book: BookRecord): Promise<number> => {
 };
 
 const getBooksMetadata = async (): Promise<BookMetadata[]> => {
-  const db = await init();
+  const dbInstance = await init();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.openCursor();
     const books: BookMetadata[] = [];
@@ -84,10 +105,11 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
       if (cursor) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format } = cursor.value;
-        books.push({ id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, description, subjects, format });
+        // Return all fields from the stored BookRecord for robust UI display
+        books.push({ ...cursor.value });
         cursor.continue();
       } else {
+        console.log('[db.getBooksMetadata] Loaded metadata:', books);
         resolve(books);
       }
     };
@@ -100,13 +122,14 @@ const getBooksMetadata = async (): Promise<BookMetadata[]> => {
 };
 
 const getAllBooks = async (): Promise<BookRecord[]> => {
-  const db = await init();
+  const dbInstance = await init();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAll();
 
     request.onsuccess = () => {
+      console.log('[db.getAllBooks] Loaded books:', request.result);
       resolve(request.result as BookRecord[]);
     };
 
@@ -118,9 +141,9 @@ const getAllBooks = async (): Promise<BookRecord[]> => {
 };
 
 const getBook = async (id: number): Promise<BookRecord | undefined> => {
-  const db = await init();
+  const dbInstance = await init();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(id);
 
@@ -136,17 +159,17 @@ const getBook = async (id: number): Promise<BookRecord | undefined> => {
 };
 
 const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
-  const db = await init();
+  const dbInstance = await init();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(id);
 
     request.onsuccess = () => {
       const bookRecord = request.result as BookRecord | undefined;
       if (bookRecord) {
-        const { id, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, distributor, description, subjects, format } = bookRecord;
-        resolve({ id: id!, title, author, coverImage, publisher, publicationDate, isbn, providerId, providerName, distributor, description, subjects, format });
+        // Return all fields from the stored BookRecord for robust UI display
+        resolve({ ...bookRecord, id: bookRecord.id! });
       } else {
         resolve(null);
       }
@@ -162,12 +185,12 @@ const getBookMetadata = async (id: number): Promise<BookMetadata | null> => {
 
 const findBookByIdentifier = async (identifier: string): Promise<BookRecord | null> => {
   if (!identifier) return null;
-  const db = await init();
+  const dbInstance = await init();
 
   const search = (indexName: 'providerId' | 'isbn'): Promise<BookRecord | null> => {
     return new Promise((resolve, reject) => {
       try {
-        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const transaction = dbInstance.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
         if (!store.indexNames.contains(indexName)) {
           resolve(null);
@@ -201,9 +224,9 @@ const findBookByIdentifier = async (identifier: string): Promise<BookRecord | nu
 };
 
 const deleteBook = async (id: number): Promise<void> => {
-  const db = await init();
+  const dbInstance = await init();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.delete(id);
 
@@ -219,9 +242,9 @@ const deleteBook = async (id: number): Promise<void> => {
 };
 
 const clearAllBooks = async (): Promise<void> => {
-  const db = await init();
+  const dbInstance = await init();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.clear();
 
@@ -236,14 +259,12 @@ const clearAllBooks = async (): Promise<void> => {
   });
 };
 
-export const db = {
-  init,
-  saveBook,
-  getBooksMetadata,
-  getAllBooks,
-  getBook,
-  getBookMetadata,
-  findBookByIdentifier,
-  deleteBook,
-  clearAllBooks,
-};
+db.init = init;
+db.saveBook = saveBook;
+db.getBooksMetadata = getBooksMetadata;
+db.getAllBooks = getAllBooks;
+db.getBook = getBook;
+db.getBookMetadata = getBookMetadata;
+db.findBookByIdentifier = findBookByIdentifier;
+db.deleteBook = deleteBook;
+db.clearAllBooks = clearAllBooks;

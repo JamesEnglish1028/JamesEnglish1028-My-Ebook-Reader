@@ -122,9 +122,10 @@ const Library: React.FC<LibraryProps> = ({
     setIsLoading(true);
     try {
       const result = await bookRepository.findAllMetadata();
-
+      console.log('[Library] fetchBooks result:', result);
       if (result.success) {
         setBooks(result.data);
+        console.log('[Library] setBooks called with:', result.data);
       } else {
         // result.success is false, so result.error exists
         logger.error('Failed to fetch books from repository:', (result as { success: false; error: string }).error);
@@ -344,6 +345,7 @@ const Library: React.FC<LibraryProps> = ({
   // Migration logic moved to the hook itself
 
   useEffect(() => {
+    console.log('[Library] useEffect (library/catalog) triggered', { activeOpdsSource, catalogNavPath });
     if (activeOpdsSource) {
       // If a source is active but the path is empty (e.g., on first selection or page load), initialize it.
       if (catalogNavPath.length === 0) {
@@ -355,6 +357,7 @@ const Library: React.FC<LibraryProps> = ({
       }
     } else {
       // No active source, so show the local library.
+      console.log('[Library] useEffect: calling fetchBooks for local library');
       fetchBooks();
     }
   }, [activeOpdsSource, catalogNavPath, fetchAndParseSource, fetchBooks, setCatalogNavPath]);
@@ -853,8 +856,8 @@ const Library: React.FC<LibraryProps> = ({
                                 <span
                                   key={`${book.title}-${fmt.format}-${idx}`}
                                   className={`inline-block text-slate-50 text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                                      fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' :
-                                        'bg-sky-600'
+                                    fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' :
+                                      'bg-sky-600'
                                     }`}
                                   title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
                                 >
@@ -863,8 +866,8 @@ const Library: React.FC<LibraryProps> = ({
                               ))
                             ) : book.format && (
                               <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                                  book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                                    'bg-sky-500'
+                                book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                                  'bg-sky-500'
                                 }`}>
                                 {book.format}
                               </span>
@@ -916,6 +919,7 @@ const Library: React.FC<LibraryProps> = ({
         {isLoading ? (
           <div className="flex justify-center mt-20"><Spinner /></div>
         ) : books.length > 0 ? (
+          (() => { console.log('[Library] Rendering books:', books, 'Sorted:', sortedBooks); return null; })(),
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
             {sortedBooks.map((book) => (
               <div key={book.id} onClick={() => book.id && handleLocalBookClick(book)} className="cursor-pointer group relative">
@@ -947,8 +951,8 @@ const Library: React.FC<LibraryProps> = ({
                         <span
                           key={`${book.title}-${fmt.format}-${idx}`}
                           className={`inline-block text-slate-50 text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                              fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' :
-                                'bg-sky-600'
+                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-700' :
+                              'bg-sky-600'
                             }`}
                           title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
                         >
@@ -957,8 +961,8 @@ const Library: React.FC<LibraryProps> = ({
                       ))
                     ) : (
                       <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${(book.format || 'EPUB').toUpperCase() === 'PDF' ? 'bg-red-600' :
-                          (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                            'bg-sky-500'
+                        (book.format || 'EPUB').toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                          'bg-sky-500'
                         }`}>
                         {book.format || 'EPUB'}
                       </span>
@@ -1438,8 +1442,8 @@ const Library: React.FC<LibraryProps> = ({
                     <button
                       onClick={() => handleCollectionChange('all')}
                       className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${(catalogNavPath.length <= 1 && (collectionMode === 'all' || !collectionMode))
-                          ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
-                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
+                        ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
                         }`}
                     >
                       All Books

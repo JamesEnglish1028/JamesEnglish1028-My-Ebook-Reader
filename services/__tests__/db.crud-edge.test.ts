@@ -42,9 +42,9 @@ describe('db.ts - error paths, edge cases, CRUD', () => {
   });
 
   it('handles error when IndexedDB is unavailable', async () => {
-    // Clear dbInstance cache and simulate IndexedDB failure
-    // @ts-ignore
-    db.dbInstance = null;
+  // Clear dbInstance cache and simulate IndexedDB failure
+  // @ts-ignore
+  db.dbInstance = null;
     const orig = window.indexedDB;
     // @ts-ignore
     delete window.indexedDB;

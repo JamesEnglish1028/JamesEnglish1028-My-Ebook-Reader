@@ -176,8 +176,9 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
   if (typeof jsonData !== 'object' || jsonData === null) {
     throw new Error('Invalid OPDS2 catalog format: input is not an object');
   }
+  // If metadata is missing, default to empty object (for edge-case feeds)
   if (!jsonData.metadata) {
-    throw new Error('OPDS2 catalog missing required metadata');
+    jsonData.metadata = {};
   }
   console.log('[OPDS2] parseOpds2Json CALLED with baseUrl:', baseUrl, 'jsonData keys:', Object.keys(jsonData));
   const books: CatalogBook[] = [];

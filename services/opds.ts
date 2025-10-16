@@ -352,9 +352,9 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     }
 
 
-    // Throw if <feed> has no <entry> elements (empty feed)
+    // If <feed> has no <entry> elements (empty feed), return empty books and navLinks (do not throw)
     if (rootNodeName && (rootNodeName.toLowerCase() === 'feed' || rootNodeName.endsWith(':feed')) && entries.length === 0) {
-        throw new Error('This appears to be a valid Atom feed, but it contains no entries. Please ensure the URL points to an OPDS catalog.');
+        return { books: [], navLinks: [], pagination };
     }
     // Throw if <feed> has entries but no OPDS content
     if (rootNodeName && (rootNodeName.toLowerCase() === 'feed' || rootNodeName.endsWith(':feed')) && entries.length > 0 && books.length === 0 && navLinks.length === 0) {
@@ -368,8 +368,9 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     if (!jsonData || typeof jsonData !== 'object') {
         throw new Error('Invalid catalog format. The response was not a valid JSON object.');
     }
+    // If metadata is missing, default to empty object (for edge-case feeds)
     if (!jsonData.metadata) {
-        throw new Error('Invalid OPDS 2.0 feed. The required "metadata" object is missing.');
+        jsonData.metadata = {};
     }
 
     const books: CatalogBook[] = [];
