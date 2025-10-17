@@ -8,6 +8,7 @@
 
 import { DB_INDEXES, DB_NAME, DB_VERSION, STORE_NAME } from '../../constants';
 import { logger } from '../../services/logger';
+
 import type { BookMetadata, BookRecord } from './types';
 
 /**

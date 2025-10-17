@@ -1,4 +1,5 @@
 import React from 'react';
+
 import {
   LocalStorageModal,
   NetworkDebugModal,
@@ -6,7 +7,6 @@ import {
   SettingsModal,
   ShortcutHelpModal,
 } from '..';
-
 import type { CredentialPrompt } from '../../types';
 
 interface GlobalModalsProps {

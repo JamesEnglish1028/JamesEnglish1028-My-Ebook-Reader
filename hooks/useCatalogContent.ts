@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { logger } from '../services/logger';
 import { fetchCatalogContent } from '../services/opds';
 import type { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
@@ -40,7 +41,7 @@ export function useCatalogContent(
   url: string | null,
   baseUrl: string,
   opdsVersion: 'auto' | '1' | '2' = 'auto',
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
   return useQuery({
     queryKey: catalogKeys.content(url || '', baseUrl, opdsVersion),
@@ -81,10 +82,10 @@ export function useCatalogContent(
 
       if (isFeedARegistry && result.pagination) {
         const paginationUrls = Object.values(result.pagination).filter(
-          (val): val is string => !!val
+          (val): val is string => !!val,
         );
         finalNavLinks = result.navLinks.filter(
-          nav => !paginationUrls.includes(nav.url)
+          nav => !paginationUrls.includes(nav.url),
         );
       }
 
@@ -113,7 +114,7 @@ export function useCatalogContent(
  */
 export function useCatalogRootCollections(
   books: CatalogBook[],
-  navLinks: CatalogNavigationLink[]
+  navLinks: CatalogNavigationLink[],
 ): string[] {
   if (books.length === 0) return [];
 

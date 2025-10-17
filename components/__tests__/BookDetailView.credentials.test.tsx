@@ -25,26 +25,24 @@ describe('BookDetailView credential retry using stored creds', () => {
 
     // First resolve attempt with stored creds should succeed and return final href
     const spyResolve = vi.spyOn(opds, 'resolveAcquisitionChainOpds1')
-      .mockImplementationOnce(async (href: string, creds: any) => {
+      .mockImplementationOnce(async (_href: string, creds: any) => {
         // Expect that stored creds are passed in the first call
         expect(creds).toBeDefined();
         expect(creds.username).toBe(stored.username);
         return 'https://cdn.example/content/book.epub';
       });
 
-    const mockFetch = vi.fn(async (_url: string, _opts?: any) => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
+  const mockFetch = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
     (globalThis as any).fetch = mockFetch;
 
     // Test harness similar to real app import flow
     const TestHarness: React.FC = () => {
       const [importStatus, setImportStatus] = useState({ isLoading: false, message: '', error: null as string | null });
 
-      const handleImportFromCatalog = async (book: CatalogBook) => {
-        try {
-          // BookDetailView will call resolveAcquisitionChainOpds1 internally when palace-type
-          // For this harness we don't need to do anything here; return success false to allow UI path
-          return { success: false };
-        } catch (e) { return { success: false }; }
+      const handleImportFromCatalog = async () => {
+        // BookDetailView will call resolveAcquisitionChainOpds1 internally when palace-type
+        // For this harness we don't need to do anything here; return success false to allow UI path
+        return { success: false };
       };
 
       const sample: CatalogBook = { title: 'Auth Book', author: 'A', coverImage: null, downloadUrl: 'https://opds.example/borrow/1', summary: null, providerId: 'p1', format: 'EPUB', acquisitionMediaType: 'application/adobe+epub' };

@@ -7,6 +7,7 @@
 
 import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
+
 import type { Bookmark } from './types';
 
 /**

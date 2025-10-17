@@ -2,8 +2,10 @@
 // EPUB/OPF metadata and accessibility extraction service
 
 
-import { BookMetadata } from '../domain/book/types';
 import { DOMParser } from 'xmldom';
+
+import type { BookMetadata } from '../domain/book/types';
+
 import {
   accessibilityFeatureMap,
   accessibilityHazardMap,

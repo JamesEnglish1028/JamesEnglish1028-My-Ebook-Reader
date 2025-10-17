@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { useFocusTrap } from '../hooks';
 import type { Catalog, CatalogRegistry } from '../types';
 
@@ -39,7 +40,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
 
     const modalRef = useFocusTrap<HTMLDivElement>({
         isActive: isOpen,
-        onEscape: onClose
+        onEscape: onClose,
     });
 
     if (!isOpen) return null;

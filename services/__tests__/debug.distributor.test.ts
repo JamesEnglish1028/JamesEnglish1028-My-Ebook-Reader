@@ -1,6 +1,8 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
+/* global __dirname */
+
 import { describe, it, expect } from 'vitest';
 
 import { parseOpds1Xml } from '../opds';

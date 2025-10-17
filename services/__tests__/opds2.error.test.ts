@@ -17,7 +17,7 @@ describe('fetchOpds2Feed - error conditions', () => {
   it('returns 401 status and empty books when unauthorized without credentials', async () => {
     (globalThis as any).fetch = vi.fn(async () => ({
       status: 401,
-      headers: { get: (k: string) => null },
+  headers: { get: () => null },
       text: async () => 'Unauthorized',
     }));
 
@@ -34,7 +34,7 @@ describe('fetchOpds2Feed - error conditions', () => {
       expect(headers['Authorization'] || headers['authorization']).toBeDefined();
       // return a valid OPDS JSON feed
       const body = JSON.stringify({ metadata: { title: 'OK' }, publications: [] });
-      return { status: 200, headers: { get: (k: string) => k.toLowerCase() === 'content-type' ? 'application/opds+json' : null }, text: async () => body };
+  return { status: 200, headers: { get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/opds+json' : null }, text: async () => body };
     });
 
     const res = await fetchOpds2Feed(url, credentials);
@@ -45,7 +45,7 @@ describe('fetchOpds2Feed - error conditions', () => {
   it('returns 429 status for rate-limited responses', async () => {
     (globalThis as any).fetch = vi.fn(async () => ({
       status: 429,
-      headers: { get: (k: string) => null },
+  headers: { get: () => null },
       text: async () => 'Too Many Requests',
     }));
 
@@ -57,7 +57,7 @@ describe('fetchOpds2Feed - error conditions', () => {
   it('throws when JSON is malformed', async () => {
     (globalThis as any).fetch = vi.fn(async () => ({
       status: 200,
-      headers: { get: (k: string) => k.toLowerCase() === 'content-type' ? 'application/opds+json' : null },
+  headers: { get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/opds+json' : null },
       text: async () => 'not a json',
     }));
 

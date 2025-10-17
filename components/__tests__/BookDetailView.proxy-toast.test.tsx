@@ -1,9 +1,10 @@
 import React from 'react';
 
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, test, expect, vi } from 'vitest';
 
+import { resolveAcquisitionChainOpds1 } from '../../services/opds';
 import BookDetailView from '../BookDetailView';
 import { ToastProvider } from '../toast/ToastContext';
 import ToastStack from '../toast/ToastStack';
@@ -12,10 +13,6 @@ import ToastStack from '../toast/ToastStack';
 vi.mock('../../services/opds', () => ({
   resolveAcquisitionChainOpds1: vi.fn(),
 }));
-
-import { resolveAcquisitionChainOpds1 } from '../../services/opds';
-
-const noop = () => {};
 
 const sampleCatalogBook = {
   title: 'Proxy Test Book',

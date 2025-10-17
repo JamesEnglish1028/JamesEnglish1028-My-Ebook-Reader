@@ -1,6 +1,7 @@
 
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { useGlobalShortcuts } from '../useGlobalShortcuts';
 
 describe('useGlobalShortcuts', () => {
@@ -8,8 +9,8 @@ describe('useGlobalShortcuts', () => {
     const action = vi.fn();
     renderHook(() => useGlobalShortcuts({
       shortcuts: [
-        { key: 'a', description: 'Test', action }
-      ]
+        { key: 'a', description: 'Test', action },
+      ],
     }));
     // Patch: Provide a valid event.target for jsdom
     const button = document.createElement('button');

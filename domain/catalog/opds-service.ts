@@ -9,10 +9,11 @@
 import { logger } from '../../services/logger';
 import { parseOpds1Xml, resolveAcquisitionChainOpds1 } from '../../services/opds';
 import { parseOpds2Json, resolveAcquisitionChain as resolveOpds2 } from '../../services/opds2';
+
 import type {
   CatalogBook,
   CatalogNavigationLink,
-  CatalogPagination
+  CatalogPagination,
 } from './types';
 
 /**
@@ -57,7 +58,7 @@ export class OPDSParserService {
 
       logger.info('OPDS 1 parse successful', {
         bookCount: result.books.length,
-        navLinkCount: result.navLinks.length
+        navLinkCount: result.navLinks.length,
       });
 
       return {
@@ -65,8 +66,8 @@ export class OPDSParserService {
         data: {
           books: result.books,
           navLinks: result.navLinks,
-          pagination: result.pagination
-        }
+          pagination: result.pagination,
+        },
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error parsing OPDS 1';
@@ -90,7 +91,7 @@ export class OPDSParserService {
 
       logger.info('OPDS 2 parse successful', {
         bookCount: result.books.length,
-        navLinkCount: result.navLinks.length
+        navLinkCount: result.navLinks.length,
       });
 
       return {
@@ -98,8 +99,8 @@ export class OPDSParserService {
         data: {
           books: result.books,
           navLinks: result.navLinks,
-          pagination: result.pagination
-        }
+          pagination: result.pagination,
+        },
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error parsing OPDS 2';
@@ -188,7 +189,7 @@ export class OPDSAcquisitionService {
   async resolveOPDS2(
     href: string,
     credentials?: { username: string; password: string } | null,
-    maxRedirects = 5
+    maxRedirects = 5,
   ): Promise<ParserResult<string>> {
     try {
       logger.info('Resolving OPDS 2 acquisition chain', { href });
@@ -210,7 +211,7 @@ export class OPDSAcquisitionService {
         success: false,
         error: errorMessage,
         status: error?.status,
-        proxyUsed: error?.proxyUsed
+        proxyUsed: error?.proxyUsed,
       };
     }
   }
@@ -226,7 +227,7 @@ export class OPDSAcquisitionService {
   async resolveOPDS1(
     href: string,
     credentials?: { username: string; password: string } | null,
-    maxRedirects = 5
+    maxRedirects = 5,
   ): Promise<ParserResult<string>> {
     try {
       logger.info('Resolving OPDS 1 acquisition chain', { href });
@@ -248,7 +249,7 @@ export class OPDSAcquisitionService {
         success: false,
         error: errorMessage,
         status: error?.status,
-        proxyUsed: error?.proxyUsed
+        proxyUsed: error?.proxyUsed,
       };
     }
   }
@@ -266,7 +267,7 @@ export class OPDSAcquisitionService {
     href: string,
     version: OPDSVersion = 'auto',
     credentials?: { username: string; password: string } | null,
-    maxRedirects = 5
+    maxRedirects = 5,
   ): Promise<ParserResult<string>> {
     if (version === '2') {
       return this.resolveOPDS2(href, credentials, maxRedirects);

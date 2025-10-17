@@ -1,6 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
-import { BookRecord } from '../../domain/book/types';
+
+import type { BookRecord } from '../../domain/book/types';
 import { db } from '../db';
 
 describe('DB and repository accessibility roundtrip', () => {

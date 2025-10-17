@@ -1,6 +1,8 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
+/* global __dirname */
+
 import { describe, test, expect } from 'vitest';
 
 import { parseOpds1Xml, groupBooksByMode, getAvailableCollections, filterBooksByCollection } from '../opds';

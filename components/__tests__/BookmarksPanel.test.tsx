@@ -1,7 +1,9 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import BookmarksPanel, { Bookmark } from '../BookmarksPanel';
+
+import type { Bookmark } from '../BookmarksPanel';
+import BookmarksPanel from '../BookmarksPanel';
 
 describe('BookmarksPanel', () => {
   const bookmarks: Bookmark[] = [
@@ -20,7 +22,7 @@ describe('BookmarksPanel', () => {
         onDelete={onDelete}
         isOpen={true}
         onClose={onClose}
-      />
+      />,
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Bookmarks')).toBeInTheDocument();
@@ -36,7 +38,7 @@ describe('BookmarksPanel', () => {
         onDelete={onDelete}
         isOpen={true}
         onClose={onClose}
-      />
+      />,
     );
     expect(screen.getByText(/no bookmarks/i)).toBeInTheDocument();
   });
@@ -49,7 +51,7 @@ describe('BookmarksPanel', () => {
         onDelete={onDelete}
         isOpen={true}
         onClose={onClose}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText(/go to bookmark: chapter 1/i));
     expect(onNavigate).toHaveBeenCalledWith('epubcfi(/6/2[chapter1]!/4/1:0)');
@@ -63,7 +65,7 @@ describe('BookmarksPanel', () => {
         onDelete={onDelete}
         isOpen={true}
         onClose={onClose}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText(/delete bookmark: chapter 2/i));
     expect(onDelete).toHaveBeenCalledWith('2');
@@ -77,7 +79,7 @@ describe('BookmarksPanel', () => {
         onDelete={onDelete}
         isOpen={true}
         onClose={onClose}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText(/close bookmarks panel/i));
     expect(onClose).toHaveBeenCalled();
@@ -91,7 +93,7 @@ describe('BookmarksPanel', () => {
         onDelete={onDelete}
         isOpen={false}
         onClose={onClose}
-      />
+      />,
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

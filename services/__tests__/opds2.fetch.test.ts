@@ -9,7 +9,7 @@ describe('fetchOpds2Feed', () => {
   beforeEach(() => {
     originalFetch = (globalThis as any).fetch;
     // Clear any previous cached etag for deterministic tests
-    try { localStorage.removeItem('mebooks.opds.etag.' + encodeURIComponent(url)); } catch {}
+    try { localStorage.removeItem('mebooks.opds.etag.' + encodeURIComponent(url)); } catch { /* ignore */ }
   });
 
   afterEach(() => {
@@ -20,13 +20,15 @@ describe('fetchOpds2Feed', () => {
   it('sends If-None-Match when an ETag is cached and returns 304 result', async () => {
     setCachedEtag(url, '"abc123"');
 
-    const mockFetch = vi.fn(async (u: string, opts: any) => {
+    const mockFetch = vi.fn(async (_u: string, _opts: any) => {
+      // mark params used to satisfy linter
+      void _u; void _opts;
       // assert that the proxied URL was called and header contains If-None-Match
-      const headers = opts?.headers || {};
+      const headers = _opts?.headers || {};
       expect(headers['If-None-Match'] || headers['If-None-Match'.toLowerCase()]).toBe('"abc123"');
       return {
         status: 304,
-        headers: { get: (k: string) => null },
+        headers: { get: () => null },
         text: async () => '',
       };
     });
@@ -42,7 +44,8 @@ describe('fetchOpds2Feed', () => {
 
   it('parses JSON response and stores ETag', async () => {
     const body = JSON.stringify({ metadata: { title: 'Feed' }, publications: [{ metadata: { title: 'X' }, links: [{ href: '/x', rel: 'http://opds-spec.org/acquisition/borrow', type: 'application/epub+zip' }] }] });
-    const mockFetch = vi.fn(async (u: string, opts: any) => {
+    const mockFetch = vi.fn(async (_u: string, _opts: any) => {
+      void _u; void _opts;
       return {
         status: 200,
         headers: { get: (k: string) => k.toLowerCase() === 'etag' ? '"etag-200"' : (k.toLowerCase() === 'content-type' ? 'application/opds+json' : null) },

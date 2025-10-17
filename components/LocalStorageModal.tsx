@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+
 import { useFocusTrap } from '../hooks';
 import { db } from '../services/db';
 
@@ -16,7 +17,7 @@ const LocalStorageModal: React.FC<LocalStorageModalProps> = ({ isOpen, onClose }
 
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   useEffect(() => {

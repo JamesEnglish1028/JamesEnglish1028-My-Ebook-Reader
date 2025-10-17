@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { useFocusTrap } from '../hooks';
 import { isDebug, maybeProxyForCors, proxiedUrl } from '../services/utils';
 
@@ -11,7 +12,7 @@ const NetworkDebugModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   if (!isDebug()) return null;

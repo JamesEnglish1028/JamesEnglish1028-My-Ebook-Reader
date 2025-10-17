@@ -1,5 +1,6 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { logger } from '../logger';
 
 describe('logger.ts - logger methods', () => {

@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
+
 import { useFocusTrap } from '../hooks';
+
 import { CloseIcon } from './icons';
 
 interface ConfirmModalProps {
@@ -18,7 +20,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title = 'Confirm', 
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
     onEscape: onClose,
-    initialFocusRef: cancelBtnRef
+    initialFocusRef: cancelBtnRef,
   });
 
 

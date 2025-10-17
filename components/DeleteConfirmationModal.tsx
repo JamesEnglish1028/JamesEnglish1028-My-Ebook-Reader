@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { useFocusTrap } from '../hooks';
+
 import { CloseIcon, TrashIcon } from './icons';
 
 interface DeleteConfirmationModalProps {
@@ -12,7 +14,7 @@ interface DeleteConfirmationModalProps {
 const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ isOpen, onClose, onConfirm, bookTitle }) => {
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   if (!isOpen) return null;

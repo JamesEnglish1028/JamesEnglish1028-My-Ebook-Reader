@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 
 export interface KeyboardNavigationOptions {
   /**
@@ -63,7 +63,7 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
     onActivate,
     onEscape,
     preventDefault = true,
-    stopPropagation = false
+    stopPropagation = false,
   } = options;
 
   // Store callbacks in refs to avoid recreating the event listener
@@ -217,12 +217,12 @@ export function useGridNavigation(options: GridNavigationOptions) {
     enableActivation: true,
     onArrowKey: handleArrowKey,
     onActivate: handleActivate,
-    preventDefault: true
+    preventDefault: true,
   });
 
   return {
     focusedIndex,
-    setFocusedIndex
+    setFocusedIndex,
   };
 }
 

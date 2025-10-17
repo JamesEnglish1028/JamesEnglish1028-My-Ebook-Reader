@@ -1,4 +1,5 @@
 import React from 'react';
+
 import Spinner from '../Spinner';
 
 type LoadingVariant = 'spinner' | 'skeleton' | 'inline' | 'page';

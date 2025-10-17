@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+
 import { useFocusTrap } from '../hooks';
+
 import { CloseIcon } from './icons';
 
 interface CitationModalProps {
@@ -17,7 +19,7 @@ const CitationModal: React.FC<CitationModalProps> = ({ isOpen, onClose, onSave }
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
     initialFocusRef: textareaRef,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   useEffect(() => {

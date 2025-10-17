@@ -33,10 +33,10 @@ describe('Import flow with authDocument', () => {
         e.authDocument = authDoc;
         throw e;
       })
-      .mockImplementationOnce(async (_href: string, _creds: any) => 'https://cdn.example/content/book.epub');
+    .mockImplementationOnce(async () => 'https://cdn.example/content/book.epub');
 
     // Mock fetch for download: respond with ok and an ArrayBuffer
-    const mockFetch = vi.fn(async (_url: string, _opts?: any) => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
+  const mockFetch = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
     (globalThis as any).fetch = mockFetch;
 
     // Test harness mimicking App import flow
@@ -69,13 +69,13 @@ describe('Import flow with authDocument', () => {
         }
       };
 
-      const handleCredentialSubmit = async (username: string, password: string, save: boolean) => {
+  const handleCredentialSubmit = async (username: string, password: string) => {
         if (!credentialPrompt.pendingHref) return;
         setCredentialPrompt(prev => ({ ...prev, isOpen: false }));
         setImportStatus({ isLoading: true, message: 'Retrying download...', error: null });
         try {
-          const resolved = await opds2.resolveAcquisitionChain(credentialPrompt.pendingHref!, { username, password });
-          const proxy = proxiedUrl(resolved!);
+          const resolved = await opds2.resolveAcquisitionChain(credentialPrompt.pendingHref ?? '', { username, password });
+          const proxy = proxiedUrl(resolved ?? '');
           const resp = await fetch(proxy, { headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` } });
           if (!resp.ok) throw new Error('Download failed');
           await resp.arrayBuffer();

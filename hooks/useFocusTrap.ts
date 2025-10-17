@@ -53,7 +53,7 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>(options: Focus
       'input:not([disabled])',
       'select:not([disabled])',
       '[tabindex]:not([tabindex="-1"])',
-      '[contenteditable]'
+      '[contenteditable]',
     ].join(',');
 
     const elements = Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors));

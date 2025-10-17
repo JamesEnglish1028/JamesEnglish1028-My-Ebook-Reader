@@ -1,10 +1,11 @@
 
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { useCatalogs } from '../useCatalogs';
 
 vi.mock('../useLocalStorage', () => ({
-  useLocalStorage: (key: string, defaultValue: any) => [[], vi.fn(), vi.fn()]
+  useLocalStorage: () => [[], vi.fn(), vi.fn()],
 }));
 
 describe('useCatalogs', () => {

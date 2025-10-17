@@ -1,6 +1,7 @@
 
 import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { useFocusTrap } from '../useFocusTrap';
 
 describe('useFocusTrap', () => {

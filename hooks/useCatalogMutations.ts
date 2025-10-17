@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
+
 import { LIBRARY_KEYS } from '../constants';
 import { logger } from '../services/logger';
 import type { Catalog, CatalogRegistry } from '../types';
+
 import { useLocalStorage } from './useLocalStorage';
 
 /**
@@ -95,7 +97,7 @@ export function useUpdateCatalogMutation() {
             return updatedCatalog;
           }
           return c;
-        })
+        }),
       );
 
       if (!updatedCatalog) {
@@ -225,7 +227,7 @@ export function useUpdateRegistryMutation() {
             return updatedRegistry;
           }
           return r;
-        })
+        }),
       );
 
       if (!updatedRegistry) {

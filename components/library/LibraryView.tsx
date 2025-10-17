@@ -1,11 +1,14 @@
-import { useQueryClient } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useQueryClient } from '@tanstack/react-query';
+
 import { mebooksBook } from '../../assets';
 import { bookKeys, useCatalogs, useLocalStorage } from '../../hooks';
 import type { BookMetadata, BookRecord, Catalog, CatalogBook, CatalogRegistry, CoverAnimationData } from '../../types';
 import DuplicateBookModal from '../DuplicateBookModal';
 import { ChevronDownIcon, SettingsIcon } from '../icons';
 import ManageCatalogsModal from '../ManageCatalogsModal';
+
 import { CatalogView } from './catalog';
 import { ImportButton, LocalLibraryView, SortControls } from './local';
 
@@ -213,7 +216,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
 
       console.log('[LibraryView] File read successfully, calling processAndSaveBook...', {
         fileName,
-        size: arrayBuffer.byteLength
+        size: arrayBuffer.byteLength,
       });
 
       try {
@@ -249,7 +252,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
         error: reader.error,
         errorName: reader.error?.name,
         errorMessage: reader.error?.message,
-        event: e
+        event: e,
       });
       setImportStatus({ isLoading: false, message: '', error: `File read error: ${reader.error?.message || 'Unknown error'}` });
       event.target.value = '';

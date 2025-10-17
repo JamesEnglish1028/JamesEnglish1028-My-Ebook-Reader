@@ -8,6 +8,7 @@
 import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
 import type { BookMetadata } from '../book/types';
+
 import type { Citation, CitationFormat, FormattedCitation } from './types';
 
 /**
@@ -408,7 +409,7 @@ export class CitationService {
             pre: `${formattedAuthor} (${year}). `,
             title,
             post: `. ${publisher}.`,
-            isItalic: true
+            isItalic: true,
           };
 
         case 'mla':
@@ -416,7 +417,7 @@ export class CitationService {
             pre: `${formattedAuthor}. `,
             title,
             post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
-            isItalic: true
+            isItalic: true,
           };
 
         case 'chicago':
@@ -424,7 +425,7 @@ export class CitationService {
             pre: `${formattedAuthor}. `,
             title,
             post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
-            isItalic: false
+            isItalic: false,
           };
 
         default:
@@ -432,7 +433,7 @@ export class CitationService {
             pre: `${author}. `,
             title,
             post: `.`,
-            isItalic: false
+            isItalic: false,
           };
       }
     } catch (error) {
@@ -441,7 +442,7 @@ export class CitationService {
         pre: '',
         title: book.title || 'Untitled Book',
         post: '',
-        isItalic: false
+        isItalic: false,
       };
     }
   }
@@ -459,7 +460,7 @@ export class CitationService {
 
     return {
       format,
-      text
+      text,
     };
   }
 

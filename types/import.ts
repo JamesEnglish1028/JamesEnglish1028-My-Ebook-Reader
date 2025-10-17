@@ -325,7 +325,7 @@ export function createImportError(
         errorType?: ImportError['errorType'];
         retryable?: boolean;
         details?: unknown;
-    }
+    },
 ): ImportError {
     return {
         kind: 'error',

@@ -25,13 +25,13 @@ describe('BookDetailView when stored credentials fail', () => {
     // First call with stored creds fails with authDocument error
     const authDoc = { title: 'Login', links: [{ href: 'https://auth.example', rel: 'authenticate' }] };
     vi.spyOn(opds, 'resolveAcquisitionChainOpds1')
-      .mockImplementationOnce(async (_href: string, _creds: any) => { const e: any = new Error('auth required'); e.status = 401; e.authDocument = authDoc; throw e; })
-      .mockImplementationOnce(async (_href: string, _creds: any) => { const e: any = new Error('auth required'); e.status = 401; e.authDocument = authDoc; throw e; });
+      .mockImplementationOnce(async () => { const e: any = new Error('auth required'); e.status = 401; e.authDocument = authDoc; throw e; })
+      .mockImplementationOnce(async () => { const e: any = new Error('auth required'); e.status = 401; e.authDocument = authDoc; throw e; });
 
     const TestHarness: React.FC = () => {
       const [importStatus, setImportStatus] = useState({ isLoading: false, message: '', error: null as string | null });
 
-      const handleImportFromCatalog = async (book: CatalogBook) => {
+      const handleImportFromCatalog = async () => {
         return { success: false };
       };
 

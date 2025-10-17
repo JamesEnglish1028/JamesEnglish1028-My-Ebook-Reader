@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { AudienceMode, FictionMode, MediaMode } from '../../../types';
 
 interface FilterOption<T> {

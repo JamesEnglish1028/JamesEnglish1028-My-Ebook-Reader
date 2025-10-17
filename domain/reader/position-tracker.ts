@@ -8,6 +8,7 @@
 
 import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
+
 import type { ReadingPosition } from './types';
 
 /**
@@ -295,7 +296,7 @@ export class PositionTrackerService {
   createLocationInfo(
     currentPage: number,
     totalPages: number,
-    progress?: number
+    progress?: number,
   ): LocationInfo {
     const calculatedProgress = progress !== undefined
       ? progress

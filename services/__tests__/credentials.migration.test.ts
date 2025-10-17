@@ -9,8 +9,8 @@ async function clearAll() {
     for (const c of all) {
       await deleteCredential(c.host);
     }
-  } catch (e) {
-    // ignore
+  } catch {
+    /* ignore */
   }
 }
 
@@ -45,8 +45,8 @@ describe('credentials migration', () => {
     // The credential should now be in IDB
     const found = await findCredential('catalog.example.org');
     expect(found).toBeDefined();
-    expect(found!.username).toBe('alice');
-    expect(found!.password).toBe('s3cr3t');
+  expect(found?.username).toBe('alice');
+  expect(found?.password).toBe('s3cr3t');
 
     // getAllCredentials should contain the entry
     const all = await getAllCredentials();
@@ -68,10 +68,10 @@ describe('credentials migration', () => {
     const a = await findCredential('catalog.example.org');
     // Should still be bob/initial
     expect(a).toBeDefined();
-    expect(a!.username).toBe('bob');
+  expect(a?.username).toBe('bob');
 
     const b = await findCredential('another.example');
     expect(b).toBeDefined();
-    expect(b!.username).toBe('carol');
+  expect(b?.username).toBe('carol');
   });
 });

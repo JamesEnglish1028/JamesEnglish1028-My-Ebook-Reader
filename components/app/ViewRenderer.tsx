@@ -1,12 +1,11 @@
 import React from 'react';
+
 import {
   AboutPage,
   BookDetailView,
   ErrorBoundary,
   ReaderView,
 } from '..';
-import LibraryView from '../library/LibraryView';
-
 import type {
   BookMetadata,
   BookRecord,
@@ -15,6 +14,8 @@ import type {
   CatalogRegistry,
   CoverAnimationData,
 } from '../../types';
+import LibraryView from '../library/LibraryView';
+
 
 interface ViewRendererProps {
   currentView: 'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about';

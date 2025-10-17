@@ -1,3 +1,5 @@
+/* global __dirname */
+
 import * as fs from 'fs';
 import * as path from 'path';
 

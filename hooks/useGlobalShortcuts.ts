@@ -135,7 +135,7 @@ export function useGlobalShortcuts(options: GlobalShortcutsOptions) {
         matchingShortcut.action(event);
       }
     },
-    [enabled, preventInInputs]
+    [enabled, preventInInputs],
   );
 
   useEffect(() => {
@@ -176,7 +176,7 @@ export const shortcutRegistry: ShortcutAction[] = [];
 export function registerShortcut(shortcut: ShortcutAction) {
   // Check for conflicts
   const existing = shortcutRegistry.find(
-    (s) => s.key === shortcut.key && s.ctrl === shortcut.ctrl && s.shift === shortcut.shift && s.alt === shortcut.alt
+    (s) => s.key === shortcut.key && s.ctrl === shortcut.ctrl && s.shift === shortcut.shift && s.alt === shortcut.alt,
   );
 
   if (existing) {

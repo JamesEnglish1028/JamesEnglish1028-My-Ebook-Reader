@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+/* global __dirname */
+
 import { describe, test, expect } from 'vitest';
 
 import { parseOpds1Xml } from '../opds';

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { getFormatFromMimeType, parseOpds1Xml } from '../opds';
 
 describe('opds.ts - error handling and edge cases', () => {

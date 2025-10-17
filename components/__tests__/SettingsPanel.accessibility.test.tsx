@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
 import SettingsPanel from '../SettingsPanel';
 
 const baseSettings = {
@@ -27,7 +28,7 @@ describe('SettingsPanel accessibility', () => {
   it('has correct ARIA roles and supports keyboard navigation', async () => {
     const onClose = vi.fn();
     render(
-      <SettingsPanel isOpen={true} onClose={onClose} settings={baseSettings} onSettingsChange={() => { }} />
+      <SettingsPanel isOpen={true} onClose={onClose} settings={baseSettings} onSettingsChange={() => { }} />,
     );
     // Dialog has role dialog
     const dialog = screen.getByRole('dialog');

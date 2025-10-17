@@ -12,17 +12,17 @@ export type { SortOrder } from './useSortedBooks';
 // React Query hooks for async data
 export {
   bookKeys, useBookMetadata, useBooks, useDeleteBook,
-  useUpdateBook
+  useUpdateBook,
 } from './useBooks';
 
 export {
   catalogKeys, useCatalogContent,
-  useCatalogRootCollections
+  useCatalogRootCollections,
 } from './useCatalogContent';
 
 // Catalog management mutations
 export {
-  catalogManagementKeys, useAddCatalog, useAddRegistry, useDeleteCatalogMutation, useDeleteRegistryMutation, useUpdateCatalogMutation, useUpdateRegistryMutation
+  catalogManagementKeys, useAddCatalog, useAddRegistry, useDeleteCatalogMutation, useDeleteRegistryMutation, useUpdateCatalogMutation, useUpdateRegistryMutation,
 } from './useCatalogMutations';
 
 // Accessibility hooks

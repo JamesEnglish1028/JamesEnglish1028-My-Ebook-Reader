@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 
-import { parseOpds1Xml, extractCollectionNavigation, groupBooksByMode, getAvailableCollections, filterBooksByCollection } from '../opds';
+import { parseOpds1Xml, extractCollectionNavigation, getAvailableCollections, filterBooksByCollection } from '../opds';
 
 describe('OPDS 1 Collection Navigation', () => {
   test('extracts collection navigation links from OPDS 1 books', () => {

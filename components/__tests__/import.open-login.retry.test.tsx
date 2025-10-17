@@ -25,9 +25,9 @@ describe('Open provider login + Retry flow', () => {
         const e: any = new Error('auth required');
         e.status = 401; e.authDocument = authDoc; throw e;
       })
-      .mockImplementationOnce(async (_href: string, _creds: any) => 'https://cdn.example/content/book.epub');
+  .mockImplementationOnce(async () => 'https://cdn.example/content/book.epub');
 
-    const mockFetch = vi.fn(async (_url: string, _opts?: any) => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
+  const mockFetch = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
     (globalThis as any).fetch = mockFetch;
 
     // Harness that mimics App import flow for a single BookDetailView
@@ -47,31 +47,29 @@ describe('Open provider login + Retry flow', () => {
         return { success: false };
       };
 
-      const handleCredentialSubmit = async (username: string, password: string, save: boolean) => {
+      const handleCredentialSubmit = async (username: string, password: string) => {
         if (!credentialPrompt.pendingHref) return;
         setCredentialPrompt(prev => ({ ...prev, isOpen: false }));
         try {
-          const resolved = await opds2.resolveAcquisitionChain(credentialPrompt.pendingHref!, { username, password });
-          const proxy = proxiedUrl(resolved!);
+          const resolved = await opds2.resolveAcquisitionChain(credentialPrompt.pendingHref ?? '', { username, password });
+          const proxy = proxiedUrl(resolved ?? '');
           const resp = await fetch(proxy, { headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` } });
           if (!resp.ok) throw new Error('Download failed');
           await resp.arrayBuffer();
-        } catch (e) {
-          // ignore for test
-        }
+        } catch { /* ignore */ }
       };
 
-      const handleOpenAuthLink = (href: string) => { /* record or telemetry in real app */ };
+  // no-op for test
       const handleRetry = async () => {
         if (!credentialPrompt.pendingHref) return;
         try {
           const resolved = await opds2.resolveAcquisitionChain(credentialPrompt.pendingHref, null);
-          const proxy = proxiedUrl(resolved!);
+          const proxy = proxiedUrl(resolved ?? '');
           const resp = await fetch(proxy);
           if (!resp.ok) throw new Error('Download failed');
           await resp.arrayBuffer();
           setCredentialPrompt({ isOpen: false, host: null, pendingHref: null, pendingBook: null });
-        } catch (e) { }
+  } catch { /* ignore */ }
       };
 
       const sample: CatalogBook = { title: 'Auth Book', author: 'A', coverImage: null, downloadUrl: 'https://opds.example/borrow/1', summary: null, providerId: 'p1', format: 'EPUB' };
@@ -79,7 +77,7 @@ describe('Open provider login + Retry flow', () => {
       return (
         <div>
           <BookDetailView book={sample} source="catalog" onBack={() => {}} onReadBook={() => {}} onImportFromCatalog={handleImportFromCatalog} importStatus={importStatus} setImportStatus={setImportStatus} />
-          <OpdsCredentialsModal isOpen={credentialPrompt.isOpen} host={credentialPrompt.host} authDocument={credentialPrompt.authDocument} onClose={() => setCredentialPrompt(prev => ({ ...prev, isOpen: false }))} onSubmit={handleCredentialSubmit} onOpenAuthLink={handleOpenAuthLink} onRetry={handleRetry} />
+          <OpdsCredentialsModal isOpen={credentialPrompt.isOpen} host={credentialPrompt.host} authDocument={credentialPrompt.authDocument} onClose={() => setCredentialPrompt(prev => ({ ...prev, isOpen: false }))} onSubmit={handleCredentialSubmit} onRetry={handleRetry} />
         </div>
       );
     };

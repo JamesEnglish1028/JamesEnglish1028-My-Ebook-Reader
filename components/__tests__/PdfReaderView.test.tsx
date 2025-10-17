@@ -1,16 +1,17 @@
 // Mock URL.revokeObjectURL for jsdom
-global.URL.revokeObjectURL = vi.fn();
+globalThis.URL.revokeObjectURL = vi.fn();
 // Mock URL.createObjectURL for jsdom
-global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
 // Mock ResizeObserver for jsdom
 class ResizeObserverMock {
   observe() { }
   unobserve() { }
   disconnect() { }
 }
-global.ResizeObserver = ResizeObserverMock;
+globalThis.ResizeObserver = ResizeObserverMock;
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
 import PdfReaderView from '../PdfReaderView';
 
 // Mock react-router-dom hooks

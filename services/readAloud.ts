@@ -36,7 +36,7 @@ const SENTENCE_REGEX = new RegExp(
  */
 export const findSentenceRange = (
   text: string,
-  index: number
+  index: number,
 ): { start: number; end: number; sentence: string } | null => {
   SENTENCE_REGEX.lastIndex = 0; // Reset regex state for global flag
   let match;
@@ -70,7 +70,7 @@ export const findSentenceRange = (
 export const findDomRangeFromCharacterOffsets = (
   root: Node,
   startOffset: number,
-  endOffset: number
+  endOffset: number,
 ): Range | null => {
   const doc = root.ownerDocument;
   if (!doc) return null;

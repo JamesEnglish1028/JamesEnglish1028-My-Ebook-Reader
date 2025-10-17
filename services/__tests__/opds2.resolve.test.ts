@@ -10,7 +10,7 @@ describe('resolveAcquisitionChain', () => {
   it('follows POST and reads URL from JSON body', async () => {
     (globalThis as any).fetch = vi.fn(async () => ({
       status: 200,
-      headers: { get: (k: string) => 'application/json' },
+      headers: { get: () => 'application/json' },
       json: async () => ({ url: 'https://cdn.example/content/book.epub' }),
       text: async () => '{}',
     }));

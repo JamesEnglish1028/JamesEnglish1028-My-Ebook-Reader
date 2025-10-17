@@ -328,7 +328,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
           r === 'http://opds-spec.org/acquisition/borrow' ||
           r === 'http://opds-spec.org/acquisition/loan' ||
           r === 'http://opds-spec.org/acquisition/open-access' ||
-          r.includes('/open-access')
+          r.includes('/open-access'),
         );
         if (isAcq) {
           const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);

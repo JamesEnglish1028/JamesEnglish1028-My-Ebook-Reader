@@ -1,5 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
+
 import { parseOpfMetadata } from '../epubParser';
 
 const opfWithAccessibility = `<?xml version="1.0" encoding="utf-8"?>

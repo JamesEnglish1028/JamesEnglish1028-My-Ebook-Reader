@@ -1,14 +1,15 @@
 
+import React from 'react';
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { useAddCatalog } from '../useCatalogMutations';
 
 vi.mock('../useLocalStorage', () => ({
-  useLocalStorage: () => [[], vi.fn(), vi.fn()]
+  useLocalStorage: () => [[], vi.fn(), vi.fn()],
 }));
-
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 describe('useAddCatalog', () => {
   it('returns a mutation object', () => {

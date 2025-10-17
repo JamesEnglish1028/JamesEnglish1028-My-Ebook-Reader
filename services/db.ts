@@ -4,7 +4,7 @@ import type { BookMetadata, BookRecord } from '../types';
 import { logger } from './logger';
 
 
-type DBApi = {
+interface DBApi {
   dbInstance: IDBDatabase | null;
   init?: typeof init;
   saveBook?: typeof saveBook;
@@ -15,7 +15,7 @@ type DBApi = {
   findBookByIdentifier?: typeof findBookByIdentifier;
   deleteBook?: typeof deleteBook;
   clearAllBooks?: typeof clearAllBooks;
-};
+}
 
 export const db: DBApi = {
   dbInstance: null,

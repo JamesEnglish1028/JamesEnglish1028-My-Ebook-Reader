@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { deleteCredential, findCredential, getAllCredentials, migrateFromLocalStorage, saveCredential } from '../credentials';
 
 async function clearAll() {
@@ -7,7 +8,7 @@ async function clearAll() {
     for (const c of all) {
       await deleteCredential(c.host);
     }
-  } catch { }
+  } catch { /* ignore */ }
 }
 
 describe('credentials.ts - CRUD and edge/error cases', () => {
@@ -24,7 +25,7 @@ describe('credentials.ts - CRUD and edge/error cases', () => {
     await saveCredential('host1', 'user1', 'pw1');
     let found = await findCredential('host1');
     expect(found).toBeDefined();
-    expect(found!.username).toBe('user1');
+  expect(found?.username).toBe('user1');
     await deleteCredential('host1');
     found = await findCredential('host1');
     expect(found).toBeUndefined();

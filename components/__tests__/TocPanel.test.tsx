@@ -1,10 +1,11 @@
 import React from 'react';
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 
 import type { ReaderSettings } from '../../types';
-import { BookRecord } from '../../types';
+// BookRecord type import removed (not used in this test)
 import TocPanel from '../TocPanel';
 
 const mockSettings: ReaderSettings = {
@@ -53,10 +54,11 @@ describe('TocPanel', () => {
       />,
     );
 
-    // Label click should navigate
-    const chapterButton = screen.getByLabelText(/Go to Chapter 1/i);
-    fireEvent.click(chapterButton);
-    expect(onTocNavigate).toHaveBeenCalledWith('chapter1.html');
+  // Label click should navigate
+  const chapterButton = screen.getByLabelText(/Go to Chapter 1/i);
+  const user = userEvent.setup();
+  await user.click(chapterButton);
+  expect(onTocNavigate).toHaveBeenCalledWith('chapter1.html');
 
     // Chevron click should expand subitems but not call navigate
     const chevronButtons = screen.getAllByRole('button');
@@ -64,7 +66,7 @@ describe('TocPanel', () => {
     const chevron = chevronButtons.find(b => b.getAttribute('aria-label')?.includes('Expand'));
     expect(chevron).toBeDefined();
     if (chevron) {
-      fireEvent.click(chevron);
+      await user.click(chevron);
       // subitem should now be in the document
       expect(await screen.findByText('Section 1')).toBeTruthy();
     }

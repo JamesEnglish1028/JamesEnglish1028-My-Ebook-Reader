@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+
 import { useFocusTrap } from '../hooks';
 import { maybeProxyForCors } from '../services/utils';
 
@@ -56,7 +57,7 @@ const OpdsCredentialsModal: React.FC<Props> = ({ isOpen, host, authDocument, onC
 
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   if (!isOpen) return null;

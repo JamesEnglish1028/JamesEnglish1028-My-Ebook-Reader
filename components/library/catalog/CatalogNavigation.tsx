@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { CatalogPagination } from '../../../types';
 import { ChevronRightIcon, LeftArrowIcon, RightArrowIcon } from '../../icons';
 

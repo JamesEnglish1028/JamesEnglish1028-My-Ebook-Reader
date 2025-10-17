@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { proxiedUrl } from '../../../services/utils';
 import type { BookMetadata, CatalogBook } from '../../../types';
 
@@ -21,7 +22,7 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
   onClick,
   onContextMenu,
   className = '',
-  isFocused = false
+  isFocused = false,
 }, ref) => {
   const handleClick = () => onClick(book);
 

@@ -1,7 +1,10 @@
 
+import React from 'react';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { useBooks } from '../useBooks';
 
 vi.mock('../../domain/book', () => ({
@@ -10,9 +13,9 @@ vi.mock('../../domain/book', () => ({
       success: true, data: [
         { id: 1, title: 'Book 1', author: 'Author 1', coverImage: null },
         { id: 2, title: 'Book 2', author: 'Author 2', coverImage: null },
-      ]
-    })
-  }
+      ],
+    }),
+  },
 }));
 
 describe('useBooks', () => {

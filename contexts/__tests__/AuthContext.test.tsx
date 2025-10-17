@@ -1,6 +1,8 @@
-import { act, render, screen } from '@testing-library/react';
 import React from 'react';
+
+import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { AuthProvider, useAuth } from '../AuthContext';
 vi.mock('../../services/google', () => ({
   revokeToken: vi.fn(),
@@ -38,7 +40,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <Consumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
     expect(screen.getByTestId('user')).toHaveTextContent('none');
     expect(screen.getByTestId('logged-in')).toHaveTextContent('no');
@@ -54,7 +56,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <Consumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
     act(() => {
       screen.getByText('Sign Out').click();

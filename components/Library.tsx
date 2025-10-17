@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { mebooksBook } from '../assets';
 import { bookRepository } from '../domain/book';
 import { SORT_OPTIONS, useCatalogs, useLocalStorage, useSortedBooks } from '../hooks';
 import { db } from '../services/db';
@@ -8,7 +9,6 @@ import { fetchCatalogContent, filterBooksByFiction, filterBooksByMedia, getAvail
 import { proxiedUrl } from '../services/utils';
 import type { AudienceMode, BookMetadata, BookRecord, Catalog, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogRegistry, CategorizationMode, CategoryLane, Collection, CollectionGroup, CollectionMode, CoverAnimationData, FictionMode, MediaMode } from '../types';
 
-import { mebooksBook } from '../assets';
 import { CategoryLaneComponent } from './CategoryLane';
 import { CollectionLane } from './CollectionLane';
 import DeleteConfirmationModal from './DeleteConfirmationModal';

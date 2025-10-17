@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusTrap } from '../hooks';
 
@@ -42,7 +43,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onUpload
 
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: handleClose
+    onEscape: handleClose,
   });
 
   if (!isOpen) return null;

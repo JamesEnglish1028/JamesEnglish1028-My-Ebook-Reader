@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { useFocusTrap } from '../hooks';
+
 import { CloseIcon } from './icons';
 
 interface DuplicateBookModalProps {
@@ -13,7 +15,7 @@ interface DuplicateBookModalProps {
 const DuplicateBookModal: React.FC<DuplicateBookModalProps> = ({ isOpen, onClose, onReplace, onAddAnyway, bookTitle }) => {
   const modalRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   if (!isOpen) return null;

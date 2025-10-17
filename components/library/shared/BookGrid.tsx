@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+
 import { useKeyboardNavigation } from '../../../hooks';
 import type { BookMetadata, CatalogBook } from '../../../types';
 import Spinner from '../../Spinner';
@@ -110,7 +111,7 @@ const BookGrid: React.FC<BookGridProps> = ({
     enableActivation: isGridActive && books.length > 0,
     onArrowKey: handleArrowKey,
     onActivate: handleActivate,
-    preventDefault: true
+    preventDefault: true,
   });
 
   // Handle focus on grid container

@@ -1,6 +1,8 @@
-import { act, render, screen } from '@testing-library/react';
 import React from 'react';
+
+import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import { ConfirmProvider, useConfirm } from '../ConfirmContext';
 
 // Mock ToastContext to avoid side effects
@@ -26,7 +28,7 @@ describe('ConfirmContext', () => {
     render(
       <ConfirmProvider>
         <Consumer />
-      </ConfirmProvider>
+      </ConfirmProvider>,
     );
     act(() => {
       screen.getByText('Ask').click();

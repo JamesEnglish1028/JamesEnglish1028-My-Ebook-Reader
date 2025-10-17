@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+
 import { SORT_OPTIONS } from '../../../hooks';
 import { AdjustmentsVerticalIcon } from '../../icons';
 

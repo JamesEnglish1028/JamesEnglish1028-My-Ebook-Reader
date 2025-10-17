@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+
 import { useCatalogContent } from '../../../hooks';
 import { filterBooksByAudience, filterBooksByFiction, filterBooksByMedia, getAvailableAudiences, getAvailableCategories, getAvailableCollections, getAvailableFictionModes, getAvailableMediaModes, groupBooksByMode } from '../../../services/opds';
 import type { AudienceMode, Catalog, CatalogBook, CatalogNavigationLink, CatalogRegistry, CategorizationMode, CategoryLane, CollectionGroup, CollectionMode, FictionMode, MediaMode } from '../../../types';
@@ -62,17 +63,27 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     ? (activeOpdsSource as any).opdsVersion || 'auto'
     : 'auto';
 
+  // Clear local display state when switching sources or navigation URL so stale
+  // books/caches don't remain visible while the new feed loads.
+  useEffect(() => {
+    setCatalogBooks([]);
+    setCategoryLanes([]);
+    setUncategorizedBooks([]);
+    setCatalogCollections([]);
+    setShowCategoryView(false);
+  }, [currentUrl, activeOpdsSource?.id]);
+
   // Fetch catalog content using React Query
   const {
     data: catalogData,
     isLoading,
     error,
-    refetch
+    refetch,
   } = useCatalogContent(
     currentUrl,
     activeOpdsSource?.url || '',
     opdsVersion,
-    !!activeOpdsSource // Only fetch if source is active
+    !!activeOpdsSource, // Only fetch if source is active
   );
 
   // Extract data from query result
@@ -128,7 +139,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     let finalFiltered = mediaFiltered;
     if (collectionMode !== 'all' && catalogNavPath.length <= 1) {
       finalFiltered = mediaFiltered.filter(book =>
-        book.collections?.some(c => c.title === collectionMode)
+        book.collections?.some(c => c.title === collectionMode),
       );
     }
 
@@ -150,7 +161,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
           audienceMode,
           fictionMode,
           mediaMode,
-          collectionMode
+          collectionMode,
         );
         setCategoryLanes(grouped.categoryLanes);
         setUncategorizedBooks(grouped.uncategorizedBooks);
@@ -282,7 +293,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
                 (link) =>
                   (link.rel === 'collection' || link.rel === 'subsection') &&
                   link.title === category &&
-                  link.url.includes('/groups/')
+                  link.url.includes('/groups/'),
               );
               if (categoryNavLink) {
                 handleCategoryNavigate(categoryNavLink);

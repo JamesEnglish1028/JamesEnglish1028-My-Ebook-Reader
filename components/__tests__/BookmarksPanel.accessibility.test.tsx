@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+
 import BookmarksPanel from '../BookmarksPanel';
 
 describe('BookmarksPanel accessibility', () => {
@@ -18,7 +19,7 @@ describe('BookmarksPanel accessibility', () => {
         bookmarks={bookmarks}
         onNavigate={onNavigate}
         onDelete={onDelete}
-      />
+      />,
     );
     // Panel has role dialog
     const dialog = screen.getByRole('dialog');

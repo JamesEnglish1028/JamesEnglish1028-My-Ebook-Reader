@@ -426,7 +426,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 
             // Separate open-access links
             const openAccessLinks = acquisitionLinks.filter((l: any) =>
-                l.rel?.includes('/open-access') || l.rel === 'http://opds-spec.org/acquisition/open-access'
+                l.rel?.includes('/open-access') || l.rel === 'http://opds-spec.org/acquisition/open-access',
             );
 
             // Prefer open-access EPUB over PDF as primary (EPUB is generally more reliable)
@@ -449,7 +449,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
                         format: fmt,
                         downloadUrl: new URL(link.href, baseUrl).href,
                         mediaType: link.type,
-                        isOpenAccess: openAccessLinks.includes(link)
+                        isOpenAccess: openAccessLinks.includes(link),
                     });
                 }
             }

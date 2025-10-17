@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { maybeProxyForCors, proxiedUrl } from '../utils';
 
 describe('utils.ts - proxiedUrl and maybeProxyForCors', () => {

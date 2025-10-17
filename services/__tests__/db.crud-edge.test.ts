@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+
 import { db } from '../db';
 
 describe('db.ts - error paths, edge cases, CRUD', () => {

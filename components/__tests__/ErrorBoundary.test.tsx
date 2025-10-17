@@ -1,6 +1,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+
 import ErrorBoundary from '../ErrorBoundary';
 
 const ProblemChild = () => {
@@ -16,7 +17,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary onReset={onReset}>
         <ProblemChild />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
     expect(screen.getByText(/test error/i)).toBeInTheDocument();
@@ -27,7 +28,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary onReset={onReset}>
         <div>Safe Child</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText('Safe Child')).toBeInTheDocument();
   });
@@ -37,7 +38,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary onReset={onReset}>
         <ProblemChild />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /try again/i }));

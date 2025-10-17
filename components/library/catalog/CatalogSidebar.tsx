@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import type { CatalogNavigationLink, CollectionMode } from '../../../types';
 
 interface CatalogSidebarProps {
@@ -53,7 +54,7 @@ const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
       (link) =>
         (link.rel === 'collection' || link.rel === 'subsection') &&
         link.title === category &&
-        link.url.includes('/groups/')
+        link.url.includes('/groups/'),
     );
 
     if (categoryNavLink && activeOpdsSource) {

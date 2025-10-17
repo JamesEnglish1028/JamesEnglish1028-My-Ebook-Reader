@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
+
 import { formatShortcut, useFocusTrap, type ShortcutAction } from '../hooks';
+
 import { AdjustmentsVerticalIcon, MinusIcon, PlusIcon } from './icons';
 import Tooltip from './Tooltip';
 
@@ -20,7 +22,7 @@ const ShortcutHelpModal: React.FC<Props> = ({ isOpen, onClose, onZoomIn, onZoomO
   const dialogRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
     initialFocusRef: closeButtonRef,
-    onEscape: onClose
+    onEscape: onClose,
   });
 
   if (!isOpen) return null;

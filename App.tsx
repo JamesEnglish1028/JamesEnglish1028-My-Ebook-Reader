@@ -1,6 +1,7 @@
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+
 import { QueryClient, QueryClientProvider, QueryErrorResetBoundary } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
 // Styles required by react-pdf layers
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -13,17 +14,18 @@ import {
   ScreenReaderAnnouncer,
   SplashScreen,
   useConfirm,
-  useToast
+  useToast,
 } from './components';
 // Import new LibraryView from refactored structure
 // Import app-level components
 import { GlobalModals, ViewRenderer } from './components/app';
 
 // Hooks imports
+import { useAuth } from './contexts/AuthContext';
+import { opdsAcquisitionService } from './domain/catalog';
 import { useGlobalShortcuts } from './hooks';
 
 // Service imports - using barrel exports
-import { useAuth } from './contexts/AuthContext';
 import {
   db,
   downloadLibraryFromDrive,
@@ -33,13 +35,12 @@ import {
   logger,
   maybeProxyForCors,
   saveOpdsCredential,
-  uploadLibraryToDrive
+  uploadLibraryToDrive,
 } from './services';
 import { extractBookMetadataFromOpf } from './services/epubParser';
 import { extractOpfXmlFromEpub } from './services/epubZipUtils';
 
 // Domain service imports
-import { opdsAcquisitionService } from './domain/catalog';
 
 // Type imports - kept separate as they're from a single file
 import type {
@@ -415,7 +416,7 @@ const AppInner: React.FC = () => {
         const resolveResult = await opdsAcquisitionService.resolve(
           book.downloadUrl,
           'auto',
-          cred ? { username: cred.username, password: cred.password } : null
+          cred ? { username: cred.username, password: cred.password } : null,
         );
 
         if (resolveResult.success) {
