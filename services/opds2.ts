@@ -176,10 +176,6 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
   if (typeof jsonData !== 'object' || jsonData === null) {
     throw new Error('Invalid OPDS2 catalog format: input is not an object');
   }
-  // If metadata is missing, default to empty object (for edge-case feeds)
-  if (!jsonData.metadata) {
-    jsonData.metadata = {};
-  }
   console.log('[OPDS2] parseOpds2Json CALLED with baseUrl:', baseUrl, 'jsonData keys:', Object.keys(jsonData));
   const books: CatalogBook[] = [];
   const navLinks: CatalogNavigationLink[] = [];
@@ -407,12 +403,28 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     });
   }
 
+  // After attempting to parse publications/navigation, validate that the
+  // feed isn't completely empty. Some providers omit top-level metadata but
+  // still include publications; accept those. Only throw when there is no
+  // metadata and no publications (and nothing was parsed into books/navLinks).
+  const hasMetadata = jsonData.metadata && typeof jsonData.metadata === 'object';
+  const hasPublications = Array.isArray(jsonData.publications) && jsonData.publications.length > 0;
+  if (!hasMetadata && !hasPublications && books.length === 0 && navLinks.length === 0) {
+    throw new Error('OPDS2 feed is missing required metadata');
+  }
+
   // navigation fallback
   if (jsonData.navigation && Array.isArray(jsonData.navigation)) {
     jsonData.navigation.forEach((link: any) => {
       if (link.href && link.title) {
         const url = new URL(link.href, baseUrl).href;
-        navLinks.push({ title: link.title, url, rel: link.rel || '' });
+        // Some registries omit a rel on navigation items but provide a type
+        // indicating the target is itself an OPDS catalog. Treat those as
+        // subsections/catalogs so the UI can present them as terminal catalog
+        // links (able to be added) rather than opaque unrelated links.
+        const inferredRel = link.rel || (link.type && typeof link.type === 'string' && link.type.includes('application/opds+json') ? 'subsection' : '');
+        const isCatalog = !!(link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) || !!link.isCatalog;
+        navLinks.push({ title: link.title, url, rel: inferredRel, isCatalog });
       }
     });
   }

@@ -10,6 +10,7 @@ This README summarizes the current state (features implemented), developer setup
 - Library: import EPUB and PDF files and store them locally in IndexedDB.
 - EPUB reader: paginated and scrolled flows, font-family and font-size customization, themes (light/dark), bookmarks, citations, full-text search, and read-aloud (TTS).
 - PDF reader: DOM-based PDF rendering using react-pdf/pdfjs (lazy-loaded) with per-book zoom and fit controls and a TOC mapped from PDF outlines.
+- PDF reader: DOM-based PDF rendering using react-pdf/pdfjs (lazy-loaded) with per-book zoom and fit controls and a TOC mapped from PDF outlines. Note: PDFs are supported — the project ships with a bundle-friendly pdf.worker import and the app requires compatible `pdfjs-dist`/worker versions; the dev environment pins compatible versions to avoid the worker/API mismatch.
 - Keyboard shortcuts: navigation and reader controls are available via keyboard (help overlay lists shortcuts).
 - Accessibility: focus management and aria attributes on modals and the help overlay; keyboard-trappable help dialog.
 - Persistence: per-book last-read positions, per-book view state (PDF zoom / EPUB font-size), bookmarks, and citations saved in LocalStorage and IndexedDB.
@@ -79,7 +80,7 @@ Run the test suite:
 npm run test
 ```
 
-**Test Status**: ✅ 89/89 tests passing (100% pass rate)
+- **Test Status**: ✅ All tests passing locally (200 passed, 0 failed)
 
 Current test coverage:
 - OPDS 1 & 2 parsing
@@ -87,6 +88,10 @@ Current test coverage:
 - Credential handling
 - Book detail views
 - Import flows
+
+Recent test updates: additional OPDS2 unit tests were added to cover:
+- Publications-only OPDS2 feeds (feeds that omit top-level metadata but contain publications)
+- Registry navigation inference (treat navigation items with type `application/opds+json` as catalog entries so registries like Fulcrum show their catalogs correctly in the UI)
 
 Linting:
 
@@ -131,6 +136,9 @@ See the migration guide for usage examples and best practices.
 - ✅ Added comprehensive logging to all domain operations
 - ✅ Full backward compatibility maintained
 - ✅ 89/89 tests passing
+ - ✅ Full backward compatibility maintained
+ - ✅ Tests updated and expanded for OPDS2 parsing and registry handling (current suite: 200 tests locally)
+ - ✅ OPDS2 parsing: accept publications-only feeds and infer registry navigation items (type=application/opds+json) as terminal catalog entries so registries surface properly in the UI
 
 ### Previous Features
 - Added EPUB font-size zoom and per-book persistence.

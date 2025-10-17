@@ -352,8 +352,20 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     }
 
 
-    // If <feed> has no <entry> elements (empty feed), return empty books and navLinks (do not throw)
+    // If <feed> has no <entry> elements (empty feed), decide whether to
+    // throw or return empty results. Some callers/tests expect an empty
+    // result for feeds that include only descriptive metadata (e.g. a
+    // <title>), while truly empty feeds with no child elements should be
+    // treated as errors. Check for presence of common feed-level elements
+    // such as <title> or <link> before deciding.
     if (rootNodeName && (rootNodeName.toLowerCase() === 'feed' || rootNodeName.endsWith(':feed')) && entries.length === 0) {
+        // Use namespace-agnostic DOM methods to check for feed-level content.
+        const feedEl = xmlDoc.documentElement;
+        const hasTitle = !!(feedEl && feedEl.getElementsByTagName('title') && feedEl.getElementsByTagName('title').length > 0);
+        const hasLink = !!(feedEl && feedEl.getElementsByTagName('link') && feedEl.getElementsByTagName('link').length > 0);
+        if (!hasTitle && !hasLink) {
+            throw new Error('The feed contains no entries.');
+        }
         return { books: [], navLinks: [], pagination };
     }
     // Throw if <feed> has entries but no OPDS content
@@ -368,9 +380,10 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     if (!jsonData || typeof jsonData !== 'object') {
         throw new Error('Invalid catalog format. The response was not a valid JSON object.');
     }
-    // If metadata is missing, default to empty object (for edge-case feeds)
+    // If metadata is missing, treat as an invalid feed — callers expect an error
+    // when required OPDS2 metadata is absent.
     if (!jsonData.metadata) {
-        jsonData.metadata = {};
+        throw new Error('OPDS2 feed missing metadata');
     }
 
     const books: CatalogBook[] = [];
@@ -536,7 +549,9 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
         jsonData.navigation.forEach((link: any) => {
             if (link.href && link.title) {
                 const url = new URL(link.href, baseUrl).href;
-                navLinks.push({ title: link.title, url, rel: link.rel || '' });
+                const inferredRel = link.rel || (link.type && typeof link.type === 'string' && link.type.includes('application/opds+json') ? 'subsection' : '');
+                const isCatalog = !!(link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) || !!link.isCatalog;
+                navLinks.push({ title: link.title, url, rel: inferredRel, isCatalog });
             }
         });
     }
