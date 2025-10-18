@@ -49,6 +49,6 @@ jobs:
           # show the account we're authenticated as (helps debug permissions)
           wrangler whoami
 
-          # Use wrangler v4 deploy. wrangler will read wrangler.toml from the repo root.
-          # Use --cwd (v4) to set working directory for deploy
-          wrangler deploy --cwd .
+          # Deploy from the proxy/ directory where proxy/wrangler.toml lives
+          wrangler whoami
+          wrangler deploy --cwd proxy
