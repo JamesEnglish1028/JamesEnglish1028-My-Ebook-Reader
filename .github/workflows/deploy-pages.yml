@@ -18,6 +18,8 @@ jobs:
       - name: Build
         run: npm run build
       - name: Verify Pages secrets
+        env:
+          RESOLVED_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT_NAME || secrets.CF_PAGES_PROJECT_NAME }}
         run: |
           if [ -z "${{ secrets.CF_PAGES_API_TOKEN }}" ]; then
             echo "Error: CF_PAGES_API_TOKEN is not set in repository secrets.";
@@ -27,8 +29,8 @@ jobs:
             echo "Error: CF_ACCOUNT_ID is not set in repository secrets.";
             exit 1;
           fi
-          if [ -z "${{ secrets.CF_PAGES_PROJECT_NAME }}" ]; then
-            echo "Error: CF_PAGES_PROJECT_NAME is not set in repository secrets.";
+          if [ -z "$RESOLVED_PAGES_PROJECT" ]; then
+            echo "Error: CF_PAGES_PROJECT_NAME is not set in repository variables or secrets.";
             exit 1;
           fi
 
@@ -37,5 +39,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_PAGES_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: ${{ secrets.CF_PAGES_PROJECT_NAME }}
+          # Prefer repository variable, fallback to secret for compatibility
+          projectName: ${{ vars.CF_PAGES_PROJECT_NAME || secrets.CF_PAGES_PROJECT_NAME }}
           directory: ./dist
