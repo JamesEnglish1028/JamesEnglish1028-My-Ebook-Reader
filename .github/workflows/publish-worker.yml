@@ -1,0 +1,26 @@
+name: Publish Worker
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  publish-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm ci
+      - name: Publish Worker with Wrangler
+        uses: cloudflare/wrangler-action@2
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          command: publish
+        env:
+          # If your proxy worker requires secrets, set them in the Cloudflare dashboard
+          # or use Wrangler secrets; do not store them in the repo.
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
