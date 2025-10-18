@@ -17,6 +17,21 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Verify Pages secrets
+        run: |
+          if [ -z "${{ secrets.CF_PAGES_API_TOKEN }}" ]; then
+            echo "Error: CF_PAGES_API_TOKEN is not set in repository secrets.";
+            exit 1;
+          fi
+          if [ -z "${{ secrets.CF_ACCOUNT_ID }}" ]; then
+            echo "Error: CF_ACCOUNT_ID is not set in repository secrets.";
+            exit 1;
+          fi
+          if [ -z "${{ secrets.CF_PAGES_PROJECT_NAME }}" ]; then
+            echo "Error: CF_PAGES_PROJECT_NAME is not set in repository secrets.";
+            exit 1;
+          fi
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
