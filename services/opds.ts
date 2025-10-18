@@ -181,14 +181,16 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     // Extract pagination links from feed-level link elements
     const feedLinks = Array.from(xmlDoc.querySelectorAll('feed > link'));
     feedLinks.forEach(link => {
-        const rel = link.getAttribute('rel');
+        const relRaw = link.getAttribute('rel') || '';
+        const rel = String(relRaw).toLowerCase();
         const href = link.getAttribute('href');
         if (href) {
             const fullUrl = new URL(href, baseUrl).href;
-            if (rel === 'next') pagination.next = fullUrl;
-            if (rel === 'previous') pagination.prev = fullUrl;
-            if (rel === 'first') pagination.first = fullUrl;
-            if (rel === 'last') pagination.last = fullUrl;
+            // Be tolerant of rel variants and full URIs (e.g. rel="prev" or rel="http://opds-spec.org/rel/previous")
+            if (rel.includes('next')) pagination.next = fullUrl;
+            if (rel.includes('prev') || rel.includes('previous')) pagination.prev = fullUrl;
+            if (rel.includes('first')) pagination.first = fullUrl;
+            if (rel.includes('last')) pagination.last = fullUrl;
         }
     });
 

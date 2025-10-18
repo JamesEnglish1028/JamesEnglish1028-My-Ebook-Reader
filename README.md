@@ -9,7 +9,6 @@ This README summarizes the current state (features implemented), developer setup
 
 - Library: import EPUB and PDF files and store them locally in IndexedDB.
 - EPUB reader: paginated and scrolled flows, font-family and font-size customization, themes (light/dark), bookmarks, citations, full-text search, and read-aloud (TTS).
-- PDF reader: DOM-based PDF rendering using react-pdf/pdfjs (lazy-loaded) with per-book zoom and fit controls and a TOC mapped from PDF outlines.
 - PDF reader: DOM-based PDF rendering using react-pdf/pdfjs (lazy-loaded) with per-book zoom and fit controls and a TOC mapped from PDF outlines. Note: PDFs are supported — the project ships with a bundle-friendly pdf.worker import and the app requires compatible `pdfjs-dist`/worker versions; the dev environment pins compatible versions to avoid the worker/API mismatch.
 - Keyboard shortcuts: navigation and reader controls are available via keyboard (help overlay lists shortcuts).
 - Accessibility: focus management and aria attributes on modals and the help overlay; keyboard-trappable help dialog.

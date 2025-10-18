@@ -187,16 +187,17 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
   if (jsonData.links && Array.isArray(jsonData.links)) {
     jsonData.links.forEach((link: any) => {
       if (link.href && link.rel) {
-        const rels = toArray(link.rel).map((r: any) => String(r));
+        const rels = toArray(link.rel).map((r: any) => String(r).toLowerCase());
         const fullUrl = new URL(link.href, baseUrl).href;
-        if (rels.includes('next')) pagination.next = fullUrl;
-        if (rels.includes('previous')) pagination.prev = fullUrl;
-        if (rels.includes('first')) pagination.first = fullUrl;
-        if (rels.includes('last')) pagination.last = fullUrl;
+        // Accept both 'prev' and 'previous' and tolerate full-rel URIs
+        if (rels.some((r: string) => r.includes('next'))) pagination.next = fullUrl;
+        if (rels.some((r: string) => r.includes('prev') || r.includes('previous'))) pagination.prev = fullUrl;
+        if (rels.some((r: string) => r.includes('first'))) pagination.first = fullUrl;
+        if (rels.some((r: string) => r.includes('last'))) pagination.last = fullUrl;
 
         // Extract navigation links with collection, subsection, or other navigation relations
-        if (link.title && (rels.includes('collection') || rels.includes('subsection') ||
-          rels.includes('section') || rels.includes('related'))) {
+        if (link.title && (rels.some((r: string) => r.includes('collection')) || rels.some((r: string) => r.includes('subsection')) ||
+          rels.some((r: string) => r.includes('section')) || rels.some((r: string) => r.includes('related')))) {
           navLinks.push({ title: link.title, url: fullUrl, rel: rels[0] || '' });
         }
       }

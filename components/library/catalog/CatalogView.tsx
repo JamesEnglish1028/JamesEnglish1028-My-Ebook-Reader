@@ -52,6 +52,8 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const [catalogCollections, setCatalogCollections] = useState<CollectionGroup[]>([]);
   const [uncategorizedBooks, setUncategorizedBooks] = useState<CatalogBook[]>([]);
   const [catalogBooks, setCatalogBooks] = useState<CatalogBook[]>([]);
+  // Local page history stack to synthesize "previous" when feeds omit it
+  const [pageHistory, setPageHistory] = useState<string[]>([]);
 
   // Get current URL from navigation path
   const currentUrl = catalogNavPath.length > 0
@@ -73,6 +75,11 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     setShowCategoryView(false);
   }, [currentUrl, activeOpdsSource?.id]);
 
+  // Reset page history when switching active source (not when paging)
+  useEffect(() => {
+    setPageHistory([]);
+  }, [activeOpdsSource?.id]);
+
   // Fetch catalog content using React Query
   const {
     data: catalogData,
@@ -90,6 +97,15 @@ const CatalogView: React.FC<CatalogViewProps> = ({
   const originalCatalogBooks = catalogData?.books || [];
   const catalogNavLinks = catalogData?.navLinks || [];
   const catalogPagination = catalogData?.pagination || null;
+
+  // Synthesize an effective pagination object: if the feed omits a prev link,
+  // use the last entry in our local pageHistory stack so the UI can enable
+  // a "Previous" button that actually navigates back.
+  const effectivePagination = useMemo(() => {
+    if (!catalogPagination) return null;
+    const prev = catalogPagination.prev || (pageHistory.length > 0 ? pageHistory[pageHistory.length - 1] : undefined);
+    return { ...catalogPagination, prev };
+  }, [catalogPagination, pageHistory]);
 
   // Update root collections when catalog data changes
   useEffect(() => {
@@ -186,6 +202,8 @@ const CatalogView: React.FC<CatalogViewProps> = ({
     setFictionMode('all');
     setMediaMode('all');
     setCollectionMode('all');
+    // Clear pagination history when navigating via breadcrumbs
+    setPageHistory([]);
   };
 
   const handlePaginationClick = (url: string) => {
@@ -195,6 +213,25 @@ const CatalogView: React.FC<CatalogViewProps> = ({
       const newPath = [...prev];
       newPath[newPath.length - 1] = { ...newPath[newPath.length - 1], url };
       return newPath;
+    });
+
+    // Maintain local history stack so "Previous" can be synthesized when
+    // feeds don't expose a prev link. If the clicked URL equals the last
+    // history entry, treat it as a back navigation and pop; otherwise push
+    // the currentUrl as the previous location.
+    setPageHistory(prevHist => {
+      try {
+        if (!currentUrl) return prevHist;
+        const last = prevHist[prevHist.length - 1];
+        if (last && last === url) {
+          // Back navigation: pop last
+          return prevHist.slice(0, -1);
+        }
+        // Forward navigation: push current
+        return [...prevHist, currentUrl];
+      } catch {
+        return prevHist;
+      }
     });
   };
 
@@ -311,7 +348,7 @@ const CatalogView: React.FC<CatalogViewProps> = ({
         {/* Breadcrumb Navigation */}
         <CatalogNavigation
           navPath={catalogNavPath}
-          pagination={catalogPagination}
+          pagination={effectivePagination ?? catalogPagination}
           onBreadcrumbClick={handleBreadcrumbClick}
           onPaginationClick={handlePaginationClick}
           isLoading={isLoading}
