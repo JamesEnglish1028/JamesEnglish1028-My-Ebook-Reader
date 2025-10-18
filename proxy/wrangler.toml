@@ -1,6 +1,4 @@
-[name]
-# Top-level worker entry settings for Wrangler v4
-name = "mebooks-proxy-worker"
+[name] = "mebooks-proxy-worker"
 main = "./cloudflare-worker-example.js"
 compatibility_date = "2025-10-18"
 
