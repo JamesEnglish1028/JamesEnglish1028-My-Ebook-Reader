@@ -2,9 +2,6 @@ name = "mebooks-proxy-worker"
 main = "./cloudflare-worker-example.js"
 compatibility_date = "2025-10-18"
 
-[site]
-bucket = "public"
-
 [vars]
 # Optionally set a PROXY_KEY in your Cloudflare Worker environment and pass it as x-proxy-key
 # to protect the echo endpoint in production
