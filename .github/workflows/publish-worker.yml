@@ -50,4 +50,5 @@ jobs:
           wrangler whoami
 
           # Use wrangler v4 deploy. wrangler will read wrangler.toml from the repo root.
-          wrangler deploy --project-root .
+          # Use --cwd (v4) to set working directory for deploy
+          wrangler deploy --cwd .
