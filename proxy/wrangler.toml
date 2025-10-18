@@ -1,4 +1,4 @@
-[name] = "mebooks-proxy-worker"
+name = "mebooks-proxy-worker"
 main = "./cloudflare-worker-example.js"
 compatibility_date = "2025-10-18"
 
