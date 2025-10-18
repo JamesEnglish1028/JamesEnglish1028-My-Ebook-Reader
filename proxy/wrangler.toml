@@ -1,3 +1,9 @@
+[name]
+# Top-level worker entry settings for Wrangler v4
+name = "mebooks-proxy-worker"
+main = "./cloudflare-worker-example.js"
+compatibility_date = "2025-10-18"
+
 [site]
 bucket = "public"
 
@@ -5,6 +11,3 @@ bucket = "public"
 # Optionally set a PROXY_KEY in your Cloudflare Worker environment and pass it as x-proxy-key
 # to protect the echo endpoint in production
 # PROXY_KEY = "your-secret-key"
-
-name = "mebooks-proxy-worker"
-main = "./cloudflare-worker-example.js"
