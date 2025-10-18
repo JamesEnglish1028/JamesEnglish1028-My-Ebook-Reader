@@ -17,8 +17,9 @@ jobs:
         run: npm ci
       - name: Verify Worker secrets
         run: |
-          if [ -z "${{ secrets.CF_API_TOKEN }}" ]; then
-            echo "Error: CF_API_TOKEN is not set in repository secrets.";
+          # Accept either the new CLOUDFLARE_API_TOKEN (preferred) or the older CF_API_TOKEN as a fallback
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && [ -z "${{ secrets.CF_API_TOKEN }}" ]; then
+            echo "Error: neither CLOUDFLARE_API_TOKEN nor CF_API_TOKEN is set in repository secrets.";
             exit 1;
           fi
           if [ -z "${{ secrets.CF_ACCOUNT_ID }}" ]; then
@@ -27,18 +28,26 @@ jobs:
           fi
 
       - name: Install Wrangler CLI
-        run: npm install -g wrangler
+        run: npm install -g wrangler@^4
 
-      - name: Publish Worker with npx wrangler
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      - name: Publish Worker with wrangler v4
         run: |
-          # Verify token is available
-          if [ -z "$CF_API_TOKEN" ]; then
-            echo "Error: CF_API_TOKEN is not set";
+          # prefer CLOUDFLARE_API_TOKEN, fall back to CF_API_TOKEN
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          else
+            export CLOUDFLARE_API_TOKEN="${{ secrets.CF_API_TOKEN }}"
+          fi
+
+          export CF_ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
+
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "Error: CLOUDFLARE_API_TOKEN is not set";
             exit 1;
           fi
-          # Publish using wrangler
-          wrangler whoami || true
-          wrangler publish --account-id "$CF_ACCOUNT_ID"
+
+          # show the account we're authenticated as (helps debug permissions)
+          wrangler whoami
+
+          # Use wrangler v4 deploy. wrangler will read wrangler.toml from the repo root.
+          wrangler deploy --project-root .
