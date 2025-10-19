@@ -17,23 +17,6 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Verify Pages secrets
-        env:
-          RESOLVED_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT_NAME || secrets.CF_PAGES_PROJECT_NAME }}
-        run: |
-          if [ -z "${{ secrets.CF_PAGES_API_TOKEN }}" ]; then
-            echo "Error: CF_PAGES_API_TOKEN is not set in repository secrets.";
-            exit 1;
-          fi
-          if [ -z "${{ secrets.CF_ACCOUNT_ID }}" ]; then
-            echo "Error: CF_ACCOUNT_ID is not set in repository secrets.";
-            exit 1;
-          fi
-          if [ -z "$RESOLVED_PAGES_PROJECT" ]; then
-            echo "Error: CF_PAGES_PROJECT_NAME is not set in repository variables or secrets.";
-            exit 1;
-          fi
-
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
