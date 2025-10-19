@@ -34,11 +34,8 @@ jobs:
             exit 1;
           fi
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          apiToken: ${{ secrets.CF_PAGES_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          # Prefer repository variable, fallback to secret for compatibility
-          projectName: ${{ vars.CF_PAGES_PROJECT_NAME || secrets.CF_PAGES_PROJECT_NAME }}
-          directory: ./dist
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

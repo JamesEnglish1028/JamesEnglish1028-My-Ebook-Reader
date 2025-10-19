@@ -2,6 +2,7 @@
   "name": "mebooks",
   "private": true,
   "version": "0.2.0",
+  "homepage": "https://JamesEnglish1028.github.io/JamesEnglish1028-My-Ebook-Reader",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,7 +18,7 @@
     "@tanstack/react-query": "^5.90.3",
     "@tanstack/react-query-devtools": "^5.90.2",
     "jszip": "^3.10.1",
-  "pdfjs-dist": "5.4.296",
+    "pdfjs-dist": "5.3.93",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-pdf": "^10.1.0",
@@ -43,7 +44,7 @@
     "fake-indexeddb": "^6.2.2",
     "jsdom": "^22.0.0",
     "typescript": "^5.0.0",
-    "vite": "^5.4.20",
-    "vitest": "^1.6.1"
+    "vite": "^7.1.10",
+    "vitest": "^3.2.4"
   }
 }

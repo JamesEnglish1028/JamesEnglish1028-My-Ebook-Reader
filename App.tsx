@@ -6,7 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 // Styles required by react-pdf layers
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { HashRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 // Component imports - using barrel exports for cleaner code
 import {
@@ -750,7 +750,7 @@ const App: React.FC = () => (
   <QueryClientProvider client={queryClient}>
     <QueryErrorResetBoundary>
       {({ reset }) => (
-        <BrowserRouter>
+        <HashRouter>
           <Routes>
             <Route path="/debug/db" element={<DebugDbRoute />} />
             <Route path="/pdf/:id" element={
@@ -766,7 +766,7 @@ const App: React.FC = () => (
               </ErrorBoundary>
             } />
           </Routes>
-        </BrowserRouter>
+        </HashRouter>
       )}
     </QueryErrorResetBoundary>
     {/* React Query DevTools - only visible in development */}

@@ -1,5 +1,5 @@
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { BookRecord } from '../../domain/book/types';
 import { db } from '../db';
