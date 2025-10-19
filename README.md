@@ -2,7 +2,7 @@
 
 A local-first, browser-based ebook reader that supports EPUB and PDF. MeBooks is built as a Single Page Application using React + TypeScript and focuses on a smooth reading experience, per-book persistence, and offline-first behavior.
 
-<!-- Trigger Pages rebuild: 2025-10-18T21:25:00Z -->
+<!-- Trigger Pages rebuild: 2025-10-18T21:40:00Z -->
 
 # MeBooks
 
