@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeBooks VPAT</title>
+  <style>
+    body {
+      background: #f8fafc;
+      color: #222;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      padding: 2rem 2.5rem;
+    }
+    h1, h2, h3 {
+      color: #0ea5e9;
+      margin-top: 1.5rem;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 0.75rem 1rem;
+      text-align: left;
+    }
+    th {
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: bold;
+    }
+    tr:nth-child(even) {
+      background: #f1f5f9;
+    }
+    ul {
+      margin: 1rem 0 1rem 2rem;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .contact {
+      background: #e0f2fe;
+      padding: 1rem;
+      border-radius: 8px;
+      color: #0369a1;
+      font-weight: 500;
+      margin-top: 2rem;
+    }
+    .updated {
+      color: #64748b;
+      font-size: 0.95rem;
+      margin-top: 2rem;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Voluntary Product Accessibility Template (VPAT)</h1>
+    <hr>
+    <div class="section">
+      <strong>Product Name:</strong> MeBooks Reader<br>
+      <strong>Version:</strong> October 2025<br>
+      <strong>Date:</strong> 2025-10-21
+    </div>
+    <div class="section">
+      <h2>Summary</h2>
+      <p>MeBooks Reader is designed to meet WCAG 2.1 Level AA accessibility standards. This VPAT documents current accessibility features, compliance status, and ongoing improvements.</p>
+    </div>
+    <div class="section">
+      <h2>WCAG 2.1 AA Compliance Table</h2>
+      <table>
+        <tr>
+          <th>Criteria</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+        <tr>
+          <td>1.1.1 Non-text Content</td>
+          <td>Supported</td>
+          <td>All images/icons have descriptive alt text or ARIA labels.</td>
+        </tr>
+        <tr>
+          <td>1.3.1 Info & Relationships</td>
+          <td>Supported</td>
+          <td>Semantic HTML, ARIA roles, and landmarks used throughout.</td>
+        </tr>
+        <tr>
+          <td>1.4.3 Contrast (Minimum)</td>
+          <td>Supported</td>
+          <td>All text/UI elements meet 4.5:1/3:1 contrast.</td>
+        </tr>
+        <tr>
+          <td>2.1.1 Keyboard</td>
+          <td>Supported</td>
+          <td>All features accessible via keyboard; skip links and shortcuts provided.</td>
+        </tr>
+        <tr>
+          <td>2.4.7 Focus Visible</td>
+          <td>Supported</td>
+          <td>Strong, visible focus indicators for all interactive elements.</td>
+        </tr>
+        <tr>
+          <td>4.1.2 Name, Role, Value</td>
+          <td>Supported</td>
+          <td>All controls have accessible names and roles.</td>
+        </tr>
+        <tr>
+          <td>...</td>
+          <td>...</td>
+          <td>...</td>
+        </tr>
+      </table>
+    </div>
+    <div class="section">
+      <h2>Accessibility Features</h2>
+      <ul>
+        <li><strong>Keyboard Navigation:</strong> Logical tab order, skip links, and global shortcuts.</li>
+        <li><strong>Screen Reader Support:</strong> ARIA labels, live regions, and dynamic announcements.</li>
+        <li><strong>High Contrast & Color Blind Friendly:</strong> Palette tested for WCAG AA compliance.</li>
+        <li><strong>Adjustable Font Size & Family:</strong> Reader settings for easy text customization.</li>
+        <li><strong>Responsive Design:</strong> Works on all devices and screen sizes.</li>
+        <li><strong>Accessible Modals & Dialogs:</strong> Focus management, ARIA roles, and announcements.</li>
+        <li><strong>Full-Text Search:</strong> Accessible search results and navigation.</li>
+        <li><strong>Citation Export:</strong> Accessible export of citations in .ris format.</li>
+        <li><strong>Read Aloud (EPUB):</strong> Text-to-speech with synchronized highlighting.</li>
+        <li><strong>No Color-Only Information:</strong> All information is conveyed with text or icons.</li>
+      </ul>
+    </div>
+    <div class="section">
+      <h2>Recent Improvements</h2>
+      <ul>
+        <li><strong>Skip Links & Landmarks:</strong> Added for faster navigation.</li>
+        <li><strong>ARIA Labeling:</strong> Improved for modals and dialogs.</li>
+        <li><strong>Keyboard Shortcuts:</strong> Enhanced discoverability and documentation.</li>
+        <li><strong>Contrast:</strong> Increased for focus indicators and UI controls.</li>
+        <li><strong>Screen Reader Announcements:</strong> Expanded for dynamic content.</li>
+      </ul>
+    </div>
+    <div class="section">
+      <h2>Limitations & Planned Improvements</h2>
+      <ul>
+        <li>No known accessibility blockers as of October 2025.</li>
+        <li>Ongoing user testing and feedback collection.</li>
+        <li><strong>Planned:</strong> WCAG 2.2 review, additional language support, more granular font controls.</li>
+      </ul>
+    </div>
+    <div class="contact">
+      <strong>Contact:</strong> For accessibility support or feedback, email <a href="mailto:support@mebooks.app">support@mebooks.app</a>
+    </div>
+    <div class="updated">
+      Last updated: 2025-10-21
+    </div>
+  </div>
+</body>
+</html>
