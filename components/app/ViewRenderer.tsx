@@ -18,6 +18,7 @@ import LibraryView from '../library/LibraryView';
 
 
 interface ViewRendererProps {
+  libraryRefreshFlag: number;
   currentView: 'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about';
 
   // Reader view props
@@ -47,6 +48,7 @@ interface ViewRendererProps {
     providerId?: string,
     format?: string,
     coverImageUrl?: string | null,
+    catalogBookMeta?: Partial<CatalogBook>,
   ) => Promise<{ success: boolean; bookRecord?: BookRecord; existingBook?: BookRecord }>;
   activeOpdsSource: Catalog | CatalogRegistry | null;
   setActiveOpdsSource: (source: Catalog | CatalogRegistry | null) => void;
@@ -94,6 +96,7 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
   onShowAbout,
   importStatus,
   setImportStatus,
+  libraryRefreshFlag,
 }) => {
   switch (currentView) {
     case 'reader':
@@ -152,6 +155,7 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
             onOpenCloudSyncModal={onOpenCloudSyncModal}
             onOpenLocalStorageModal={onOpenLocalStorageModal}
             onShowAbout={onShowAbout}
+            libraryRefreshFlag={libraryRefreshFlag}
           />
         </ErrorBoundary>
       );

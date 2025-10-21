@@ -29,7 +29,8 @@ interface LibraryProps {
     providerName?: string,
     providerId?: string,
     format?: string,
-    coverImageUrl?: string | null
+    coverImageUrl?: string | null,
+    catalogBookMeta?: Partial<CatalogBook>,
   ) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
@@ -40,6 +41,7 @@ interface LibraryProps {
   onOpenCloudSyncModal: () => void;
   onOpenLocalStorageModal: () => void;
   onShowAbout: () => void;
+  libraryRefreshFlag: number;
 }
 
 const Library: React.FC<LibraryProps> = ({
@@ -55,6 +57,22 @@ const Library: React.FC<LibraryProps> = ({
   onOpenCloudSyncModal,
   onOpenLocalStorageModal,
   onShowAbout,
+  libraryRefreshFlag,
+}) => {
+  console.log('[Library] component mounted. Props:', { libraryRefreshFlag, activeOpdsSource });
+  onOpenBook,
+  onShowBookDetail,
+  processAndSaveBook,
+  importStatus,
+  setImportStatus,
+  activeOpdsSource,
+  setActiveOpdsSource,
+  catalogNavPath,
+  setCatalogNavPath,
+  onOpenCloudSyncModal,
+  onOpenLocalStorageModal,
+  onShowAbout,
+  libraryRefreshFlag,
 }) => {
 
   const [books, setBooks] = useState<BookMetadata[]>([]);
@@ -122,19 +140,21 @@ const Library: React.FC<LibraryProps> = ({
     setIsCatalogLoading(false);
     setIsLoading(true);
     try {
+      console.log('[Library] fetchBooks called');
       const result = await bookRepository.findAllMetadata();
       console.log('[Library] fetchBooks result:', result);
       if (result.success) {
         setBooks(result.data);
         console.log('[Library] setBooks called with:', result.data);
       } else {
-        // result.success is false, so result.error exists
         logger.error('Failed to fetch books from repository:', (result as { success: false; error: string }).error);
         setBooks([]);
+        console.log('[Library] setBooks called with: [] (error)');
       }
     } catch (error) {
       logger.error('Failed to fetch books:', error);
       setBooks([]);
+      console.log('[Library] setBooks called with: [] (exception)');
     } finally {
       setIsLoading(false);
     }
@@ -311,33 +331,28 @@ const Library: React.FC<LibraryProps> = ({
     setIsCatalogDropdownOpen(false);
     if (source === 'library') {
       setActiveOpdsSource(null);
-      setCatalogNavPath([]);
-      // Reset filters when going back to local library
+      setCatalogNavPath([]); // Ensure nav path is reset for My Library
+      // ...existing code...
       setCategorizationMode('subject');
       setAudienceMode('all');
       setFictionMode('all');
       setMediaMode('all');
       setCollectionMode('all');
-      // Clear collection-related state
       setRootLevelCollections([]);
       setCollectionLinks([]);
       setCatalogCollections([]);
       setShowCollectionView(false);
     } else if (activeOpdsSource?.id !== source.id) {
-      // Reset filters when switching to a different catalog source
       setCategorizationMode('subject');
       setAudienceMode('all');
       setFictionMode('all');
       setMediaMode('all');
       setCollectionMode('all');
-      // Clear collection-related state from previous catalog
       setRootLevelCollections([]);
       setCollectionLinks([]);
       setCatalogCollections([]);
       setShowCollectionView(false);
-
       setActiveOpdsSource(source);
-      // When a new source is selected, reset the navigation path to its root.
       setCatalogNavPath([{ name: source.name, url: source.url }]);
     }
   }, [activeOpdsSource?.id, setActiveOpdsSource, setCatalogNavPath]);
@@ -346,22 +361,28 @@ const Library: React.FC<LibraryProps> = ({
   // Migration logic moved to the hook itself
 
   useEffect(() => {
-    console.log('[Library] useEffect (library/catalog) triggered', { activeOpdsSource, catalogNavPath });
-    if (activeOpdsSource) {
-      // If a source is active but the path is empty (e.g., on first selection or page load), initialize it.
-      if (catalogNavPath.length === 0) {
-        setCatalogNavPath([{ name: activeOpdsSource.name, url: activeOpdsSource.url }]);
-      } else {
-        // Otherwise, fetch content for the current navigation path.
-        const currentPath = catalogNavPath[catalogNavPath.length - 1];
-        fetchAndParseSource(currentPath.url, activeOpdsSource.url);
-      }
-    } else {
-      // No active source, so show the local library.
-      console.log('[Library] useEffect: calling fetchBooks for local library');
+    console.log('[Library] useEffect (books refresh) triggered', {
+      activeOpdsSource,
+      catalogNavPath,
+      libraryRefreshFlag
+    });
+    // Always refetch books when switching to My Library, when refresh flag changes, or on mount
+    if (!activeOpdsSource) {
+      console.log('[Library] No activeOpdsSource, calling fetchBooks()');
       fetchBooks();
+      return;
     }
-  }, [activeOpdsSource, catalogNavPath, fetchAndParseSource, fetchBooks, setCatalogNavPath]);
+    if (catalogNavPath.length === 0) {
+      console.log('[Library] catalogNavPath empty, setting initial path');
+      setCatalogNavPath([{ name: activeOpdsSource.name, url: activeOpdsSource.url }]);
+    } else {
+      const currentPath = catalogNavPath[catalogNavPath.length - 1];
+      console.log('[Library] Navigating catalog, calling fetchAndParseSource', currentPath.url, activeOpdsSource.url);
+      fetchAndParseSource(currentPath.url, activeOpdsSource.url);
+    }
+    // Force fetchBooks on every mount of Library view
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOpdsSource, catalogNavPath, fetchAndParseSource, fetchBooks, setCatalogNavPath, libraryRefreshFlag]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

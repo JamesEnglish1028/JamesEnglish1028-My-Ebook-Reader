@@ -8,6 +8,7 @@ import { ImportButton, SortControls } from '../local';
 import { BookGrid, EmptyState } from '../shared';
 
 interface LocalLibraryViewProps {
+  libraryRefreshFlag: number;
   /** Callback to open a book for reading */
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   /** Callback to show book detail view */
@@ -29,13 +30,20 @@ const LocalLibraryView: React.FC<LocalLibraryViewProps> = ({
   onShowBookDetail,
   onFileChange,
   importStatus,
+  libraryRefreshFlag,
 }) => {
+  console.log('[LocalLibraryView] mounted. libraryRefreshFlag:', libraryRefreshFlag);
   const [bookToDelete, setBookToDelete] = useState<BookMetadata | null>(null);
   const [sortOrder, setSortOrder] = useLocalStorage<string>('ebook-sort-order', 'added-desc');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
   // Fetch books using React Query
   const { data: books = [], isLoading, error, refetch } = useBooks();
+
+  React.useEffect(() => {
+    console.log('[LocalLibraryView] useEffect triggered by libraryRefreshFlag:', libraryRefreshFlag);
+    refetch();
+  }, [libraryRefreshFlag, refetch]);
 
   // Delete book mutation
   const { mutate: deleteBook, isPending: isDeleting } = useDeleteBook();

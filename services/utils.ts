@@ -243,14 +243,22 @@ export const imageUrlToBase64 = async (url: string): Promise<string | null> => {
       return null;
     }
     const blob = await response.blob();
-    if (!blob.type.startsWith('image/')) {
-      console.error(`Fetched resource from ${url} is not an image. MIME type: ${blob.type}`);
-      return null;
-    }
+    // Relax MIME type check: attempt to convert any blob to DataURL
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onloadend = () => {
+        // If result is a valid DataURL, accept it
+        if (typeof reader.result === 'string' && reader.result.startsWith('data:')) {
+          resolve(reader.result as string);
+        } else {
+          console.error(`Failed to convert resource from ${url} to base64 DataURL.`);
+          resolve(null);
+        }
+      };
+      reader.onerror = () => {
+        console.error(`Error reading blob from ${url} as DataURL.`);
+        reject(null);
+      };
       reader.readAsDataURL(blob);
     });
   } catch (error) {

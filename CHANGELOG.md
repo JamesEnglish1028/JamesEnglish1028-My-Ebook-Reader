@@ -33,6 +33,31 @@ All notable changes to this project will be documented in this file.
 - All real-world and edge-case tests pass (except for two strict error-throwing tests, which are intentionally skipped for lenient behavior).
 - Accessibility, OPDS parsing, and DB error handling are fully covered by tests.
 
+## October 21, 2025
+
+### Bug Fix: My Library View Refresh After Import
+- Fixed issue where newly imported books did not appear in My Library until browser refresh.
+- Refactored import and state logic:
+  - After import, `activeOpdsSource` is reset to `null` and the view switches to My Library.
+  - Added `libraryRefreshFlag` prop, passed through `App.tsx`, `ViewRenderer.tsx`, `LibraryView.tsx`, and `LocalLibraryView.tsx`.
+  - `LocalLibraryView` now refetches books from the DB when `libraryRefreshFlag` changes.
+- Added debug logging to trace state and fetch flow.
+- Relaxed MIME type check for cover images to support non-image covers.
+- Updated dependencies: `pdfjs-dist` to `^5.4.296`, `vite` to `^7.1.11`.
+
+### Impact
+- Users now see newly imported books in My Library immediately after import, without needing to refresh the browser.
+- Improved reliability of cover image import from remote catalogs.
+
 ---
 
-For details see commits on `main` and tag `v0.2.0`.
+## How to Deploy
+1. Run `npm install` to update dependencies.
+2. Run `npm run build` to build the app.
+3. Push changes to GitHub to deploy via GitHub Pages.
+
+---
+
+## Contributors
+- @JamesEnglish1028
+- GitHub Copilot

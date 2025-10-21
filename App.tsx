@@ -128,6 +128,9 @@ const AppInner: React.FC = () => {
     { isOpen: false, host: null, pendingHref: null, pendingBook: null, pendingCatalogName: undefined, authDocument: null },
   );
 
+  // Used to trigger UI refresh after import
+  const [libraryRefreshFlag, setLibraryRefreshFlag] = useState(0);
+
   // Initialize DB on app start & handle splash screen
   useEffect(() => {
     db.init();
@@ -237,6 +240,7 @@ const AppInner: React.FC = () => {
     setCurrentView('about');
   }, []);
 
+
   const processAndSaveBook = useCallback(async (
     bookData: ArrayBuffer,
     fileName: string = 'Untitled Book',
@@ -246,6 +250,7 @@ const AppInner: React.FC = () => {
     providerId?: string,
     format?: string,
     coverImageUrl?: string | null,
+    catalogBookMeta?: Partial<CatalogBook>,
   ): Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }> => {
 
     let finalCoverImage: string | null = null;
@@ -265,17 +270,66 @@ const AppInner: React.FC = () => {
           finalCoverImage = await generatePdfCover(title, author);
         }
 
+        // Validate PDF: check for minimal PDF header and non-empty
+        const pdfHeader = new Uint8Array(bookData).slice(0, 5);
+        const isPdf = pdfHeader[0] === 0x25 && pdfHeader[1] === 0x50 && pdfHeader[2] === 0x44 && pdfHeader[3] === 0x46 && pdfHeader[4] === 0x2d;
+        if (!isPdf || !bookData || (bookData instanceof ArrayBuffer && bookData.byteLength < 1000)) {
+          setImportStatus({ isLoading: false, message: '', error: 'Downloaded file is not a valid PDF or is empty. Import aborted.' });
+          return { success: false };
+        }
+
+        // Validate cover: must be a base64 string or null
+        let validCover = finalCoverImage;
+        if (validCover && typeof validCover === 'string') {
+          // Check for base64 prefix
+          if (!/^data:image\/(png|jpeg|jpg);base64,/.test(validCover)) {
+            validCover = null;
+          }
+        }
+
+        // If importing from catalog, preserve catalog metadata
+        let catalogMeta = {};
+        if (source === 'catalog' && catalogBookMeta) {
+          catalogMeta = {
+            summary: catalogBookMeta.summary,
+            publisher: catalogBookMeta.publisher,
+            publicationDate: catalogBookMeta.publicationDate,
+            subjects: catalogBookMeta.subjects,
+            coverImage: validCover || (catalogBookMeta.coverImage ? await imageUrlToBase64(catalogBookMeta.coverImage) : null),
+          };
+        }
+
+        // Only save if PDF and cover are valid
+        if (!isPdf || !bookData || (bookData instanceof ArrayBuffer && bookData.byteLength < 1000)) {
+          setImportStatus({ isLoading: false, message: '', error: 'Downloaded file is not a valid PDF or is empty. Import aborted.' });
+          return { success: false };
+        }
+        // If cover is required, but not valid, abort
+        if (source === 'catalog' && !((catalogMeta as any).coverImage)) {
+          setImportStatus({ isLoading: false, message: '', error: 'No valid cover image found for this book. Import aborted.' });
+          return { success: false };
+        }
+
         const newBook: BookRecord = {
           title: title,
           author: author,
-          coverImage: finalCoverImage,
+          coverImage: (catalogMeta as any).coverImage || validCover,
           epubData: bookData,
           format: 'PDF',
           providerName,
           providerId,
+          description: (catalogMeta as Partial<CatalogBook>).summary,
+          publisher: (catalogMeta as any).publisher,
+          publicationDate: (catalogMeta as any).publicationDate,
+          subjects: (catalogMeta as any).subjects,
         };
         await db.saveBook(newBook);
         setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+        setLibraryRefreshFlag(flag => {
+          const next = flag + 1;
+          console.log('[App] setLibraryRefreshFlag called. Previous:', flag, 'Next:', next);
+          return next;
+        }); // Trigger UI refresh
         setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
         return { success: true };
       } catch (error) {
@@ -375,6 +429,11 @@ const AppInner: React.FC = () => {
       console.log('[processAndSaveBook] Book saved successfully');
 
       setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
+      setLibraryRefreshFlag(flag => {
+        const next = flag + 1;
+        console.log('[App] setLibraryRefreshFlag called. Previous:', flag, 'Next:', next);
+        return next;
+      }); // Trigger UI refresh
       setTimeout(() => setImportStatus({ isLoading: false, message: '', error: null }), 2000);
 
       if (source === 'catalog') {
@@ -479,7 +538,37 @@ const AppInner: React.FC = () => {
         throw new Error(errorMessage);
       }
       const bookData = await response.arrayBuffer();
-      return await processAndSaveBook(bookData, book.title, book.author, 'catalog', catalogName, book.providerId, book.format, book.coverImage);
+      // Pass catalogBookMeta for PDFs
+      let catalogBookMeta: Partial<CatalogBook> | undefined = undefined;
+      if (book.format && book.format.toUpperCase() === 'PDF') {
+        catalogBookMeta = {
+          summary: book.summary,
+          publisher: book.publisher,
+          publicationDate: book.publicationDate,
+          subjects: book.subjects,
+          coverImage: book.coverImage,
+        };
+      }
+      const result = await processAndSaveBook(
+        bookData,
+        book.title,
+        book.author,
+        'catalog',
+        catalogName,
+        book.providerId,
+        book.format,
+        book.coverImage,
+        catalogBookMeta
+      );
+      // If import was successful, switch to library view so the user sees the new book immediately
+      if (result.success) {
+        console.log('[App] Import successful, switching to My Library view and resetting activeOpdsSource.');
+        setActiveOpdsSource(null);
+        setCurrentView('library');
+      } else {
+        console.log('[App] Import failed or duplicate, not switching to My Library.');
+      }
+      return result;
     } catch (error) {
       logger.error('Error importing from catalog:', error);
       let message = 'Download failed. The file may no longer be available or there was a network issue.';
@@ -709,7 +798,14 @@ const AppInner: React.FC = () => {
             onShowAbout={handleShowAbout}
             importStatus={importStatus}
             setImportStatus={setImportStatus}
+            libraryRefreshFlag={libraryRefreshFlag}
           />
+          {console.log('[App] Rendering ViewRenderer with props:', {
+            currentView,
+            libraryRefreshFlag,
+            activeOpdsSource,
+            catalogNavPath
+          })}
         </main>
       )}
       <GlobalModals

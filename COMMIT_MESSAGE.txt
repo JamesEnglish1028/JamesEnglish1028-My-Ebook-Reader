@@ -114,3 +114,13 @@ All other components maintain backward compatibility.
 ---
 
 Co-authored-by: GitHub Copilot <copilot@github.com>
+
+## October 21, 2025
+
+- Bug fix: My Library view now refreshes immediately after importing a book from a remote catalog. No browser refresh required.
+- Refactored state logic to use `libraryRefreshFlag` and reset `activeOpdsSource` after import.
+- Relaxed MIME type check for cover images to support non-image covers.
+- Updated dependencies: `pdfjs-dist` to `^5.4.296`, `vite` to `^7.1.11`.
+- Added debug logging to trace state and fetch flow.
+
+See CHANGELOG.md for full details.

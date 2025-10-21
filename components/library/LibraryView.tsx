@@ -13,6 +13,7 @@ import { CatalogView } from './catalog';
 import { ImportButton, LocalLibraryView, SortControls } from './local';
 
 interface LibraryViewProps {
+  libraryRefreshFlag: number;
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => void;
   processAndSaveBook: (
@@ -23,7 +24,8 @@ interface LibraryViewProps {
     providerName?: string,
     providerId?: string,
     format?: string,
-    coverImageUrl?: string | null
+    coverImageUrl?: string | null,
+    catalogBookMeta?: Partial<CatalogBook>,
   ) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
   importStatus: { isLoading: boolean; message: string; error: string | null; };
   setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
@@ -55,7 +57,9 @@ const LibraryView: React.FC<LibraryViewProps> = ({
   onOpenCloudSyncModal,
   onOpenLocalStorageModal,
   onShowAbout,
+  libraryRefreshFlag,
 }) => {
+  // Use libraryRefreshFlag to trigger refreshes in child components if needed
   // React Query client for cache invalidation
   const queryClient = useQueryClient();
 
