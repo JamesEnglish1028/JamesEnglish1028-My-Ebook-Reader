@@ -56,6 +56,7 @@ const Library: React.FC<LibraryProps> = ({
   onOpenLocalStorageModal,
   onShowAbout,
 }) => {
+
   const [books, setBooks] = useState<BookMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -702,7 +703,7 @@ const Library: React.FC<LibraryProps> = ({
               }`}>{link.title}</span>
             <ChevronRightIcon className={`w-4 h-4 transition-opacity mr-2 ${isActive
               ? 'text-sky-500 opacity-100'
-              : 'text-slate-200 opacity-0 group-hover/item:opacity-100'
+              : 'text-slate-200 opacity-0 group-hover:item:opacity-100'
               }`} />
           </button>
           <button
@@ -802,6 +803,19 @@ const Library: React.FC<LibraryProps> = ({
                       <UncategorizedLane
                         books={uncategorizedBooks}
                         onBookClick={handleCatalogBookClick}
+                      />
+                    )}
+                  </div>
+                ) : showCollectionView && catalogCollections.length > 0 ? (
+                  <div className="space-y-6 animate-fadeIn">
+                    {catalogCollections.map((collectionGroup, groupIndex) => (
+                      <CollectionLane
+                        key={`${collectionGroup.collection.title}-${groupIndex}`}
+                        collection={collectionGroup.collection}
+                        books={collectionGroup.books}
+                        onBookClick={handleCatalogBookClick}
+                        onCollectionClick={handleCollectionClick}
+                     
                       />
                     )}
                   </div>
@@ -1219,6 +1233,17 @@ const Library: React.FC<LibraryProps> = ({
                 aria-orientation="vertical"
               >
                 <ul className="p-1 text-white" role="none">
+                  <li role="none" className="flex items-center justify-between px-3 py-2">
+                    <span className="text-sm">Theme</span>
+                    <button
+                      onClick={() => setUiTheme(uiTheme === 'dark' ? 'light' : 'dark')}
+                      className={`ml-2 px-3 py-1 rounded-md border-2 transition-colors text-sm font-medium ${uiTheme === 'dark' ? 'border-sky-500 bg-sky-500/20 text-sky-300' : 'border-slate-600 bg-white text-slate-800'}`}
+                      role="menuitem"
+                      aria-label="Toggle theme"
+                    >
+                      {uiTheme === 'dark' ? 'Dark' : 'Light'}
+                    </button>
+                  </li>
                   <li role="none">
                     <button
                       onClick={() => {

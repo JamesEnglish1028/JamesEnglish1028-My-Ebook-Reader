@@ -42,7 +42,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
               <li><span className="font-semibold">Responsive Design:</span> Works on all devices and screen sizes.</li>
             </ul>
             <div className="mt-3">
-              <a href="/VPAT.md" target="_blank" rel="noopener noreferrer" className="block bg-sky-900/80 border border-sky-700 rounded px-4 py-2 text-sky-300 font-semibold text-center hover:bg-sky-800 transition">Accessibility VPAT (Voluntary Product Accessibility Template)</a>
+              <a href="/JamesEnglish1028-My-Ebook-Reader/VPAT.html" target="_blank" rel="noopener noreferrer" className="block bg-sky-900/80 border border-sky-700 rounded px-4 py-2 text-sky-300 font-semibold text-center hover:bg-sky-800 transition">Accessibility VPAT (Voluntary Product Accessibility Template)</a>
             </div>
           </div>
           <div className="bg-slate-800/80 rounded-xl shadow p-6 border border-slate-700 flex flex-col gap-2">

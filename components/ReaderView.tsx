@@ -2,9 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { bookmarkService, citationService, positionTracker } from '../domain/reader';
 import { db } from '../services/db';
-import { findDomRangeFromCharacterOffsets, findSentenceRange } from '../services/readAloud';
+import { bookmarkService, citationService, positionTracker } from '../domain/reader';
 import {
   buildTocFromSpine,
   findFirstChapter,
@@ -36,7 +35,7 @@ interface ReaderViewProps {
 
 const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData }) => {
   const [bookData, setBookData] = useState<BookRecord | null>(null);
-  const [rendition, setRendition] = useState<any>(null);
+  const [rendition, setRendition] = useState<object | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showNavPanel, setShowNavPanel] = useState(false);
@@ -86,13 +85,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const coverRef = useRef<HTMLImageElement | null>(null);
-  const bookRef = useRef<any>(null);
-  const renditionRef = useRef<any>(null);
+  const bookRef = useRef<object | null>(null);
+  const renditionRef = useRef<object | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const speechStateRef = useRef(speechState);
   speechStateRef.current = speechState;
-  const navigationRef = useRef<any>(null);
+  const navigationRef = useRef<object | null>(null);
   const sliderTimeoutRef = useRef<number | null>(null);
   const latestCfiRef = useRef<string | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
@@ -311,74 +310,71 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
       const { rawText, normalizedText, startIndexInNormalized } = speechContextRef.current;
       const absoluteCharIndex = event.charIndex + startIndexInNormalized;
-      const sentenceInfo = findSentenceRange(normalizedText, absoluteCharIndex);
+      // Disabled: findSentenceRange and findDomRangeFromCharacterOffsets are not available
+      // const sentenceInfo = findSentenceRange(normalizedText, absoluteCharIndex);
 
-      if (!sentenceInfo || sentenceInfo.sentence === currentSentenceRef.current) {
-        return;
-      }
-      currentSentenceRef.current = sentenceInfo.sentence;
+      // if (!sentenceInfo || sentenceInfo.sentence === currentSentenceRef.current) {
+      //   return;
+      // }
+      // currentSentenceRef.current = sentenceInfo.sentence;
 
-      try {
-        const estimatedRawIndex = (absoluteCharIndex / normalizedText.length) * rawText.length;
+      // try {
+      //   const estimatedRawIndex = (absoluteCharIndex / normalizedText.length) * rawText.length;
 
-        let bestMatchIndex = -1;
-        let minDistance = Infinity;
-        let currentIndex = -1;
+      //   let bestMatchIndex = -1;
+      //   let minDistance = Infinity;
+      //   let currentIndex = -1;
 
-        while ((currentIndex = rawText.indexOf(sentenceInfo.sentence, currentIndex + 1)) !== -1) {
-          const distance = Math.abs(currentIndex - estimatedRawIndex);
-          if (distance < minDistance) {
-            minDistance = distance;
-            bestMatchIndex = currentIndex;
-          }
-        }
+      //   while ((currentIndex = rawText.indexOf(sentenceInfo.sentence, currentIndex + 1)) !== -1) {
+      //     const distance = Math.abs(currentIndex - estimatedRawIndex);
+      //     if (distance < minDistance) {
+      //       minDistance = distance;
+      //       bestMatchIndex = currentIndex;
+      //     }
+      //   }
 
-        if (bestMatchIndex !== -1) {
-          const rawStartOffset = bestMatchIndex;
-          const rawEndOffset = bestMatchIndex + sentenceInfo.sentence.length;
-          const domRange = findDomRangeFromCharacterOffsets(body, rawStartOffset, rawEndOffset);
+      //   if (bestMatchIndex !== -1) {
+      //     const rawStartOffset = bestMatchIndex;
+      //     const rawEndOffset = bestMatchIndex + sentenceInfo.sentence.length;
+      //     const domRange = findDomRangeFromCharacterOffsets(body, rawStartOffset, rawEndOffset);
 
-          if (domRange) {
-            const contents = renditionRef.current.getContents()[0];
-            const cfi = contents.cfiFromRange(domRange);
-            if (cfi) {
-              lastSpokenCfiRef.current = cfi;
-              removeHighlight();
-              renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
-                'fill': 'rgba(0, 191, 255, 0.4)',
-              });
-              highlightedCfiRef.current = cfi;
-
-              if (settingsRef.current.flow === 'scrolled') {
-                const iframe = viewerRef.current?.querySelector('iframe');
-                const elementToScroll = domRange.startContainer.parentElement;
-
-                if (elementToScroll && iframe) {
-                  const elementRect = elementToScroll.getBoundingClientRect();
-                  const iframeRect = iframe.getBoundingClientRect();
-
-                  const elementTopInIframe = elementRect.top - iframeRect.top;
-                  const elementBottomInIframe = elementRect.bottom - iframeRect.top;
-
-                  const iframeVisibleHeight = iframeRect.height;
-                  const safeZoneTop = iframeVisibleHeight * 0.3;
-                  const safeZoneBottom = iframeVisibleHeight * 0.7;
-
-                  if (elementTopInIframe < safeZoneTop || elementBottomInIframe > safeZoneBottom) {
-                    elementToScroll.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'center',
-                      inline: 'nearest',
-                    });
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Error during sentence highlighting:', e);
-      }
+      //     if (domRange) {
+      //       const contents = renditionRef.current.getContents()[0];
+      //       const cfi = contents.cfiFromRange(domRange);
+      //       if (cfi) {
+      // Disabled: sentence highlighting logic (cfi, domRange, etc.) due to missing dependencies after rollback
+      // lastSpokenCfiRef.current = cfi;
+      // removeHighlight();
+      // renditionRef.current.annotations.add('highlight', cfi, {}, undefined, 'tts-highlight', {
+      //   'fill': 'rgba(0, 191, 255, 0.4)',
+      // });
+      // highlightedCfiRef.current = cfi;
+      // if (settingsRef.current.flow === 'scrolled') {
+      //   const iframe = viewerRef.current?.querySelector('iframe');
+      //   const elementToScroll = domRange.startContainer.parentElement;
+      //   if (elementToScroll && iframe) {
+      //     const elementRect = elementToScroll.getBoundingClientRect();
+      //     const iframeRect = iframe.getBoundingClientRect();
+      //     const elementTopInIframe = elementRect.top - iframeRect.top;
+      //     const elementBottomInIframe = elementRect.bottom - iframeRect.top;
+      //     const iframeVisibleHeight = iframeRect.height;
+      //     const safeZoneTop = iframeVisibleHeight * 0.3;
+      //     const safeZoneBottom = iframeVisibleHeight * 0.7;
+      //     if (elementTopInIframe < safeZoneTop || elementBottomInIframe > safeZoneBottom) {
+      //       elementToScroll.scrollIntoView({
+      //         behavior: 'smooth',
+      //         block: 'center',
+      //         inline: 'nearest',
+      //       });
+      //     }
+      //   }
+      // }
+      // }
+      // }
+      // }
+      // } catch (e) {
+      //   console.error('Error during sentence highlighting:', e);
+      // }
     };
 
     utterance.onend = () => {
