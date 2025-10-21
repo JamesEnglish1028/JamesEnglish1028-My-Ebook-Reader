@@ -38,13 +38,17 @@ jobs:
       - name: Install Wrangler CLI
         run: npm install -g wrangler@^4
       - name: Publish Worker with wrangler v4
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         run: |
-          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
-            export CLOUDFLARE_API_TOKEN="${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN"
           else
-            export CLOUDFLARE_API_TOKEN="${{ secrets.CF_API_TOKEN }}"
+            export CLOUDFLARE_API_TOKEN="$CF_API_TOKEN"
           fi
-          export CF_ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
+          export CF_ACCOUNT_ID="$CF_ACCOUNT_ID"
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "Error: CLOUDFLARE_API_TOKEN is not set";
             exit 1;
