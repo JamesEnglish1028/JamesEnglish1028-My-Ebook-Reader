@@ -144,8 +144,22 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citati
       onReadBook(book.id, animationData, book.format || 'EPUB');
     }
   };
+  // Import button state and modal
+  const [showImportSuccess, setShowImportSuccess] = React.useState(false);
+  const [isImporting, setIsImporting] = React.useState(false);
+
+  const handleImportClick = async () => {
+    if (isImporting) return;
+    setIsImporting(true);
+    if (onImportFromCatalog) {
+      await onImportFromCatalog(book);
+      setShowImportSuccess(true);
+    }
+    setIsImporting(false);
+  };
+
   return (
-  <div className="flex flex-col md:flex-row gap-8 items-start px-4 md:px-12 md:pr-16">
+    <div className="flex flex-col md:flex-row gap-8 items-start px-4 md:px-12 md:pr-16">
       {/* Left column: cover, buttons, bookmarks, citations */}
       <div className="md:w-1/3 flex-shrink-0">
         <BookDetailHeader onBack={onBack} source={source} />
@@ -170,11 +184,23 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citati
             </button>
           ) : (
             <button
-              className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600"
-              onClick={() => onImportFromCatalog && onImportFromCatalog(book)}
+              className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600 disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={handleImportClick}
+              disabled={isImporting}
             >
-              Import to My Library
+              {isImporting ? 'Importing...' : 'Import to My Library'}
             </button>
+          )}
+          {showImportSuccess && (
+            <div className="fixed inset-0 flex items-center justify-center z-50">
+              <div className="bg-slate-900 bg-opacity-90 p-8 rounded-lg shadow-2xl flex flex-col items-center">
+                <h2 className="text-2xl font-bold text-sky-400 mb-4">Import Successful!</h2>
+                <p className="text-slate-200 mb-6">The book has been imported to your library.</p>
+                <button className="px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600" onClick={() => setShowImportSuccess(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
           )}
         </div>
         <div className="w-full max-w-xs mx-auto">
@@ -184,7 +210,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citati
       {/* Right column: Book Details */}
       <div className="md:w-2/3 mt-8 md:mt-0">
         {/* Book Title, Author, Publisher, etc. Section OUTSIDE container */}
-  <div className="mb-6 mt-10 flex flex-col justify-start">
+        <div className="mb-6 mt-10 flex flex-col justify-start">
           <h2 className="text-4xl md:text-5xl font-extrabold text-slate-100 mb-6 leading-tight mt-0">{book.title}</h2>
           {book.author && <div className="mb-2 text-lg text-slate-400">By {book.author}</div>}
           {book.publisher && <div className="mb-2 text-slate-400">Publisher: {book.publisher}</div>}
