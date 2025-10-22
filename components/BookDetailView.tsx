@@ -106,12 +106,13 @@ interface BookDetailViewProps {
   citations?: Citation[];
   onBack: () => void;
   source: 'library' | 'catalog';
+  catalogName?: string;
   userCitationFormat: 'apa' | 'mla' | 'chicago';
   onReadBook?: (id: number, animationData: AnimationData, format: string) => void;
   onImportFromCatalog?: (book: BookMetadata) => void;
 }
 
-const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citations, onBack, source, userCitationFormat, onReadBook, onImportFromCatalog }) => {
+const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citations, onBack, source, catalogName, userCitationFormat, onReadBook, onImportFromCatalog }) => {
   const [localBookmarks, setLocalBookmarks] = React.useState<Bookmark[]>(bookmarks ?? []);
   const [localCitations, setLocalCitations] = React.useState<Citation[]>(citations ?? []);
 
@@ -218,7 +219,7 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citati
           <h3 className="text-xl font-bold text-sky-300 mb-4">Book Details</h3>
           <ul className="space-y-2 text-base">
             <li>
-              <span className="font-semibold text-slate-200">Provider:</span> <span className="text-slate-400">{book.providerName || 'Imported locally'}</span>
+              <span className="font-semibold text-slate-200">Provider:</span> <span className="text-slate-400">{book.providerName || (source === 'catalog' ? catalogName : 'Imported locally')}</span>
               {book.providerId ? (
                 <div className="text-xs text-slate-500 mt-1">
                   Provider ID: {
