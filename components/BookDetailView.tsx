@@ -69,15 +69,21 @@ const BookAnnotationsAside: React.FC<{
         </h3>
         {citations.length > 0 ? (
           <ul className="space-y-2">
-            {citations.map((ct, idx) => (
-              <li key={ct.id || idx} className="bg-slate-800 rounded p-3 text-slate-300">
-                <div className="font-semibold">{`Citation ${idx + 1}`}</div>
-                {ct.note && <div className="text-slate-400 text-sm mt-1">{ct.note}</div>}
-                {ct.chapter && <div className="text-xs text-slate-500 mt-1">Chapter: {ct.chapter}</div>}
-                {ct.pageNumber && <div className="text-xs text-slate-500 mt-1">Page: {ct.pageNumber}</div>}
-                <div className="text-xs text-slate-500">Created: {formatDate(ct.createdAt)}</div>
-              </li>
-            ))}
+            {citations.map((ct, idx) => {
+              // Format citation using the style required (APA, MLA, Chicago)
+              const citationFormat = ct.citationFormat || userCitationFormat || 'apa';
+              const formatted = citationService.formatCitation(libraryBook, citationFormat);
+              return (
+                <li key={ct.id || idx} className="bg-slate-800 rounded p-3 text-slate-300">
+                  <div className="font-semibold mb-1">{formatted.text}</div>
+                  {ct.note && <div className="text-slate-400 text-sm mt-1">{ct.note}</div>}
+                  {ct.chapter && <div className="text-xs text-slate-500 mt-1">Chapter: {ct.chapter}</div>}
+                  {ct.pageNumber && <div className="text-xs text-slate-500 mt-1">Page: {ct.pageNumber}</div>}
+                  <div className="text-xs text-slate-500">Created: {formatDate(ct.createdAt)}</div>
+                  <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs font-bold bg-sky-900 text-sky-300">{citationFormat.toUpperCase()}</span>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <div className="text-slate-500 text-sm">No citations yet.</div>
@@ -156,7 +162,9 @@ const BookDetailView: React.FC<{ book: BookMetadata; bookmarks?: Bookmark[]; cit
             </button>
           )}
         </div>
-        <BookAnnotationsAside libraryBook={book} bookmarks={localBookmarks} citations={localCitations} userCitationFormat={userCitationFormat} />
+        <div className="w-full max-w-xs mx-auto">
+          <BookAnnotationsAside libraryBook={book} bookmarks={localBookmarks} citations={localCitations} userCitationFormat={userCitationFormat} />
+        </div>
       </div>
       {/* Right column: Book Details */}
       <div className="md:w-2/3 mt-8 md:mt-0">
@@ -166,6 +174,9 @@ const BookDetailView: React.FC<{ book: BookMetadata; bookmarks?: Bookmark[]; cit
           {book.author && <div className="mb-2 text-lg text-slate-400">By {book.author}</div>}
           {book.publisher && <div className="mb-2 text-slate-400">Publisher: {book.publisher}</div>}
           {book.publicationDate && <div className="mb-2 text-slate-400">Published: {book.publicationDate}</div>}
+          {book.isbn && (
+            <div className="mb-2 text-slate-400">Publisher ID: {book.isbn}</div>
+          )}
           {book.language && <div className="mb-2 text-slate-400">Language: {book.language}</div>}
           {book.format && (
             <div className="mb-2">
@@ -192,7 +203,20 @@ const BookDetailView: React.FC<{ book: BookMetadata; bookmarks?: Bookmark[]; cit
         <div className="space-y-6 p-6 bg-slate-800 rounded-lg border border-slate-700 md:mt-4 md:mr-6 md:mb-4 md:p-8">
           <h3 className="text-xl font-bold text-sky-300 mb-4">Book Details</h3>
           <ul className="space-y-2 text-base">
-            {book.providerName && <li><span className="font-semibold text-slate-200">Provider:</span> <span className="text-slate-400">{book.providerName}</span></li>}
+            <li>
+              <span className="font-semibold text-slate-200">Provider:</span> <span className="text-slate-400">{book.providerName || 'Imported locally'}</span>
+              {book.providerId ? (
+                <div className="text-xs text-slate-500 mt-1">
+                  Provider ID: {
+                    /^https?:\/\//.test(book.providerId)
+                      ? <a href={book.providerId} target="_blank" rel="noopener noreferrer" className="text-sky-400 underline hover:text-sky-600">{book.providerId}</a>
+                      : book.providerId
+                  }
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500 mt-1">Imported locally</div>
+              )}
+            </li>
             {book.accessibilitySummary && <li><span className="font-semibold text-slate-200">Accessibility:</span> <span className="text-slate-400">{book.accessibilitySummary}</span></li>}
             {book.accessibilityFeatures && book.accessibilityFeatures.length > 0 && (
               <li><span className="font-semibold text-slate-200">Features:</span> <span className="text-slate-400">{book.accessibilityFeatures.join(', ')}</span></li>

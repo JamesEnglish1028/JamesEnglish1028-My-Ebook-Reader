@@ -18,7 +18,19 @@ This README summarizes the current state (features implemented), developer setup
 - Keyboard shortcuts: navigation and reader controls are available via keyboard (help overlay lists shortcuts).
 - Accessibility: focus management and aria attributes on modals and the help overlay; keyboard-trappable help dialog.
 - Persistence: per-book last-read positions, per-book view state (PDF zoom / EPUB font-size), bookmarks, and citations saved in LocalStorage and IndexedDB.
-- **NEW: Service Layer** (Phase 2): Domain-driven architecture with type-safe services for books, OPDS, bookmarks, citations, and position tracking.
+- **Book Details Page**: Restored and enhanced layout with two-column design, top-aligned cover and title, accessible font sizes and spacing, format badges (EPUB, PDF, Audiobook) matching catalog views, and citation format support (APA, MLA, Chicago). Includes backup and type updates for reliability.
+# Book Details Page
+
+The Book Details page provides a visually clear, accessible, and feature-rich view for each book:
+
+- **Layout**: Two-column design with top-aligned book cover and title/details. Book title is large and accessible, with spacing and alignment for clarity.
+- **Format Badges**: Book format (EPUB, PDF, Audiobook) is shown as a colored badge, consistent with catalog views for easy recognition.
+- **Accessibility**: Font sizes, spacing, and color contrast are chosen for readability. Title font is large but balanced, and all interactive elements have clear focus states.
+- **Citation Format Support**: Citations can be created and exported in APA, MLA, or Chicago style, with the format tracked per citation.
+- **Backup**: The original BookDetailView.tsx is backed up for reference and rollback.
+ - **Publisher ID (ISBN)**: If the book's metadata includes an ISBN, it is displayed as the Publisher ID directly under the Publication Date for clear provenance and cataloging.
+
+See `components/BookDetailView.tsx` and `components/BookDetailView.tsx.backup` for implementation and backup. Type updates for citations are in `domain/reader/types.ts` and service logic in `domain/reader/citation-service.ts`.
 
 ## Notable implementation details
 
