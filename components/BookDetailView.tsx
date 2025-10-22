@@ -100,7 +100,18 @@ interface AnimationData {
 import { bookmarkService } from '../domain/reader';
 import { citationService } from '../domain/reader';
 
-const BookDetailView: React.FC<{ book: BookMetadata; bookmarks?: Bookmark[]; citations?: Citation[]; onBack: () => void; source: 'library' | 'catalog'; userCitationFormat: 'apa' | 'mla' | 'chicago'; onReadBook?: (id: number, animationData: AnimationData, format: string) => void; }> = ({ book, bookmarks, citations, onBack, source, userCitationFormat, onReadBook }) => {
+interface BookDetailViewProps {
+  book: BookMetadata;
+  bookmarks?: Bookmark[];
+  citations?: Citation[];
+  onBack: () => void;
+  source: 'library' | 'catalog';
+  userCitationFormat: 'apa' | 'mla' | 'chicago';
+  onReadBook?: (id: number, animationData: AnimationData, format: string) => void;
+  onImportFromCatalog?: (book: BookMetadata) => void;
+}
+
+const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citations, onBack, source, userCitationFormat, onReadBook, onImportFromCatalog }) => {
   const [localBookmarks, setLocalBookmarks] = React.useState<Bookmark[]>(bookmarks ?? []);
   const [localCitations, setLocalCitations] = React.useState<Citation[]>(citations ?? []);
 
@@ -157,7 +168,10 @@ const BookDetailView: React.FC<{ book: BookMetadata; bookmarks?: Bookmark[]; cit
               Read Book
             </button>
           ) : (
-            <button className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600">
+            <button
+              className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600"
+              onClick={() => onImportFromCatalog && onImportFromCatalog(book)}
+            >
               Import to My Library
             </button>
           )}
