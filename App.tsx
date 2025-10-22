@@ -19,6 +19,7 @@ import {
 // Import new LibraryView from refactored structure
 // Import app-level components
 import { GlobalModals, ViewRenderer } from './components/app';
+import BookDetailView from './components/BookDetailView';
 
 // Hooks imports
 import { useAuth } from './contexts/AuthContext';
@@ -893,3 +894,31 @@ const DebugDbRoute: React.FC = () => {
 
   return <div className="p-4 text-white">Debugging DB: check console for output.</div>;
 };
+
+// Example usage: Replace with actual state/props as needed
+const exampleBook: BookMetadata = {
+  id: 1,
+  title: 'Example Book',
+  // ...other required BookMetadata fields...
+};
+const exampleBookmarks: Bookmark[] = [];
+const exampleCitations: Citation[] = [];
+
+/*
+function App() {
+  // ...existing app logic...
+  return (
+    <div>
+      {/* ...other app UI... *}
+      <BookDetailView
+        book={exampleBook}
+        bookmarks={exampleBookmarks || []}
+        citations={exampleCitations || []}
+        onBack={() => {}}
+        source="library"
+        userCitationFormat="apa"
+      />
+    </div>
+  );
+}
+*/

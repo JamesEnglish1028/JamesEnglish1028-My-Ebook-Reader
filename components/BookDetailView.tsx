@@ -1,618 +1,217 @@
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    (e.target as HTMLImageElement).src = '/default-cover.png';
+  };
+// Main BookDetailView component
+import React, { useRef } from 'react';
 
+import type { BookMetadata, Bookmark, Citation } from '../types';
 
-import React, { useCallback, useState } from 'react';
+import { LeftArrowIcon } from './icons';
 
-import type { AuthDocument, BookMetadata, BookRecord, CatalogBook, CoverAnimationData } from '../types';
-
-import DuplicateBookModal from './DuplicateBookModal';
-import { BookIcon, DownloadIcon, LeftArrowIcon } from './icons';
-import OpdsCredentialsModal from './OpdsCredentialsModal';
-import Spinner from './Spinner';
-
-// Simple HTML sanitizer for OPDS descriptions - allows safe formatting tags but removes dangerous attributes and scripts
-const sanitizeHtml = (html: string): string => {
-  // Allow basic formatting tags but strip dangerous attributes and elements
-  return html
-    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
-    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags
-    .replace(/<object[^>]*>.*?<\/object>/gi, '') // Remove object tags
-    .replace(/<embed[^>]*>/gi, '') // Remove embed tags
-    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers (onclick, onload, etc.)
-    .replace(/javascript:/gi, '') // Remove javascript: URLs
-    .replace(/data:/gi, '') // Remove data: URLs
-    .replace(/<([^>]+)\s+style\s*=\s*["'][^"']*["']/gi, '<$1') // Remove style attributes (optional - can be kept if needed)
-    .trim();
+// Utility: format date for display
+const formatDate = (dateString: string | number): string => {
+  const date = new Date(typeof dateString === 'number' ? dateString : dateString);
+  if (isNaN(date.getTime())) return String(dateString);
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 };
 
-import { bookRepository } from '../domain/book';
-import { resolveAcquisitionChainOpds1 } from '../services/opds';
-import { findCredentialForUrl, saveOpdsCredential } from '../services/opds2';
-import { proxiedUrl } from '../services/utils';
+// BookAnnotationsAside component
+const BookAnnotationsAside: React.FC<{
+  libraryBook: BookMetadata;
+  bookmarks: Bookmark[];
+  citations: Citation[];
+  userCitationFormat: 'apa' | 'mla' | 'chicago';
+}> = ({ libraryBook, bookmarks = [], citations = [], userCitationFormat }) => {
+  function downloadTextFile(filename: string, content: string) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 0);
+  }
+  return (
+    <section className="mt-8 space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-200 mb-2">Bookmarks</h3>
+        {bookmarks.length > 0 ? (
+          <ul className="space-y-2">
+            {bookmarks.map((bm, idx) => (
+              <li key={bm.id || idx} className="bg-slate-800 rounded p-3 text-slate-300">
+                <div className="font-semibold">{bm.label || `Bookmark ${idx + 1}`}</div>
+                {bm.description && <div className="text-slate-400 text-sm mt-1">{bm.description}</div>}
+                {bm.chapter && <div className="text-xs text-slate-500 mt-1">Chapter: {bm.chapter}</div>}
+                <div className="text-xs text-slate-500">Created: {formatDate(bm.createdAt)}</div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-slate-500 text-sm">No bookmarks yet.</div>
+        )}
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-slate-200 mb-2 flex items-center justify-between">
+          Citations
+          <button
+            className="ml-2 px-3 py-1 rounded bg-sky-700 text-white text-xs font-bold hover:bg-sky-600"
+            onClick={() => {
+              const ris = citations.map(c => `${c.note || ''} [${c.chapter || ''}${c.pageNumber ? ', p.' + c.pageNumber : ''}]`).join('\n');
+              downloadTextFile(`${libraryBook.title || 'citations'}.ris`, ris);
+            }}
+          >
+            Export to RIS
+          </button>
+        </h3>
+        {citations.length > 0 ? (
+          <ul className="space-y-2">
+            {citations.map((ct, idx) => (
+              <li key={ct.id || idx} className="bg-slate-800 rounded p-3 text-slate-300">
+                <div className="font-semibold">{`Citation ${idx + 1}`}</div>
+                {ct.note && <div className="text-slate-400 text-sm mt-1">{ct.note}</div>}
+                {ct.chapter && <div className="text-xs text-slate-500 mt-1">Chapter: {ct.chapter}</div>}
+                {ct.pageNumber && <div className="text-xs text-slate-500 mt-1">Page: {ct.pageNumber}</div>}
+                <div className="text-xs text-slate-500">Created: {formatDate(ct.createdAt)}</div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-slate-500 text-sm">No citations yet.</div>
+        )}
+      </div>
+    </section>
+  );
+};
 
-import { useToast } from './toast/ToastContext';
-
-interface BookDetailViewProps {
-  book: BookMetadata | CatalogBook;
-  source: 'library' | 'catalog';
-  catalogName?: string;
-  onBack: () => void;
-  onReadBook: (id: number, animationData: CoverAnimationData, format: string) => void;
-  onImportFromCatalog: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord, existingBook?: BookRecord }>;
-  importStatus: { isLoading: boolean; message: string; error: string | null; };
-  setImportStatus: React.Dispatch<React.SetStateAction<{ isLoading: boolean; message: string; error: string | null; }>>;
+interface AnimationData {
+  rect: { x: number; y: number; width: number; height: number; top: number; right: number; bottom: number; left: number };
+  coverImage?: string;
 }
+import { bookmarkService } from '../domain/reader';
+import { citationService } from '../domain/reader';
 
-const isLibraryBook = (b: BookMetadata | CatalogBook): b is BookMetadata => {
-  return 'id' in b && typeof b.id === 'number';
-};
+const BookDetailView: React.FC<{ book: BookMetadata; bookmarks?: Bookmark[]; citations?: Citation[]; onBack: () => void; source: 'library' | 'catalog'; userCitationFormat: 'apa' | 'mla' | 'chicago'; onReadBook?: (id: number, animationData: AnimationData, format: string) => void; }> = ({ book, bookmarks, citations, onBack, source, userCitationFormat, onReadBook }) => {
+  const [localBookmarks, setLocalBookmarks] = React.useState<Bookmark[]>(bookmarks ?? []);
+  const [localCitations, setLocalCitations] = React.useState<Citation[]>(citations ?? []);
 
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
+  React.useEffect(() => {
+    if (!bookmarks && book.id) {
+      const result = bookmarkService.findByBookId(book.id);
+      if (result.success) setLocalBookmarks(result.data);
+    }
+  }, [book.id, bookmarks]);
 
-  // Check if the created date is invalid
-  if (isNaN(date.getTime())) {
-    // If parsing fails, it might be a simple year or year-month string
-    // that the constructor couldn't handle perfectly. Return as-is.
-    return dateString;
-  }
-
-  const trimmedDateString = dateString.trim();
-
-  // Handles "YYYY"
-  if (/^\d{4}$/.test(trimmedDateString)) {
-    return date.getUTCFullYear().toString();
-  }
-
-  // Handles "YYYY-MM"
-  if (/^\d{4}-\d{2}$/.test(trimmedDateString)) {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      timeZone: 'UTC', // Use UTC to avoid timezone shifting the month
-    });
-  }
-
-  // Handles full dates like "YYYY-MM-DD" or ISO strings
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC', // Use UTC to avoid timezone shifting the day
-  });
-};
-
-
-const BookDetailView: React.FC<BookDetailViewProps> = ({ book, source, catalogName, onBack, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
-  const containerRef = React.useRef<HTMLElement>(null);
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [duplicateBook, setDuplicateBook] = useState<BookRecord | null>(null);
-  const [existingBook, setExistingBook] = useState<BookRecord | null>(null);
-  const [credModalOpen, setCredModalOpen] = useState(false);
-  const [credHost, setCredHost] = useState<string | null>(null);
-  const [credAuthDoc, setCredAuthDoc] = useState<AuthDocument | undefined>(undefined);
-  const [pendingCatalogBook, setPendingCatalogBook] = useState<CatalogBook | null>(null);
-  const toast = useToast();
-
-  const libraryBook = isLibraryBook(book) ? book : null;
-  const catalogBook = !isLibraryBook(book) ? book : null;
-
-  const rawDescription = 'description' in book ? book.description : catalogBook?.summary;
-  const description = rawDescription ? sanitizeHtml(rawDescription) : '';
-  const isLongDescription = description && description.length > 400;
-  // Use direct cover image URL in the browser first; fall back to proxy on error.
-  const coverImage = book.coverImage ? book.coverImage : null;
-  const providerId = (book as any).providerId || (book as any).isbn;
-  const providerName = isLibraryBook(book)
-    ? (book as BookMetadata).providerName
-    : (book as CatalogBook).distributor; // Use distributor as provider name for catalog books
-
-  const format = ('format' in book && book.format) || (isLibraryBook(book) ? 'EPUB' : undefined);
-
-
+  React.useEffect(() => {
+    if (!citations && book.id) {
+      const result = citationService.findByBookId(book.id);
+      if (result.success) setLocalCitations(result.data);
+    }
+  }, [book.id, citations]);
+  const coverRef = useRef<HTMLImageElement>(null);
   const handleReadClick = () => {
-    if (libraryBook?.id && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
+    if (onReadBook && book.id && coverRef.current) {
+      const rect = coverRef.current.getBoundingClientRect();
       const animationData = {
         rect: {
           x: rect.x, y: rect.y,
           width: rect.width, height: rect.height,
           top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left,
-        } as DOMRect,
-        coverImage: libraryBook.coverImage,
+        },
+        coverImage: book.coverImage,
       };
-      onReadBook(libraryBook.id, animationData, libraryBook.format || 'EPUB');
+      onReadBook(book.id, animationData, book.format || 'EPUB');
     }
   };
-
-  const handleAddToBookshelf = async () => {
-    if (catalogBook) {
-      // If the catalog looks like a Palace/OPDS1 host and the acquisition
-      // appears to be a Palace/LCP style type, attempt to resolve the
-      // acquisition chain (may require authentication). If auth is needed,
-      // show the credentials modal and let the user retry.
-      const acqType = (catalogBook as any).acquisitionMediaType || '';
-      const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
-      const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
-
-      if (isPalace) {
-        setImportStatus({ isLoading: true, message: 'Resolving acquisition...', error: null });
-        setPendingCatalogBook(catalogBook);
-        try {
-          // First, try any stored credential for this host automatically
-          const stored = await findCredentialForUrl(catalogBook.downloadUrl);
-          let finalHref = null;
-          if (stored) {
-            try {
-              finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, { username: stored.username, password: stored.password });
-              // Inform the user a stored credential was used
-              try { toast.pushToast('Using saved credentials', 3000); } catch { }
-            } catch (e) {
-              // Stored credentials failed; we'll fall back to an unauthenticated attempt below
-              finalHref = null;
-            }
-          }
-
-          if (!finalHref) {
-            finalHref = await resolveAcquisitionChainOpds1(catalogBook.downloadUrl, null);
-          }
-          if (finalHref) {
-            // Convert into a CatalogBook-like object for import flow
-            const clone = { ...catalogBook, downloadUrl: finalHref } as CatalogBook;
-            const result = await onImportFromCatalog(clone, catalogName);
-            if (!result.success && result.bookRecord && result.existingBook) {
-              setDuplicateBook(result.bookRecord);
-              setExistingBook(result.existingBook);
-            }
-          } else {
-            setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
-          }
-        } catch (err: any) {
-          // If the resolver throws an error with an authDocument, surface the
-          // credentials modal and allow the user to supply credentials.
-          if (err && err.authDocument) {
-            setCredHost((catalogBook as any).providerName || (new URL(catalogBook.downloadUrl).host));
-            setCredAuthDoc(err.authDocument);
-            setCredModalOpen(true);
-          } else {
-            setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
-            // If this error indicates a public proxy was used and likely stripped Authorization
-            if (err && err.proxyUsed) {
-              try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch { }
-            }
-          }
-        }
-        setPendingCatalogBook(null);
-        return;
-      }
-
-      const result = await onImportFromCatalog(catalogBook, catalogName);
-      if (!result.success && result.bookRecord && result.existingBook) {
-        setDuplicateBook(result.bookRecord);
-        setExistingBook(result.existingBook);
-      }
-    }
-  };
-
-  // Handler when user submits credentials from the modal
-  const handleCredSubmit = async (username: string, password: string, save: boolean) => {
-    setCredModalOpen(false);
-    if (!pendingCatalogBook) {
-      // No pending book; nothing to retry
-      return;
-    }
-    setImportStatus({ isLoading: true, message: 'Retrying acquisition with credentials...', error: null });
-    try {
-      const creds = { username, password };
-      // Optionally persist
-      if (save && credHost) saveOpdsCredential(credHost, username, password);
-      const finalHref = await resolveAcquisitionChainOpds1(pendingCatalogBook.downloadUrl, creds as any);
-      if (finalHref) {
-        const clone = { ...pendingCatalogBook, downloadUrl: finalHref } as CatalogBook;
-        const result = await onImportFromCatalog(clone, catalogName);
-        if (!result.success && result.bookRecord && result.existingBook) {
-          setDuplicateBook(result.bookRecord);
-          setExistingBook(result.existingBook);
-        }
-      } else {
-        setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link with provided credentials.' });
-      }
-    } catch (err: any) {
-      setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition with credentials.' });
-      if (err && err.proxyUsed) {
-        try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch { }
-      }
-    }
-  };
-
-  const handleOpenAuthLink = (href: string) => {
-    // Open provider auth link in a new tab/window; user can sign in and then click Retry
-    try { window.open(href, '_blank', 'noopener'); } catch { }
-  };
-
-  const handleRetry = async () => {
-    // Retry without credentials (use stored credentials if available) or prompt modal
-    if (!pendingCatalogBook) return;
-    setImportStatus({ isLoading: true, message: 'Retrying acquisition...', error: null });
-    try {
-      const finalHref = await resolveAcquisitionChainOpds1(pendingCatalogBook.downloadUrl, null);
-      if (finalHref) {
-        const clone = { ...pendingCatalogBook, downloadUrl: finalHref } as CatalogBook;
-        const result = await onImportFromCatalog(clone, catalogName);
-        if (!result.success && result.bookRecord && result.existingBook) {
-          setDuplicateBook(result.bookRecord);
-          setExistingBook(result.existingBook);
-        }
-      } else {
-        setImportStatus({ isLoading: false, message: '', error: 'Could not resolve acquisition link.' });
-      }
-    } catch (err: any) {
-      if (err && err.authDocument) {
-        setCredAuthDoc(err.authDocument);
-        setCredModalOpen(true);
-      } else {
-        setImportStatus({ isLoading: false, message: '', error: err?.message || 'Failed to resolve acquisition.' });
-        if (err && err.proxyUsed) {
-          try { toast.pushToast('Borrow failed through public CORS proxy. Configure VITE_OWN_PROXY_URL to use an owned proxy that preserves Authorization.', 8000); } catch { }
-        }
-      }
-    }
-  };
-
-  const handleReplaceBook = useCallback(async () => {
-    if (!duplicateBook || !existingBook) return;
-
-    setImportStatus({ isLoading: true, message: 'Replacing book...', error: null });
-    const bookToSave = { ...duplicateBook, id: existingBook.id };
-
-    setDuplicateBook(null);
-    setExistingBook(null);
-
-    try {
-      const result = await bookRepository.save(bookToSave);
-
-      if (result.success) {
-        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-        setTimeout(() => {
-          setImportStatus({ isLoading: false, message: '', error: null });
-          onBack();
-        }, 2000);
-      } else {
-        console.error('Error replacing book:', (result as { success: false; error: string }).error);
-        setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
-      }
-    } catch (error) {
-      console.error('Error replacing book:', error);
-      setImportStatus({ isLoading: false, message: '', error: 'Failed to replace the book in the library.' });
-    }
-  }, [duplicateBook, existingBook, onBack, setImportStatus]);
-
-  const handleAddAnyway = useCallback(async () => {
-    if (!duplicateBook) return;
-
-    setImportStatus({ isLoading: true, message: 'Saving new copy...', error: null });
-    const bookToSave = { ...duplicateBook };
-
-    setDuplicateBook(null);
-    setExistingBook(null);
-
-    try {
-      const result = await bookRepository.save(bookToSave);
-
-      if (result.success) {
-        setImportStatus({ isLoading: false, message: 'Import successful!', error: null });
-        setTimeout(() => {
-          setImportStatus({ isLoading: false, message: '', error: null });
-          onBack();
-        }, 2000);
-      } else {
-        console.error('Error adding duplicate book:', (result as { success: false; error: string }).error);
-        setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
-      }
-    } catch (error) {
-      console.error('Error adding duplicate book:', error);
-      setImportStatus({ isLoading: false, message: '', error: 'Failed to add the new copy to the library.' });
-    }
-  }, [duplicateBook, onBack, setImportStatus]);
-
-  const handleCancelDuplicate = () => {
-    setDuplicateBook(null);
-    setExistingBook(null);
-    setImportStatus({ isLoading: false, message: '', error: null });
-  };
-
-
   return (
-    <div className="container mx-auto p-4 md:p-8 text-white min-h-screen">
-      <header className="mb-8">
-        <button onClick={onBack} className="inline-flex items-center gap-2 text-slate-300 hover:text-sky-400 transition-colors">
-          <LeftArrowIcon className="w-5 h-5" />
-          <span>Return to {source === 'library' ? 'My Library' : 'Catalog'}</span>
-        </button>
-      </header>
-
-      <main className="grid md:grid-cols-12 gap-8 md:gap-12">
-        {/* Left Column: Cover & Actions */}
-        <aside ref={containerRef} className="md:col-span-4 lg:col-span-3">
-          {coverImage ? (
+  <div className="flex flex-col md:flex-row gap-8 items-start px-4 md:px-12 md:pr-16">
+      {/* Left column: cover, buttons, bookmarks, citations */}
+      <div className="md:w-1/3 flex-shrink-0">
+        <BookDetailHeader onBack={onBack} source={source} />
+        <div className="mb-10" />
+        <div className="mb-6 flex flex-col items-center">
+          {book.coverImage ? (
             <img
-              src={coverImage}
+              ref={coverRef}
+              src={book.coverImage}
               alt={book.title}
-              className="w-full h-auto object-cover rounded-lg shadow-2xl aspect-[2/3]"
-              onError={(e) => {
-                const img = e.currentTarget as HTMLImageElement;
-                img.onerror = null as any;
-                if (typeof book.coverImage === 'string') {
-                  img.src = proxiedUrl(book.coverImage);
-                }
-              }}
+              className="w-full max-w-xs h-auto object-cover rounded-lg shadow-2xl aspect-[2/3] mb-4"
+              onError={handleImgError}
             />
           ) : (
-            <div className="w-full flex items-center justify-center p-4 text-center text-slate-400 bg-slate-800 rounded-lg aspect-[2/3] shadow-2xl">
+            <div className="w-full max-w-xs flex items-center justify-center p-4 text-center text-slate-400 bg-slate-800 rounded-lg aspect-[2/3] shadow-2xl">
               <span className="font-semibold">{book.title}</span>
             </div>
           )}
-          <div className="mt-6">
-            {source === 'library' ? (
-              <button onClick={handleReadClick} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg">
-                <BookIcon className="w-6 h-6 mr-2" />
-                Read Book
-              </button>
-            ) : (
-              (() => {
-                // If acquisitionMediaType indicates Palace/DRM or LCP-style acquisition,
-                // the UX should surface that the book must be opened in the Palace App.
-                const acqType = (catalogBook && (catalogBook as any).acquisitionMediaType) || undefined;
-                const palaceTypes = ['application/adobe+epub', 'application/pdf+lcp', 'application/vnd.readium.license.status.v1.0+json'];
-                const isPalace = acqType ? palaceTypes.some(t => acqType.includes(t)) : false;
-                // Allow both EPUB and PDF formats
-                const isUnsupportedFormat = !!format && format !== 'EPUB' && format !== 'PDF';
-                const disabled = importStatus.isLoading || isUnsupportedFormat;
-
-                // Check for alternative formats
-                const altFormats = catalogBook?.alternativeFormats;
-                const hasMultipleFormats = altFormats && altFormats.length > 1;
-
-                if (hasMultipleFormats && !isPalace) {
-                  // Show format selection buttons
-                  return (
-                    <div className="space-y-2">
-                      <p className="text-sm text-slate-400 mb-2">Choose format:</p>
-                      {altFormats!.map((fmt: any, idx: number) => {
-                        const fmtDisabled = importStatus.isLoading;
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              // Create a modified book with this format's download URL
-                              const modifiedBook = { ...catalogBook, downloadUrl: fmt.downloadUrl, format: fmt.format, acquisitionMediaType: fmt.mediaType, isOpenAccess: fmt.isOpenAccess };
-                              onImportFromCatalog(modifiedBook, catalogName);
-                            }}
-                            disabled={fmtDisabled}
-                            className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <DownloadIcon className="w-6 h-6 mr-2" />
-                            {fmt.format} Format
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-
-                return (
-                  <button onClick={handleAddToBookshelf} disabled={disabled} className="w-full py-3 px-6 rounded-lg bg-sky-500 hover:bg-sky-600 transition-colors font-bold inline-flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                    <DownloadIcon className="w-6 h-6 mr-2" />
-                    {isPalace ? 'Read in Palace App' : (isUnsupportedFormat ? `Cannot Import ${format}` : 'Add to Bookshelf')}
-                  </button>
-                );
-              })()
-            )}
-          </div>
-        </aside>
-
-        {/* Right Column: Details */}
-        <article className="md:col-span-8 lg:col-span-9">
-          <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-white">{book.title}</h1>
-          <h2 className="text-xl lg:text-2xl text-slate-300 mt-2">{book.author}</h2>
-
-          <div className="mt-8 border-t border-slate-700 pt-8 space-y-8">
-            {description && (
-              <section>
-                <h3 className="text-lg font-semibold text-slate-200 mb-3">Description</h3>
-                <div className="relative">
-                  <div
-                    className={`prose prose-invert max-w-none text-slate-300 prose-p:mb-4 overflow-hidden transition-all duration-500 ease-in-out ${isLongDescription && !isDescriptionExpanded ? 'max-h-40' : 'max-h-[1000px]'}`}
-                  >
-                    <div dangerouslySetInnerHTML={{ __html: description }} />
-                  </div>
-                  {isLongDescription && !isDescriptionExpanded && (
-                    <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
-                  )}
-                </div>
-                {isLongDescription && (
-                  <button
-                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                    className="text-sky-400 hover:text-sky-300 font-semibold text-sm mt-2"
-                  >
-                    {isDescriptionExpanded ? 'Show Less' : 'Read More'}
-                  </button>
-                )}
-              </section>
-            )}
-
-            {(book.publisher || book.publicationDate || providerId || providerName || format) && (
-              <section>
-                <h3 className="text-lg font-semibold text-slate-200 mb-3">Publication Details</h3>
-                <div className="bg-slate-800/50 rounded-lg border border-slate-700">
-                  <dl className="divide-y divide-slate-700">
-                    {book.publisher && (
-                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-slate-400">Publisher</dt>
-                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{book.publisher}</dd>
-                      </div>
-                    )}
-                    {book.publicationDate && (
-                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-slate-400">Published</dt>
-                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{formatDate(book.publicationDate)}</dd>
-                      </div>
-                    )}
-                    {providerName && !providerId && (
-                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-slate-400">Distributor</dt>
-                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">{providerName}</dd>
-                      </div>
-                    )}
-                    {providerId && (
-                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-slate-400">Provider ID</dt>
-                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
-                          {providerId}
-                          {providerName && (
-                            <span className="block text-xs text-slate-400">from {providerName}</span>
-                          )}
-                        </dd>
-                      </div>
-                    )}
-                    {(format || (catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 0)) && (
-                      <div className="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-slate-400">
-                          {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? 'Available Formats' : 'Format'}
-                        </dt>
-                        <dd className="mt-1 text-sm text-slate-200 sm:mt-0 sm:col-span-2">
-                          <div className="flex flex-wrap gap-2">
-                            {catalogBook?.alternativeFormats && catalogBook.alternativeFormats.length > 1 ? (
-                              // Show all alternative formats with color coding
-                              catalogBook.alternativeFormats.map((fmt: any, idx: number) => (
-                                <span key={idx} className={`text-white text-xs font-medium px-2 py-1 rounded-md ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                                  fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                                    'bg-sky-500'
-                                  }`}>
-                                  {fmt.format}
-                                </span>
-                              ))
-                            ) : format ? (
-                              // Show single format
-                              <span className="bg-slate-700 text-slate-300 text-xs font-medium px-2 py-1 rounded-md">
-                                {format}
-                              </span>
-                            ) : null}
-                          </div>
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              </section>
-            )}
-
-            {book.subjects && book.subjects.length > 0 && (
-              <section>
-                <h3 className="text-lg font-semibold text-slate-200 mb-3">Subjects</h3>
-                <div className="flex flex-wrap gap-2">
-                  {book.subjects.map((subject, index) => (
-                    <span key={index} className="bg-slate-700 text-slate-300 text-sm font-medium px-3 py-1.5 rounded-full">
-                      {subject}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Accessibility & OPF Metadata Section (only for library books) */}
-            {isLibraryBook(book) && (
-              (book.accessibilityFeedback || book.accessModes || book.accessibilityFeatures || book.hazards || book.accessibilitySummary || book.language || book.rights) && (
-                <section>
-                  <h3 className="text-lg font-semibold text-slate-200 mb-3">Accessibility & Metadata</h3>
-                  <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4 space-y-2">
-                    {book.accessibilityFeedback && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Summary</span>
-                        <span className="text-slate-200 text-sm">{book.accessibilityFeedback}</span>
-                      </div>
-                    )}
-                    {book.accessModes && book.accessModes.length > 0 && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Access Modes</span>
-                        <span className="text-slate-200 text-sm">{book.accessModes.join(', ')}</span>
-                      </div>
-                    )}
-                    {book.accessibilityFeatures && book.accessibilityFeatures.length > 0 && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Features</span>
-                        <span className="text-slate-200 text-sm">{book.accessibilityFeatures.join(', ')}</span>
-                      </div>
-                    )}
-                    {book.hazards && book.hazards.length > 0 && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Hazards</span>
-                        <span className="text-slate-200 text-sm">{book.hazards.join(', ')}</span>
-                      </div>
-                    )}
-                    {book.accessibilitySummary && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Accessibility Notes</span>
-                        <span className="text-slate-200 text-sm">{book.accessibilitySummary}</span>
-                      </div>
-                    )}
-                    {book.language && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Language</span>
-                        <span className="text-slate-200 text-sm">{book.language}</span>
-                      </div>
-                    )}
-                    {book.rights && (
-                      <div>
-                        <span className="block text-sky-400 font-semibold mb-1">Rights</span>
-                        <span className="text-slate-200 text-sm">{book.rights}</span>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )
-            )}
-          </div>
-        </article>
-      </main>
-
-      {(importStatus.isLoading || importStatus.error || importStatus.message === 'Import successful!') && (
-        <div className="fixed inset-0 bg-slate-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
-            {importStatus.isLoading && !importStatus.error && <Spinner text={importStatus.message} />}
-            {importStatus.message === 'Import successful!' && !importStatus.isLoading && (
-              <div className="flex flex-col items-center">
-                <h3 className="text-xl font-bold text-green-400 mb-4">Success</h3>
-                <p className="text-slate-300 mb-6">Book added to your library!</p>
-              </div>
-            )}
-            {importStatus.error && (
-              <div className="flex flex-col items-center">
-                <h3 className="text-xl font-bold text-red-400 mb-4">Import Failed</h3>
-                <p className="text-slate-300 mb-6">{importStatus.error}</p>
-                <button
-                  onClick={() => setImportStatus({ isLoading: false, message: '', error: null })}
-                  className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
+          {source === 'library' ? (
+            <button className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600" onClick={handleReadClick}>
+              Read Book
+            </button>
+          ) : (
+            <button className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600">
+              Import to My Library
+            </button>
+          )}
         </div>
-      )}
-
-      <DuplicateBookModal
-        isOpen={!!duplicateBook}
-        onClose={handleCancelDuplicate}
-        onReplace={handleReplaceBook}
-        onAddAnyway={handleAddAnyway}
-        bookTitle={duplicateBook?.title || ''}
-      />
-      {/* ToastStack provided at app root; individual components push toasts via useToast().pushToast */}
-
-      <OpdsCredentialsModal isOpen={credModalOpen} host={credHost} authDocument={credAuthDoc} onClose={() => setCredModalOpen(false)} onSubmit={handleCredSubmit} onOpenAuthLink={handleOpenAuthLink} onRetry={handleRetry} probeUrl={pendingCatalogBook?.downloadUrl} />
+        <BookAnnotationsAside libraryBook={book} bookmarks={localBookmarks} citations={localCitations} userCitationFormat={userCitationFormat} />
+      </div>
+      {/* Right column: Book Details */}
+      <div className="md:w-2/3 mt-8 md:mt-0">
+        {/* Book Title, Author, Publisher, etc. Section OUTSIDE container */}
+  <div className="mb-6 mt-10 flex flex-col justify-start">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-slate-100 mb-6 leading-tight mt-0">{book.title}</h2>
+          {book.author && <div className="mb-2 text-lg text-slate-400">By {book.author}</div>}
+          {book.publisher && <div className="mb-2 text-slate-400">Publisher: {book.publisher}</div>}
+          {book.publicationDate && <div className="mb-2 text-slate-400">Published: {book.publicationDate}</div>}
+          {book.language && <div className="mb-2 text-slate-400">Language: {book.language}</div>}
+          {book.format && (
+            <div className="mb-2">
+              <span
+                className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded mr-2 ${
+                  book.format.toUpperCase() === 'PDF'
+                    ? 'bg-red-600'
+                    : book.format.toUpperCase() === 'AUDIOBOOK'
+                    ? 'bg-purple-600'
+                    : 'bg-sky-500'
+                }`}
+                title={`Format: ${book.format}`}
+              >
+                {book.format}
+              </span>
+            </div>
+          )}
+          {book.subjects && book.subjects.length > 0 && (
+            <div className="mb-2 text-slate-400">Subjects: {book.subjects.join(', ')}</div>
+          )}
+          {book.description && <div className="mt-4 text-slate-300 text-base">{book.description}</div>}
+        </div>
+        {/* Book Details Section (accessibility, provider) INSIDE container */}
+        <div className="space-y-6 p-6 bg-slate-800 rounded-lg border border-slate-700 md:mt-4 md:mr-6 md:mb-4 md:p-8">
+          <h3 className="text-xl font-bold text-sky-300 mb-4">Book Details</h3>
+          <ul className="space-y-2 text-base">
+            {book.providerName && <li><span className="font-semibold text-slate-200">Provider:</span> <span className="text-slate-400">{book.providerName}</span></li>}
+            {book.accessibilitySummary && <li><span className="font-semibold text-slate-200">Accessibility:</span> <span className="text-slate-400">{book.accessibilitySummary}</span></li>}
+            {book.accessibilityFeatures && book.accessibilityFeatures.length > 0 && (
+              <li><span className="font-semibold text-slate-200">Features:</span> <span className="text-slate-400">{book.accessibilityFeatures.join(', ')}</span></li>
+            )}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 };
 
 export default BookDetailView;
+// BookDetailHeader: handles the header/back button section
+const BookDetailHeader: React.FC<{ onBack: () => void, source: 'library' | 'catalog' }> = ({ onBack, source }) => (
+  <header className="mb-8">
+    <button onClick={onBack} className="inline-flex items-center gap-2 text-slate-300 hover:text-sky-400 transition-colors">
+      <LeftArrowIcon className="w-5 h-5" />
+      <span>Return to {source === 'library' ? 'My Library' : 'Catalog'}</span>
+    </button>
+  </header>
+);
+// ...existing code for BookDetailHeader, BookAnnotationsAside, type guards, and utility functions...

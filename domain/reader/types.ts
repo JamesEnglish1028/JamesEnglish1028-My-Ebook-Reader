@@ -59,6 +59,7 @@ export interface Citation {
   createdAt: number; // Unix timestamp
   pageNumber?: number;
   chapter?: string;
+  citationFormat: CitationFormat; // Style used when created
 }
 
 /**

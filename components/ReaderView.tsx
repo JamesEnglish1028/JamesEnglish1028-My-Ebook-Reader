@@ -968,6 +968,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       note: note,
       pageNumber: locationInfo.currentPage > 0 ? locationInfo.currentPage : undefined,
       chapter: chapter,
+      citationFormat: settings.citationFormat,
     });
 
     if (addResult.success) {

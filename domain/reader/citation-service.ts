@@ -26,6 +26,7 @@ export interface CreateCitationOptions {
   note: string;
   pageNumber?: number;
   chapter?: string;
+  citationFormat: import('../types').CitationFormat;
 }
 
 /**
