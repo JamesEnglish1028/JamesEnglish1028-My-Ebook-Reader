@@ -13,7 +13,7 @@ export interface ReaderSettings {
   theme: 'light' | 'dark';
   flow: 'paginated' | 'scrolled';
   fontFamily: string;
-  citationFormat: 'apa' | 'mla' | 'chicago';
+  citationFormat: 'apa' | 'mla';
   readAloud: ReadAloudSettings;
 }
 
@@ -90,7 +90,7 @@ export interface ReadingPosition {
 /**
  * Citation formatting options
  */
-export type CitationFormat = 'apa' | 'mla' | 'chicago';
+export type CitationFormat = 'apa' | 'mla';
 
 /**
  * Citation style output

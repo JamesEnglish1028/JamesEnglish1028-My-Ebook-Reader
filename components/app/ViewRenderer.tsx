@@ -17,7 +17,7 @@ import type {
 import LibraryView from '../library/LibraryView';
 
 
-interface ViewRendererProps {
+export interface ViewRendererProps {
   libraryRefreshFlag: number;
   currentView: 'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about';
 
@@ -39,6 +39,7 @@ interface ViewRendererProps {
   // Library view props
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => void;
+  userCitationFormat: 'apa' | 'mla';
   processAndSaveBook: (
     bookData: ArrayBuffer,
     fileName?: string,
@@ -97,6 +98,7 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
   importStatus,
   setImportStatus,
   libraryRefreshFlag,
+  userCitationFormat,
 }) => {
   switch (currentView) {
     case 'reader':
@@ -128,6 +130,7 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
             onImportFromCatalog={onImportFromCatalog}
             importStatus={importStatus}
             setImportStatus={setImportStatus}
+            userCitationFormat={userCitationFormat}
           />
         </ErrorBoundary>
       ) : null;

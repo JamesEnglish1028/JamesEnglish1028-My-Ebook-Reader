@@ -4,7 +4,19 @@
 // Main BookDetailView component
 import React, { useRef } from 'react';
 
-import type { BookMetadata, Bookmark, Citation } from '../types';
+import type { BookMetadata, Bookmark, Citation, CatalogBook, BookRecord, ImportStatus } from '../types';
+
+export interface BookDetailViewProps {
+  book: BookMetadata;
+  source: string | null;
+  catalogName?: string;
+  onBack: () => void;
+  onReadBook: (book: BookMetadata) => void;
+  onImportFromCatalog?: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord; existingBook?: BookRecord }>;
+  importStatus?: ImportStatus | null;
+  setImportStatus?: (status: ImportStatus | null) => void;
+  userCitationFormat: 'apa' | 'mla';
+}
 
 import { LeftArrowIcon } from './icons';
 
@@ -70,9 +82,9 @@ const BookAnnotationsAside: React.FC<{
         {citations.length > 0 ? (
           <ul className="space-y-2">
             {citations.map((ct, idx) => {
-              // Format citation using the style required (APA, MLA, Chicago)
+              // Use the citation's formatType (citationFormat) as set by the user in Reader Views
               const citationFormat = ct.citationFormat || userCitationFormat || 'apa';
-              const formatted = citationService.formatCitation(libraryBook, citationFormat);
+              const formatted = citationService.formatCitation(libraryBook, ct, citationFormat);
               return (
                 <li key={ct.id || idx} className="bg-slate-800 rounded p-3 text-slate-300">
                   <div className="font-semibold mb-1">{formatted.text}</div>
@@ -80,7 +92,7 @@ const BookAnnotationsAside: React.FC<{
                   {ct.chapter && <div className="text-xs text-slate-500 mt-1">Chapter: {ct.chapter}</div>}
                   {ct.pageNumber && <div className="text-xs text-slate-500 mt-1">Page: {ct.pageNumber}</div>}
                   <div className="text-xs text-slate-500">Created: {formatDate(ct.createdAt)}</div>
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs font-bold bg-sky-900 text-sky-300">{citationFormat.toUpperCase()}</span>
+                  <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs font-bold bg-sky-900 text-sky-300">{formatted.format.toUpperCase()}</span>
                 </li>
               );
             })}
@@ -98,37 +110,37 @@ interface AnimationData {
   coverImage?: string;
 }
 import { bookmarkService } from '../domain/reader';
-import { citationService } from '../domain/reader';
+import { citationService } from '../domain/reader/citation-service';
 
-interface BookDetailViewProps {
+export interface BookDetailViewProps {
   book: BookMetadata;
-  bookmarks?: Bookmark[];
-  citations?: Citation[];
-  onBack: () => void;
-  source: 'library' | 'catalog';
+  source: string | null;
   catalogName?: string;
+  onBack: () => void;
+  onReadBook: (book: BookMetadata) => void;
+  onImportFromCatalog?: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord; existingBook?: BookRecord }>;
+  importStatus?: ImportStatus | null;
+  setImportStatus?: (status: ImportStatus | null) => void;
   userCitationFormat: 'apa' | 'mla' | 'chicago';
-  onReadBook?: (id: number, animationData: AnimationData, format: string) => void;
-  onImportFromCatalog?: (book: BookMetadata) => void;
 }
 
-const BookDetailView: React.FC<BookDetailViewProps> = ({ book, bookmarks, citations, onBack, source, catalogName, userCitationFormat, onReadBook, onImportFromCatalog }) => {
-  const [localBookmarks, setLocalBookmarks] = React.useState<Bookmark[]>(bookmarks ?? []);
-  const [localCitations, setLocalCitations] = React.useState<Citation[]>(citations ?? []);
+const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, catalogName, userCitationFormat, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
+  const [localBookmarks, setLocalBookmarks] = React.useState<Bookmark[]>([]);
+  const [localCitations, setLocalCitations] = React.useState<Citation[]>([]);
 
   React.useEffect(() => {
-    if (!bookmarks && book.id) {
+    if (book.id) {
       const result = bookmarkService.findByBookId(book.id);
       if (result.success) setLocalBookmarks(result.data);
     }
-  }, [book.id, bookmarks]);
+  }, [book.id]);
 
   React.useEffect(() => {
-    if (!citations && book.id) {
+    if (book.id) {
       const result = citationService.findByBookId(book.id);
       if (result.success) setLocalCitations(result.data);
     }
-  }, [book.id, citations]);
+  }, [book.id]);
   const coverRef = useRef<HTMLImageElement>(null);
   const handleReadClick = () => {
     if (onReadBook && book.id && coverRef.current) {

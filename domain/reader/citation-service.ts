@@ -52,7 +52,7 @@ export interface CitationComponents {
  * Citation Service
  *
  * Manages citations (reader annotations) and provides bibliographic
- * citation formatting in APA, MLA, and Chicago styles.
+ * citation formatting in APA and MLA styles.
  */
 export class CitationService {
   /**
@@ -139,6 +139,7 @@ export class CitationService {
         createdAt: Date.now(),
         pageNumber: options.pageNumber,
         chapter: options.chapter,
+        citationFormat: options.citationFormat || 'apa',
       };
 
       // Add to list and save
@@ -358,6 +359,38 @@ export class CitationService {
 
   // ===== Bibliographic Citation Formatting =====
 
+    /**
+     * Format a citation for display in the UI
+     * @param book - BookMetadata for the book
+     * @param citation - Citation object
+  * @param format - CitationFormat ('apa', 'mla')
+     * @returns Formatted citation string
+     */
+    formatCitation(book: BookMetadata, citation: Citation, format: CitationFormat = 'apa'): { text: string, format: string } {
+      // Defensive: fallback to citation.citationFormat if format not provided
+      const citationFormat = format || citation.citationFormat || 'apa';
+      const author = book.author || 'Unknown Author';
+      const title = book.title || 'Untitled';
+      const publisher = book.publisher || '';
+      const year = this.getPublicationYear(book.publicationDate);
+      const chapter = citation.chapter ? `, ${citation.chapter}` : '';
+      const page = citation.pageNumber ? `, p. ${citation.pageNumber}` : '';
+      // Do NOT include citation.note in the formatted citation string
+      let text = '';
+      switch (citationFormat.toLowerCase()) {
+        case 'apa':
+          text = `${this.formatAuthorName(author, 'apa')} (${year}). ${title}. ${publisher}${chapter}${page}.`.trim();
+          break;
+        case 'mla':
+          text = `${author}. ${title}. ${publisher}, ${year}${chapter}${page}.`.trim();
+          break;
+        default:
+          text = `${this.formatAuthorName(author, 'apa')} (${year}). ${title}. ${publisher}${chapter}${page}.`.trim();
+          break;
+      }
+      return { text, format: citationFormat };
+    }
+
   /**
    * Extract publication year from date string
    */
@@ -389,142 +422,6 @@ export class CitationService {
     return `${lastName}, ${firstNameParts.join(' ')}`;
   }
 
-  /**
-   * Generate bibliographic citation components
-   *
-   * @param book - Book metadata
-   * @param format - Citation format (APA, MLA, or Chicago)
-   * @returns Citation components for rendering
-   */
-  generateCitation(book: BookMetadata, format: CitationFormat): CitationComponents {
-    try {
-      const author = book.author || 'Unknown Author';
-      const title = book.title || 'Untitled Book';
-      const publisher = book.publisher || '[Publisher not available]';
-      const year = this.getPublicationYear(book.publicationDate);
-      const formattedAuthor = this.formatAuthorName(author, format);
-
-      switch (format) {
-        case 'apa':
-          return {
-            pre: `${formattedAuthor} (${year}). `,
-            title,
-            post: `. ${publisher}.`,
-            isItalic: true,
-          };
-
-        case 'mla':
-          return {
-            pre: `${formattedAuthor}. `,
-            title,
-            post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
-            isItalic: true,
-          };
-
-        case 'chicago':
-          return {
-            pre: `${formattedAuthor}. `,
-            title,
-            post: `. ${publisher}, ${year === 'n.d.' ? '[Date not available]' : year}.`,
-            isItalic: false,
-          };
-
-        default:
-          return {
-            pre: `${author}. `,
-            title,
-            post: `.`,
-            isItalic: false,
-          };
-      }
-    } catch (error) {
-      logger.error('Error generating citation:', error);
-      return {
-        pre: '',
-        title: book.title || 'Untitled Book',
-        post: '',
-        isItalic: false,
-      };
-    }
-  }
-
-  /**
-   * Generate formatted citation as plain text
-   *
-   * @param book - Book metadata
-   * @param format - Citation format
-   * @returns Formatted citation object
-   */
-  formatCitation(book: BookMetadata, format: CitationFormat): FormattedCitation {
-    const components = this.generateCitation(book, format);
-    const text = `${components.pre}${components.title}${components.post}`;
-
-    return {
-      format,
-      text,
-    };
-  }
-
-  /**
-   * Generate all citation formats for a book
-   *
-   * @param book - Book metadata
-   * @returns Array of formatted citations in all supported formats
-   */
-  formatAllStyles(book: BookMetadata): FormattedCitation[] {
-    const formats: CitationFormat[] = ['apa', 'mla', 'chicago'];
-    return formats.map(format => this.formatCitation(book, format));
-  }
-
-  /**
-   * Generate RIS format export for citations
-   * RIS is a standardized format for bibliographic data
-   *
-   * @param book - Book metadata
-   * @param citations - Array of citations to export
-   * @returns RIS formatted string
-   */
-  exportToRIS(book: BookMetadata, citations: Citation[]): CitationResult<string> {
-    try {
-      logger.info('Exporting citations to RIS', { bookId: book.id, count: citations.length });
-
-      const allRecords: string[] = [];
-      const year = this.getPublicationYear(book.publicationDate);
-
-      citations.forEach(citation => {
-        const risRecord: string[] = [];
-        risRecord.push('TY  - CHAP'); // Chapter of a book
-
-        if (book.author) {
-          const formattedAuthor = this.formatAuthorName(book.author, 'apa');
-          risRecord.push(`AU  - ${formattedAuthor}`);
-        }
-
-        if (book.title) risRecord.push(`T2  - ${book.title}`);
-        if (book.publisher) risRecord.push(`PB  - ${book.publisher}`);
-        if (year !== 'n.d.') risRecord.push(`PY  - ${year}`);
-        if (book.isbn) risRecord.push(`SN  - ${book.isbn}`);
-        if (citation.chapter) risRecord.push(`TI  - ${citation.chapter}`);
-        if (citation.pageNumber) risRecord.push(`SP  - ${citation.pageNumber}`);
-
-        // Clean note content (remove line breaks)
-        const noteContent = (citation.note || '').replace(/(\r\n|\n|\r)/gm, ' ');
-        if (noteContent) risRecord.push(`N1  - ${noteContent}`);
-
-        risRecord.push('ER  - '); // End of record
-        allRecords.push(risRecord.join('\r\n'));
-      });
-
-      const risContent = allRecords.join('\r\n\r\n') + '\r\n';
-
-      logger.info('RIS export successful', { recordCount: allRecords.length });
-      return { success: true, data: risContent };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error exporting to RIS';
-      logger.error('Error exporting to RIS:', errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }
 
   /**
    * Export citations as JSON

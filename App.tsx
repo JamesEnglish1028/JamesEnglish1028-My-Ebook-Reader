@@ -93,6 +93,27 @@ const queryClient = new QueryClient({
 
 
 const AppInner: React.FC = () => {
+  // Track user's citation format setting
+  const [userCitationFormat, setUserCitationFormat] = useState<'apa' | 'mla'>(() => {
+    try {
+      const settings = JSON.parse(localStorage.getItem('ebook-reader-settings-global') || '{}');
+      return settings.citationFormat || 'apa';
+    } catch {
+      return 'apa';
+    }
+  });
+
+  // Keep citation format in sync if settings change elsewhere
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const settings = JSON.parse(localStorage.getItem('ebook-reader-settings-global') || '{}');
+        setUserCitationFormat(settings.citationFormat || 'apa');
+      } catch {}
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
   const toast = useToast();
   const [currentView, setCurrentView] = useState<'library' | 'reader' | 'pdfReader' | 'bookDetail' | 'about'>('library');
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
@@ -800,6 +821,7 @@ const AppInner: React.FC = () => {
             importStatus={importStatus}
             setImportStatus={setImportStatus}
             libraryRefreshFlag={libraryRefreshFlag}
+            userCitationFormat={userCitationFormat}
           />
           {console.log('[App] Rendering ViewRenderer with props:', {
             currentView,

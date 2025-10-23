@@ -285,7 +285,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, settings
                   Citation Format
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['APA', 'MLA', 'Chicago'].map((formatName) => (
+                  {['APA', 'MLA'].map((formatName) => (
                     <button
                       key={formatName}
                       onClick={() => onSettingsChange({ citationFormat: formatName.toLowerCase() as any })}
