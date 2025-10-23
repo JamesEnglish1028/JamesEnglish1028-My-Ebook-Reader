@@ -26,7 +26,7 @@ The Book Details page provides a visually clear, accessible, and feature-rich vi
 - **Layout**: Two-column design with top-aligned book cover and title/details. Book title is large and accessible, with spacing and alignment for clarity.
 - **Format Badges**: Book format (EPUB, PDF, Audiobook) is shown as a colored badge, consistent with catalog views for easy recognition.
 - **Accessibility**: Font sizes, spacing, and color contrast are chosen for readability. Title font is large but balanced, and all interactive elements have clear focus states.
-- **Citation Format Support**: Citations can be created and exported in APA, MLA, or Chicago style, with the format tracked per citation.
+- **Citation Format Support**: Citations can be created and exported in APA or MLA style, with the format tracked per citation.
 - **Backup**: The original BookDetailView.tsx is backed up for reference and rollback.
  - **Publisher ID (ISBN)**: If the book's metadata includes an ISBN, it is displayed as the Publisher ID directly under the Publication Date for clear provenance and cataloging.
 
@@ -125,7 +125,7 @@ MeBooks now includes a comprehensive service layer with domain-driven architectu
 1. **BookRepository** (`domain/book`) - Book persistence with CRUD operations
 2. **OPDS Services** (`domain/catalog`) - OPDS 1/2 parsing and acquisition resolution
 3. **BookmarkService** (`domain/reader`) - Bookmark management and organization
-4. **CitationService** (`domain/reader`) - Citations and bibliographic formatting (APA, MLA, Chicago)
+4. **CitationService** (`domain/reader`) - Citations and bibliographic formatting (APA, MLA)
 5. **PositionTracker** (`domain/reader`) - Reading position and progress tracking
 
 ### Key Features

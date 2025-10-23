@@ -50,7 +50,7 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
             <ul className="list-disc list-inside space-y-1 text-slate-200">
               <li><span className="font-semibold">Local-First Storage:</span> Your books and reading data never leave your computer. Book files are stored in IndexedDB, settings and annotations in LocalStorage.</li>
               <li><span className="font-semibold">EPUB & PDF Import:</span> Build your personal library with <code>.epub</code> and <code>.pdf</code> files.</li>
-              <li><span className="font-semibold">Book Details:</span> View publication info, subjects, and provider IDs.</li>
+              <li><span className="font-semibold">Book Details:</span> View publication info, subjects, provider IDs, and citation formats (APA, MLA).</li>
               <li><span className="font-semibold">Library Organization:</span> Sort by title, author, publication date, or date added.</li>
             </ul>
           </div>
