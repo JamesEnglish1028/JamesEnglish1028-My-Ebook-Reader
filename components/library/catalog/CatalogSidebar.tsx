@@ -43,8 +43,11 @@ const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [collectionsOpen, setCollectionsOpen] = useState(true);
 
-  // Don't render if no categories or collections available
-  if (categories.length === 0 && collections.length === 0 && !isLoading) {
+
+  // Show registry navigation links if no books/collections/categories but navLinks are present
+  const hasRegistryNavLinks = catalogNavLinks && catalogNavLinks.length > 0 && categories.length === 0 && collections.length === 0;
+
+  if (!hasRegistryNavLinks && categories.length === 0 && collections.length === 0 && !isLoading) {
     return null;
   }
 
@@ -67,16 +70,37 @@ const CatalogSidebar: React.FC<CatalogSidebarProps> = ({
       <div className="bg-slate-800/50 rounded-lg p-4 lg:sticky lg:top-4">
         <h3 className="text-lg font-semibold text-white mb-4">Navigate By</h3>
 
+        {/* Registry Navigation Links (for OPDS2 registries) */}
+        {hasRegistryNavLinks && (
+          <nav className="mb-6">
+            <h4 className="text-md font-semibold text-slate-200 mb-2">Catalogs</h4>
+            <ul className="space-y-1">
+              {catalogNavLinks.map((link, idx) => (
+                <li key={link.url + idx}>
+                  <button
+                    className="w-full text-left px-3 py-2 rounded-md text-sm transition-colors bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border border-transparent hover:border-sky-600/30"
+                    onClick={() => onCategoryNavigate(link.title)}
+                  >
+                    {link.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
         {/* "All Books" button - always at top */}
-        <button
-          onClick={() => onCollectionChange('all')}
-          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors mb-4 ${navPathLength <= 1 && (activeCollection === 'all' || !activeCollection)
-              ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
-              : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
-            }`}
-        >
-          All Books
-        </button>
+        {!hasRegistryNavLinks && (
+          <button
+            onClick={() => onCollectionChange('all')}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors mb-4 ${navPathLength <= 1 && (activeCollection === 'all' || !activeCollection)
+                ? 'bg-emerald-600 text-white font-medium shadow-lg border-2 border-emerald-500'
+                : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-2 border-transparent'
+              }`}
+          >
+            All Books
+          </button>
+        )}
 
         <div className="space-y-3">
           {/* Categories Accordion */}

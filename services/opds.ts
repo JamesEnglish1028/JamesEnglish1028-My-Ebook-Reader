@@ -1,4 +1,5 @@
 import type { AudienceMode, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogWithCategories, CatalogWithCollections, CategorizationMode, Category, Collection, CollectionGroup, CollectionMode, FictionMode, MediaMode, Series } from '../types';
+import { parseOpds2Json } from './opds2';
 
 import { logger } from './logger';
 import { maybeProxyForCors, proxiedUrl } from './utils';
@@ -378,188 +379,6 @@ export const parseOpds1Xml = (xmlText: string, baseUrl: string): { books: Catalo
     return { books, navLinks, pagination };
 };
 
-export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
-    if (!jsonData || typeof jsonData !== 'object') {
-        throw new Error('Invalid catalog format. The response was not a valid JSON object.');
-    }
-    // If metadata is missing, treat as an invalid feed — callers expect an error
-    // when required OPDS2 metadata is absent.
-    if (!jsonData.metadata) {
-        throw new Error('OPDS2 feed missing metadata');
-    }
-
-    const books: CatalogBook[] = [];
-    const navLinks: CatalogNavigationLink[] = [];
-    const pagination: CatalogPagination = {};
-
-    if (jsonData.links && Array.isArray(jsonData.links)) {
-        jsonData.links.forEach((link: any) => {
-            if (link.href && link.rel) {
-                const fullUrl = new URL(link.href, baseUrl).href;
-                if (link.rel === 'next') pagination.next = fullUrl;
-                if (link.rel === 'previous') pagination.prev = fullUrl;
-                if (link.rel === 'first') pagination.first = fullUrl;
-                if (link.rel === 'last') pagination.last = fullUrl;
-            }
-        });
-    }
-
-    if (jsonData.publications && Array.isArray(jsonData.publications)) {
-        jsonData.publications.forEach((pub: any) => {
-            const metadata = pub.metadata || {};
-            const title = metadata.title?.trim() || 'Untitled';
-            const summary = metadata.description?.trim() || null;
-
-            let author = 'Unknown Author';
-            if (metadata.author) {
-                if (Array.isArray(metadata.author) && metadata.author.length > 0) {
-                    const firstAuthor = metadata.author[0];
-                    if (typeof firstAuthor === 'string') author = firstAuthor.trim();
-                    else if (firstAuthor?.name) author = firstAuthor.name.trim();
-                } else if (typeof metadata.author === 'string') {
-                    author = metadata.author.trim();
-                } else if (metadata.author?.name) {
-                    author = metadata.author.name.trim();
-                }
-            }
-
-            // Find all acquisition links and prefer open-access ones
-            const acquisitionLinks = pub.links?.filter((l: any) => l.rel?.includes('opds-spec.org/acquisition')) || [];
-
-            // Separate open-access links
-            const openAccessLinks = acquisitionLinks.filter((l: any) =>
-                l.rel?.includes('/open-access') || l.rel === 'http://opds-spec.org/acquisition/open-access',
-            );
-
-            // Prefer open-access EPUB over PDF as primary (EPUB is generally more reliable)
-            let acquisitionLink = openAccessLinks.find((l: any) => l.type?.includes('epub'));
-            if (!acquisitionLink) {
-                acquisitionLink = openAccessLinks[0] || acquisitionLinks[0];
-            }
-
-            const isOpenAccess = openAccessLinks.length > 0;
-
-            // Collect all unique formats as alternatives
-            const alternativeFormats: any[] = [];
-            const seenFormats = new Set<string>();
-
-            for (const link of openAccessLinks.length > 0 ? openAccessLinks : acquisitionLinks) {
-                const fmt = getFormatFromMimeType(link.type);
-                if (fmt && !seenFormats.has(fmt)) {
-                    seenFormats.add(fmt);
-                    alternativeFormats.push({
-                        format: fmt,
-                        downloadUrl: new URL(link.href, baseUrl).href,
-                        mediaType: link.type,
-                        isOpenAccess: openAccessLinks.includes(link),
-                    });
-                }
-            }
-
-            const coverLink = pub.images?.[0];
-
-            if (acquisitionLink?.href) {
-                const downloadUrl = new URL(acquisitionLink.href, baseUrl).href;
-                const coverImage = coverLink?.href ? new URL(coverLink.href, baseUrl).href : null;
-                const mimeType = acquisitionLink?.type || '';
-                const format = getFormatFromMimeType(mimeType);
-
-                let publisher: string | undefined = undefined;
-                if (metadata.publisher) {
-                    if (typeof metadata.publisher === 'string') {
-                        publisher = metadata.publisher.trim();
-                    } else if (metadata.publisher?.name) {
-                        publisher = metadata.publisher.name.trim();
-                    }
-                }
-
-                const publicationDate = metadata.published?.trim();
-
-                let providerId: string | undefined = undefined;
-                if (typeof metadata.identifier === 'string') {
-                    providerId = metadata.identifier.trim();
-                } else if (Array.isArray(metadata.identifier) && metadata.identifier.length > 0) {
-                    const firstIdentifier = metadata.identifier.find((id: any) => typeof id === 'string');
-                    if (firstIdentifier) {
-                        providerId = firstIdentifier.trim();
-                    }
-                }
-
-                let subjects: string[] = [];
-                if (Array.isArray(metadata.subject)) {
-                    subjects = metadata.subject.map((s: any) => {
-                        if (typeof s === 'string') return s.trim();
-                        if (s?.name) return s.name.trim();
-                        return null;
-                    }).filter((s: unknown): s is string => !!s && typeof s === 'string');
-                }
-
-                // Parse OPDS 2 series information from belongsTo
-                let series: Series | undefined = undefined;
-                if (metadata.belongsTo) {
-                    const belongsTo = metadata.belongsTo;
-                    if (belongsTo.name) {
-                        series = {
-                            name: belongsTo.name.trim(),
-                            position: typeof belongsTo.position === 'number' ? belongsTo.position : undefined,
-                        };
-                    }
-                }
-
-                books.push({
-                    title,
-                    author,
-                    coverImage,
-                    downloadUrl,
-                    summary,
-                    publisher,
-                    publicationDate,
-                    providerId,
-                    subjects: subjects.length > 0 ? subjects : undefined,
-                    series,
-                    format,
-                    acquisitionMediaType: mimeType || undefined,
-                    isOpenAccess: isOpenAccess ? true : undefined,
-                    alternativeFormats: alternativeFormats.length > 0 ? alternativeFormats : undefined,
-                });
-            }
-        });
-    }
-
-    let hasNavigatedFromCatalogs = false;
-    // Prioritize a custom 'catalogs' array if it exists, as this is a convention for some registries
-    // to list their final set of catalogs.
-    if (jsonData.catalogs && Array.isArray(jsonData.catalogs) && jsonData.catalogs.length > 0) {
-        jsonData.catalogs.forEach((catalog: any) => {
-            const title = catalog.metadata?.title;
-            // FIX: Correctly find the OPDS catalog URL by its specific 'rel' attribute.
-            const catalogLink = catalog.links?.find((l: any) => l.rel === 'http://opds-spec.org/catalog' && l.href);
-
-            if (title && catalogLink) {
-                const url = new URL(catalogLink.href, baseUrl).href;
-                // Treat it as a standard navigation link for the UI, but flag it as a terminal catalog entry.
-                navLinks.push({ title, url, rel: 'subsection', isCatalog: true });
-            }
-        });
-        if (navLinks.length > 0) {
-            hasNavigatedFromCatalogs = true;
-        }
-    }
-
-    // Fallback to the standard 'navigation' array if 'catalogs' is not present or empty.
-    if (!hasNavigatedFromCatalogs && jsonData.navigation && Array.isArray(jsonData.navigation)) {
-        jsonData.navigation.forEach((link: any) => {
-            if (link.href && link.title) {
-                const url = new URL(link.href, baseUrl).href;
-                const inferredRel = link.rel || (link.type && typeof link.type === 'string' && link.type.includes('application/opds+json') ? 'subsection' : '');
-                const isCatalog = !!(link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) || !!link.isCatalog;
-                navLinks.push({ title: link.title, url, rel: inferredRel, isCatalog });
-            }
-        });
-    }
-
-    return { books, navLinks, pagination };
-};
 
 export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVersion: 'auto' | '1' | '2' = 'auto'): Promise<{ books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination, error?: string }> => {
     try {
@@ -661,6 +480,13 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                     try {
                         const jsonData = JSON.parse(responseText);
                         return parseOpds2Json(jsonData, baseUrl);
+                                const parsed = parseOpds2Json(jsonData, baseUrl);
+                                console.log('[mebooks] parseOpds2Json result:', {
+                                    navLinks: parsed.navLinks,
+                                    books: parsed.books,
+                                    pagination: parsed.pagination
+                                });
+                                return parsed;
                     } catch (e) {
                         // Some Palace endpoints return Atom XML but incorrectly set Content-Type
                         // to application/json; if the body looks like XML, try parsing as XML.
@@ -750,6 +576,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                 const jsonData = JSON.parse(responseText);
                 console.log('[mebooks] JSON.parse succeeded! About to call parseOpds2Json...');
                 logger.info('[mebooks] Delegating to parseOpds2Json for', baseUrl);
+                console.error('[mebooks] DEBUG: About to invoke parseOpds2Json', { baseUrl, jsonKeys: Object.keys(jsonData) });
                 return parseOpds2Json(jsonData, baseUrl);
             } catch (e) {
                 // Some Palace endpoints return Atom XML but incorrectly set Content-Type

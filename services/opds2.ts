@@ -1,3 +1,9 @@
+// Helper: treat rels like 'modules:xxxx' as 'collection' for navigation
+function normalizeRel(rel: string | undefined): string {
+  if (!rel) return '';
+  if (/^modules:[\w-]+$/i.test(rel)) return 'collection';
+  return rel;
+}
 import type { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
 
 import credentialsService from './credentials';
@@ -173,21 +179,53 @@ export function getCachedEtag(url: string) {
 
 
 export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: CatalogBook[], navLinks: CatalogNavigationLink[], pagination: CatalogPagination } => {
-  if (typeof jsonData !== 'object' || jsonData === null) {
-    throw new Error('Invalid OPDS2 catalog format: input is not an object');
-  }
-  console.log('[OPDS2] parseOpds2Json CALLED with baseUrl:', baseUrl, 'jsonData keys:', Object.keys(jsonData));
+  console.error('[OPDS2] parseOpds2Json REACHED', { baseUrl, typeofJson: typeof jsonData });
+  try {
+    if (typeof jsonData !== 'object' || jsonData === null) {
+      throw new Error('Invalid OPDS2 catalog format: input is not an object');
+    }
+    try {
+      const keys = Object.keys(jsonData);
+      console.error('[OPDS2] parseOpds2Json START', { baseUrl, keys });
+    } catch (err) {
+      console.error('[OPDS2] parseOpds2Json Object.keys ERROR', {
+        baseUrl,
+        type: typeof jsonData,
+        constructor: jsonData && jsonData.constructor ? jsonData.constructor.name : undefined,
+        err
+      });
+    }
   const books: CatalogBook[] = [];
   const navLinks: CatalogNavigationLink[] = [];
   const pagination: CatalogPagination = {};
 
   const toArray = (v: any) => Array.isArray(v) ? v : v ? [v] : [];
 
+    // Support OPDS2 registry feeds with top-level 'groups' array
+    if (jsonData.groups && Array.isArray(jsonData.groups)) {
+      jsonData.groups.forEach((group: any) => {
+        const groupTitle = group.metadata?.title || '';
+        if (group.navigation && Array.isArray(group.navigation)) {
+          group.navigation.forEach((link: any) => {
+            if (link.href && link.title) {
+              const url = new URL(link.href, baseUrl).href;
+              // Use group title as prefix if present
+              const navTitle = groupTitle ? `${groupTitle}: ${link.title}` : link.title;
+              // Normalize rel: treat 'modules:xxxx' as 'collection'
+              const inferredRel = normalizeRel(link.rel) || (link.type && typeof link.type === 'string' && link.type.includes('application/opds+json') ? 'subsection' : '');
+              const isCatalog = !!(link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) || !!link.isCatalog;
+              navLinks.push({ title: navTitle, url, rel: inferredRel, isCatalog });
+            }
+          });
+        }
+      });
+    }
+
   // pagination / top-level links
   if (jsonData.links && Array.isArray(jsonData.links)) {
     jsonData.links.forEach((link: any) => {
       if (link.href && link.rel) {
-        const rels = toArray(link.rel).map((r: any) => String(r).toLowerCase());
+  const rels = toArray(link.rel).map((r: any) => normalizeRel(String(r).toLowerCase()));
         const fullUrl = new URL(link.href, baseUrl).href;
         // Accept both 'prev' and 'previous' and tolerate full-rel URIs
         if (rels.some((r: string) => r.includes('next'))) pagination.next = fullUrl;
@@ -315,14 +353,13 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
       // links can be an array; each link may have rel as string or array
       const links = Array.isArray(pub.links) ? pub.links : (pub.links ? [pub.links] : []);
 
-      // Find acquisition links and pick the most appropriate one.
+
+      // Find acquisition links and collect all possible formats
       const acquisitions: { href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }[] = [];
       const collections: { title: string; href: string }[] = [];
-
       links.forEach((l: any) => {
         if (!l || !l.href) return;
         const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
-
         // If rel contains 'acquisition' or opds acquisition URIs (including open-access), treat as acquisition link
         const isAcq = rels.some((r: string) =>
           r.includes('acquisition') ||
@@ -335,36 +372,72 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
           const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
           acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
         }
-
         // Extract collection links from individual books
         if (l.title && rels.includes('collection')) {
           collections.push({ title: l.title, href: new URL(l.href, baseUrl).href });
         }
       });
 
-      // Decide on a primary acquisition link (prefer open-access, then borrow, then loan, then any)
+
+      // Expose all acquisition links as alternativeFormats, with debug output
+      const alternativeFormats = acquisitions.map(a => {
+        const format = getFormatFromMimeType(a.type) || getFormatFromMimeType(a.indirectType) || 'UNKNOWN';
+        const isOpenAccess = a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access');
+        console.log('[OPDS2] Candidate acquisition link:', {
+          href: a.href,
+          rels: a.rels,
+          type: a.type,
+          indirectType: a.indirectType,
+          format,
+          isOpenAccess
+        });
+        return {
+          format,
+          downloadUrl: a.href,
+          mediaType: a.type,
+          isOpenAccess
+        };
+      });
+
+      // Prefer EPUB, then PDF, then anything else, and avoid text/html for primary, with debug output
       let chosen: typeof acquisitions[0] | undefined;
       let isOpenAccess = false;
       if (acquisitions.length > 0) {
-        // Debug: Log all acquisition link rels
-        acquisitions.forEach((a, idx) => {
-          console.log(`[OPDS2] Acquisition link ${idx} rels:`, a.rels, 'href:', a.href);
-        });
-
-        // Prefer open-access links (no authentication required)
-        const openAccessLink = acquisitions.find(a => a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access'));
-        if (openAccessLink) {
-          chosen = openAccessLink;
-          isOpenAccess = true;
-          console.log('[OPDS2] Found open-access link for book, setting isOpenAccess=true:', openAccessLink.href);
-        } else {
-          console.log('[OPDS2] No open-access link found, isOpenAccess=false');
+        // Helper: robust type check (case-insensitive, trims, handles missing)
+        const isType = (a: any, want: string) => {
+          if (!a.type) return false;
+          const t = String(a.type).toLowerCase().trim();
+          if (want === 'epub') return t === 'application/epub+zip' || t.includes('epub');
+          if (want === 'pdf') return t === 'application/pdf' || t.includes('pdf');
+          if (want === 'html') return t === 'text/html' || t.includes('html');
+          return false;
+        };
+        const isOpen = (a: any) => a.rels.some((r: string) => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access');
+        // Selection order with debug
+        chosen = acquisitions.find(a => isOpen(a) && isType(a, 'epub'));
+        if (chosen) console.log('[OPDS2] Chose open-access EPUB:', chosen);
+        if (!chosen) {
+          chosen = acquisitions.find(a => isOpen(a) && isType(a, 'pdf'));
+          if (chosen) console.log('[OPDS2] Chose open-access PDF:', chosen);
         }
-
-        if (!openAccessLink) {
-          chosen = acquisitions.find(a => a.rels.some(r => r.includes('/borrow') || r.includes('acquisition/borrow')))
-            || acquisitions.find(a => a.rels.some(r => r.includes('/loan') || r.includes('acquisition/loan')))
-            || acquisitions[0];
+        if (!chosen) {
+          chosen = acquisitions.find(a => isType(a, 'epub'));
+          if (chosen) console.log('[OPDS2] Chose any EPUB:', chosen);
+        }
+        if (!chosen) {
+          chosen = acquisitions.find(a => isType(a, 'pdf'));
+          if (chosen) console.log('[OPDS2] Chose any PDF:', chosen);
+        }
+        if (!chosen) {
+          chosen = acquisitions.find(a => !isType(a, 'html'));
+          if (chosen) console.log('[OPDS2] Chose any non-html:', chosen);
+        }
+        if (!chosen) {
+          chosen = acquisitions[0];
+          if (chosen) console.log('[OPDS2] Fallback to first acquisition link:', chosen);
+        }
+        if (chosen && isOpen(chosen)) {
+          isOpenAccess = true;
         }
       }
 
@@ -372,7 +445,6 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
       let format: string | undefined = undefined;
       if (chosen) {
         downloadUrl = chosen.href;
-        // Prefer explicit type, else indirect type
         format = getFormatFromMimeType(chosen.type) || getFormatFromMimeType(chosen.indirectType) || undefined;
       }
 
@@ -398,6 +470,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
           collections: collections.length > 0 ? collections : undefined,
           format: format || undefined,
           isOpenAccess: isOpenAccess ? true : undefined,
+          alternativeFormats: alternativeFormats.length > 0 ? alternativeFormats : undefined,
         };
         books.push(book);
       }
@@ -430,7 +503,12 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
     });
   }
 
-  return { books, navLinks, pagination };
+    console.error('[OPDS2] parseOpds2Json END', { navLinks, books, pagination });
+    return { books, navLinks, pagination };
+  } catch (err) {
+    console.error('[OPDS2] parseOpds2Json ERROR', err);
+    return { books: [], navLinks: [], pagination: {} };
+  }
 };
 
 export const fetchOpds2Feed = async (url: string, credentials?: { username: string; password: string } | null) => {

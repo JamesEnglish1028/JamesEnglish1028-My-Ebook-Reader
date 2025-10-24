@@ -6,16 +6,20 @@ import React, { useRef } from 'react';
 
 import type { BookMetadata, Bookmark, Citation, CatalogBook, BookRecord, ImportStatus } from '../types';
 
+// Helper type to allow CatalogBook fields (mediaType, acquisitionMediaType) for detail view
+type BookDetailMetadata = BookMetadata & Partial<Pick<CatalogBook, 'mediaType' | 'acquisitionMediaType'>>;
+
+// Unified props interface (fixes type errors)
 export interface BookDetailViewProps {
-  book: BookMetadata;
-  source: string | null;
+  book: BookDetailMetadata;
+  source: 'library' | 'catalog';
   catalogName?: string;
   onBack: () => void;
-  onReadBook: (book: BookMetadata) => void;
+  onReadBook: (book: BookDetailMetadata) => void;
   onImportFromCatalog?: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord; existingBook?: BookRecord }>;
-  importStatus?: ImportStatus | null;
-  setImportStatus?: (status: ImportStatus | null) => void;
-  userCitationFormat: 'apa' | 'mla';
+  importStatus?: ImportStatus;
+  setImportStatus?: (status: ImportStatus) => void;
+  userCitationFormat: 'apa' | 'mla' | 'chicago';
 }
 
 import { LeftArrowIcon } from './icons';
@@ -112,17 +116,7 @@ interface AnimationData {
 import { bookmarkService } from '../domain/reader';
 import { citationService } from '../domain/reader/citation-service';
 
-export interface BookDetailViewProps {
-  book: BookMetadata;
-  source: string | null;
-  catalogName?: string;
-  onBack: () => void;
-  onReadBook: (book: BookMetadata) => void;
-  onImportFromCatalog?: (book: CatalogBook, catalogName?: string) => Promise<{ success: boolean; bookRecord?: BookRecord; existingBook?: BookRecord }>;
-  importStatus?: ImportStatus | null;
-  setImportStatus?: (status: ImportStatus | null) => void;
-  userCitationFormat: 'apa' | 'mla' | 'chicago';
-}
+
 
 const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, catalogName, userCitationFormat, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
   const [localBookmarks, setLocalBookmarks] = React.useState<Bookmark[]>([]);
@@ -143,17 +137,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
   }, [book.id]);
   const coverRef = useRef<HTMLImageElement>(null);
   const handleReadClick = () => {
-    if (onReadBook && book.id && coverRef.current) {
-      const rect = coverRef.current.getBoundingClientRect();
-      const animationData = {
-        rect: {
-          x: rect.x, y: rect.y,
-          width: rect.width, height: rect.height,
-          top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left,
-        },
-        coverImage: book.coverImage,
-      };
-      onReadBook(book.id, animationData, book.format || 'EPUB');
+    if (onReadBook && book.id) {
+      onReadBook(book);
     }
   };
   // Import button state and modal
@@ -231,24 +216,41 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
             <div className="mb-2 text-slate-400">Publisher ID: {book.isbn}</div>
           )}
           {book.language && <div className="mb-2 text-slate-400">Language: {book.language}</div>}
-          {book.format && (
-            <div className="mb-2">
-              <span
-                className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded mr-2 ${
-                  book.format.toUpperCase() === 'PDF'
-                    ? 'bg-red-600'
-                    : book.format.toUpperCase() === 'AUDIOBOOK'
-                    ? 'bg-purple-600'
-                    : 'bg-sky-500'
-                }`}
-                title={`Format: ${book.format}`}
-              >
-                {book.format}
-              </span>
+          {(book.format || book.mediaType || book.acquisitionMediaType) && (
+            <div className="mb-2 flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {book.format && (
+                  <span
+                    className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
+                      book.format.toUpperCase() === 'PDF'
+                        ? 'bg-red-600'
+                        : book.format.toUpperCase() === 'AUDIOBOOK'
+                        ? 'bg-purple-600'
+                        : 'bg-sky-500'
+                    }`}
+                    title={`Format: ${book.format}`}
+                  >
+                    {book.format}
+                  </span>
+                )}
+                {book.mediaType && (
+                  <span className="inline-block text-xs font-mono bg-slate-700 text-sky-200 px-2 py-0.5 rounded" title={`Media Type: ${book.mediaType}`}>
+                    {book.mediaType}
+                  </span>
+                )}
+                {book.acquisitionMediaType && !book.mediaType && (
+                  <span className="inline-block text-xs font-mono bg-slate-700 text-sky-200 px-2 py-0.5 rounded" title={`Acquisition Media Type: ${book.acquisitionMediaType}`}>
+                    {book.acquisitionMediaType}
+                  </span>
+                )}
+              </div>
+              {/* Warn if mediaType is missing or is text/html */}
+              {(!book.mediaType || book.mediaType === 'text/html') && (
+                <div className="text-xs text-yellow-400 font-semibold">
+                  Warning: This item may not be a valid book file (mediaType is {book.mediaType ? 'text/html' : 'missing'}).
+                </div>
+              )}
             </div>
-          )}
-          {book.subjects && book.subjects.length > 0 && (
-            <div className="mb-2 text-slate-400">Subjects: {book.subjects.join(', ')}</div>
           )}
           {book.description && <div className="mt-4 text-slate-300 text-base">{book.description}</div>}
         </div>
