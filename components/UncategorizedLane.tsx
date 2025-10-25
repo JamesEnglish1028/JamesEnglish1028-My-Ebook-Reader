@@ -101,29 +101,36 @@ export const UncategorizedLane: React.FC<UncategorizedLaneProps> = ({
                 )}
                 {/* Format Badges - show all available formats */}
                 <div className="flex gap-1 flex-wrap">
-                  {book.alternativeFormats && book.alternativeFormats.length > 0 ? (
-                    // Show all alternative formats
-                    book.alternativeFormats.map((fmt: any, idx: number) => (
-                      <span
-                        key={`${book.title}-${fmt.format}-${idx}`}
-                        className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                            fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                  {(() => {
+                    const isWebType = (str?: string) => str && str.trim().toLowerCase() === 'web';
+                    if (book.alternativeFormats && book.alternativeFormats.length > 0) {
+                      return book.alternativeFormats.map((fmt: any, idx: number) => (
+                        !isWebType(fmt.format) && (
+                          <span
+                            key={`${book.title}-${fmt.format}-${idx}`}
+                            className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${fmt.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                                fmt.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
+                                  'bg-sky-600'
+                                }`}
+                            title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
+                          >
+                            {fmt.format}
+                          </span>
+                        )
+                      ));
+                    } else if (book.format) {
+                      return !isWebType(book.format) && (
+                        <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
+                            book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
                               'bg-sky-500'
-                          }`}
-                        title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
-                      >
-                        {fmt.format}
-                      </span>
-                    ))
-                  ) : book.format ? (
-                    // Show single format
-                    <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${book.format.toUpperCase() === 'PDF' ? 'bg-red-600' :
-                        book.format.toUpperCase() === 'AUDIOBOOK' ? 'bg-purple-600' :
-                          'bg-sky-500'
-                      }`}>
-                      {book.format}
-                    </span>
-                  ) : null}
+                            }`}>
+                          {book.format}
+                        </span>
+                      );
+                    }
+                    // Only show format badge, suppress mediaType badge entirely
+                    return null;
+                  })()}
                 </div>
               </div>
             </div>

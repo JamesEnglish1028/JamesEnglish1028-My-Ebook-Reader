@@ -67,6 +67,13 @@ export interface CatalogBook {
 
   // Palace.io categories
   categories?: Category[];
+
+  // Publication type (Schema.org)
+  schemaOrgType?: string;
+  publicationTypeLabel?: string;
+
+  // Media type for non-book publications (from acquisition link)
+  mediumFormatCode?: string;
 }
 
 /**

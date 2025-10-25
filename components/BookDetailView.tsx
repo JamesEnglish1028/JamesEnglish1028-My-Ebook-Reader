@@ -1,4 +1,4 @@
-  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     (e.target as HTMLImageElement).src = '/default-cover.png';
   };
 // Main BookDetailView component
@@ -6,8 +6,8 @@ import React, { useRef } from 'react';
 
 import type { BookMetadata, Bookmark, Citation, CatalogBook, BookRecord, ImportStatus } from '../types';
 
-// Helper type to allow CatalogBook fields (mediaType, acquisitionMediaType) for detail view
-type BookDetailMetadata = BookMetadata & Partial<Pick<CatalogBook, 'mediaType' | 'acquisitionMediaType'>>;
+// Helper type to allow CatalogBook fields (mediaType, acquisitionMediaType, publicationTypeLabel, schemaOrgType) for detail view
+type BookDetailMetadata = BookMetadata & Partial<Pick<CatalogBook, 'mediaType' | 'acquisitionMediaType' | 'publicationTypeLabel' | 'schemaOrgType'>>;
 
 // Unified props interface (fixes type errors)
 export interface BookDetailViewProps {
@@ -23,6 +23,7 @@ export interface BookDetailViewProps {
 }
 
 import { LeftArrowIcon } from './icons';
+import BookBadges from './library/shared/BookBadges';
 
 // Utility: format date for display
 const formatDate = (dateString: string | number): string => {
@@ -216,40 +217,19 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
             <div className="mb-2 text-slate-400">Publisher ID: {book.isbn}</div>
           )}
           {book.language && <div className="mb-2 text-slate-400">Language: {book.language}</div>}
-          {(book.format || book.mediaType || book.acquisitionMediaType) && (
+          {(book.format || book.mediaType || book.acquisitionMediaType || book.publicationTypeLabel) && (
             <div className="mb-2 flex flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {book.format && (
-                  <span
-                    className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${
-                      book.format.toUpperCase() === 'PDF'
-                        ? 'bg-red-600'
-                        : book.format.toUpperCase() === 'AUDIOBOOK'
-                        ? 'bg-purple-600'
-                        : 'bg-sky-500'
-                    }`}
-                    title={`Format: ${book.format}`}
-                  >
-                    {book.format}
-                  </span>
-                )}
-                {book.mediaType && (
-                  <span className="inline-block text-xs font-mono bg-slate-700 text-sky-200 px-2 py-0.5 rounded" title={`Media Type: ${book.mediaType}`}>
-                    {book.mediaType}
-                  </span>
-                )}
-                {book.acquisitionMediaType && !book.mediaType && (
-                  <span className="inline-block text-xs font-mono bg-slate-700 text-sky-200 px-2 py-0.5 rounded" title={`Acquisition Media Type: ${book.acquisitionMediaType}`}>
-                    {book.acquisitionMediaType}
-                  </span>
+              <div className="mb-2 flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <BookBadges book={book} />
+                </div>
+                {/* Warn if mediaType is missing or is text/html */}
+                {(!book.mediaType || book.mediaType === 'text/html') && (
+                  <div className="text-xs text-yellow-400 font-semibold">
+                    Warning: This item may not be a valid book file (mediaType is {book.mediaType ? 'text/html' : 'missing'}).
+                  </div>
                 )}
               </div>
-              {/* Warn if mediaType is missing or is text/html */}
-              {(!book.mediaType || book.mediaType === 'text/html') && (
-                <div className="text-xs text-yellow-400 font-semibold">
-                  Warning: This item may not be a valid book file (mediaType is {book.mediaType ? 'text/html' : 'missing'}).
-                </div>
-              )}
             </div>
           )}
           {book.description && <div className="mt-4 text-slate-300 text-base">{book.description}</div>}

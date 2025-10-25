@@ -2,6 +2,7 @@ import React from 'react';
 
 import { proxiedUrl } from '../../../services/utils';
 import type { BookMetadata, CatalogBook } from '../../../types';
+import BookBadges from './BookBadges';
 
 interface BookCardProps {
   book: BookMetadata | CatalogBook;
@@ -58,39 +59,6 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
 
   const coverImage = getCoverImage();
 
-  // Determine format badges to display
-  const getFormatBadges = () => {
-    // For catalog books with alternative formats
-    if (isCatalogBook(book) && book.alternativeFormats && book.alternativeFormats.length > 0) {
-      return book.alternativeFormats.map((fmt, idx) => ({
-        key: `${book.title}-${fmt.format}-${idx}`,
-        format: fmt.format,
-        mediaType: fmt.mediaType,
-      }));
-    }
-
-    // For books with a single format
-    if (book.format) {
-      return [{
-        key: `${book.title}-${book.format}`,
-        format: book.format,
-        mediaType: null,
-      }];
-    }
-
-    return [];
-  };
-
-  const formatBadges = getFormatBadges();
-
-  // Get badge color based on format
-  const getBadgeColor = (format: string) => {
-    const upperFormat = format.toUpperCase();
-    if (upperFormat === 'PDF') return 'bg-red-600';
-    if (upperFormat === 'AUDIOBOOK') return 'bg-purple-600';
-    return 'bg-sky-500';
-  };
-
   return (
     <div
       ref={ref}
@@ -133,21 +101,7 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
         <p className="text-xs text-slate-400 truncate">
           {book.author}
         </p>
-
-        {/* Format Badges */}
-        {formatBadges.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
-            {formatBadges.map((badge) => (
-              <span
-                key={badge.key}
-                className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 rounded ${getBadgeColor(badge.format)}`}
-                title={badge.mediaType ? `Format: ${badge.format}, MediaType: ${badge.mediaType}` : `Format: ${badge.format}`}
-              >
-                {badge.format}
-              </span>
-            ))}
-          </div>
-        )}
+        <BookBadges book={book} />
       </div>
     </div>
   );

@@ -1,3 +1,31 @@
+// Helper: Map Schema.org @type to display label
+const schemaOrgTypeToLabel: Record<string, string> = {
+  'https://schema.org/Book': 'Book',
+  'https://schema.org/Audiobook': 'Audiobook',
+  'https://schema.org/Photograph': 'Photograph',
+  'https://schema.org/Drawing': 'Drawing',
+  'https://schema.org/Sculpture': 'Sculpture',
+  'https://schema.org/Poster': 'Poster',
+  'https://schema.org/Painting': 'Painting',
+  'https://schema.org/image': 'Image',
+  'https://schema.org/Article': 'Article',
+  'https://schema.org/Periodical': 'Periodical',
+  'https://schema.org/ShortStory': 'Short Story',
+  'https://schema.org/Map': 'Map',
+  'https://schema.org/Manuscript': 'Manuscript',
+  'https://schema.org/SheetMusic': 'Sheet Music',
+  'https://schema.org/audio': 'Audio',
+  'https://schema.org/video': 'Video',
+  'https://schema.org/Chapter': 'Chapter',
+  'https://schema.org/MusicAlbum': 'Music Album',
+  'https://schema.org/DigitalDocument': 'Digital Document',
+};
+
+function getSchemaOrgTypeAndLabel(schemaType: string | undefined): { schemaOrgType: string, publicationTypeLabel: string } {
+  if (!schemaType) return { schemaOrgType: 'https://schema.org/DigitalDocument', publicationTypeLabel: 'Digital Document' };
+  const label = schemaOrgTypeToLabel[schemaType] || 'Digital Document';
+  return { schemaOrgType: schemaType, publicationTypeLabel: label };
+}
 // Helper: treat rels like 'modules:xxxx' as 'collection' for navigation
 function normalizeRel(rel: string | undefined): string {
   if (!rel) return '';
@@ -5,6 +33,83 @@ function normalizeRel(rel: string | undefined): string {
   return rel;
 }
 import type { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
+import type { Opds2Publication, Opds2Link, Opds2NavigationGroup } from '../types/opds2';
+
+// Helper: Parse navigation links from OPDS2 feed
+function parseOpds2NavigationLinks(jsonData: any, baseUrl: string): CatalogNavigationLink[] {
+  const navLinks: CatalogNavigationLink[] = [];
+  // Top-level 'groups' array (OPDS2 registry feeds)
+  if (jsonData.groups && Array.isArray(jsonData.groups)) {
+    (jsonData.groups as Opds2NavigationGroup[]).forEach((group) => {
+      const groupTitle = group.metadata?.title || '';
+      if (group.navigation && Array.isArray(group.navigation)) {
+        (group.navigation as Opds2Link[]).forEach((link) => {
+          if (link.href && link.title) {
+            const url = new URL(link.href, baseUrl).href;
+            const navTitle = groupTitle ? `${groupTitle}: ${link.title}` : link.title;
+            let inferredRel = '';
+            if (typeof link.rel === 'string') {
+              inferredRel = normalizeRel(link.rel);
+            } else if (Array.isArray(link.rel) && link.rel.length > 0) {
+              inferredRel = normalizeRel(String(link.rel[0]));
+            } else {
+              inferredRel = (link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) ? 'subsection' : '';
+            }
+            const isCatalog = !!(link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) || !!link.isCatalog;
+            navLinks.push({ title: navTitle, url, rel: Array.isArray(inferredRel) ? String(inferredRel[0]) : inferredRel, isCatalog });
+          }
+        });
+      }
+    });
+  }
+  // Top-level navigation array
+  if (jsonData.navigation && Array.isArray(jsonData.navigation)) {
+    (jsonData.navigation as Opds2Link[]).forEach((link) => {
+      if (link.href && link.title) {
+        const url = new URL(link.href, baseUrl).href;
+        const inferredRel = link.rel || (link.type && typeof link.type === 'string' && link.type.includes('application/opds+json') ? 'subsection' : '');
+        const isCatalog = !!(link.type && typeof link.type === 'string' && link.type.includes('application/opds+json')) || !!link.isCatalog;
+  navLinks.push({ title: link.title, url, rel: Array.isArray(inferredRel) ? String(inferredRel[0]) : inferredRel, isCatalog });
+      }
+    });
+  }
+  // Top-level links with navigation relations
+  if (jsonData.links && Array.isArray(jsonData.links)) {
+    (jsonData.links as Opds2Link[]).forEach((link) => {
+      if (link.href && link.rel && link.title) {
+        let rels: string[] = [];
+        if (Array.isArray(link.rel)) {
+          rels = link.rel.map((r) => normalizeRel(String(r).toLowerCase()));
+        } else if (typeof link.rel === 'string') {
+          rels = [normalizeRel(link.rel.toLowerCase())];
+        }
+        const fullUrl = new URL(link.href, baseUrl).href;
+        if (rels.some((r: string) => r.includes('collection') || r.includes('subsection') || r.includes('section') || r.includes('related'))) {
+          navLinks.push({ title: link.title, url: fullUrl, rel: rels[0] || '', isCatalog: false });
+        }
+      }
+    });
+  }
+  return navLinks;
+}
+
+// Helper: Parse pagination links from OPDS2 feed
+function parseOpds2Pagination(jsonData: any, baseUrl: string): CatalogPagination {
+  const pagination: CatalogPagination = {};
+  if (jsonData.links && Array.isArray(jsonData.links)) {
+    (jsonData.links as Opds2Link[]).forEach((link) => {
+      if (link.href && link.rel) {
+        const rels = Array.isArray(link.rel) ? link.rel.map((r) => normalizeRel(String(r).toLowerCase())) : [normalizeRel(String(link.rel).toLowerCase())];
+        const fullUrl = new URL(link.href, baseUrl).href;
+        if (rels.some((r: string) => r.includes('next'))) pagination.next = fullUrl;
+        if (rels.some((r: string) => r.includes('prev') || r.includes('previous'))) pagination.prev = fullUrl;
+        if (rels.some((r: string) => r.includes('first'))) pagination.first = fullUrl;
+        if (rels.some((r: string) => r.includes('last'))) pagination.last = fullUrl;
+      }
+    });
+  }
+  return pagination;
+}
 
 import credentialsService from './credentials';
 import { logger } from './logger';
@@ -196,8 +301,8 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
       });
     }
   const books: CatalogBook[] = [];
-  const navLinks: CatalogNavigationLink[] = [];
-  const pagination: CatalogPagination = {};
+  const navLinks: CatalogNavigationLink[] = parseOpds2NavigationLinks(jsonData, baseUrl);
+  const pagination: CatalogPagination = parseOpds2Pagination(jsonData, baseUrl);
 
   const toArray = (v: any) => Array.isArray(v) ? v : v ? [v] : [];
 
@@ -243,6 +348,158 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
   }
 
   // Helper: find innermost indirectAcquisition type (mime)
+// Helper: Normalize format (EPUB, PDF, Web, fallback to mediaType)
+function normalizeFormat(type?: string, indirectType?: string): string | undefined {
+  const t = type ? String(type).toLowerCase().trim() : '';
+  const indirect = indirectType ? String(indirectType).toLowerCase().trim() : '';
+  if (t === 'text/html' || t.includes('html') || indirect === 'text/html' || indirect.includes('html')) return 'Web';
+  if (t.includes('epub') || t === 'application/epub+zip' || indirect.includes('epub') || indirect === 'application/epub+zip') return 'EPUB';
+  if (t.includes('pdf') || t === 'application/pdf' || indirect.includes('pdf') || indirect === 'application/pdf') return 'PDF';
+  if (t) return t;
+  if (indirect) return indirect;
+  return undefined;
+}
+
+// Helper: Normalize mediumFormatCode (Web for text/html, else mediaType)
+// Helper: Process a single OPDS2 publication and return a CatalogBook or undefined
+function processOpds2Publication(pub: Opds2Publication, baseUrl: string): CatalogBook | undefined {
+  // ...existing code for author, summary, publisher, publicationDate, providerId, subjects, coverImage...
+  const metadata = pub.metadata || {};
+  let author = 'Unknown Author';
+  if (metadata.author) {
+    if (Array.isArray(metadata.author) && metadata.author.length > 0) {
+      const a = metadata.author[0];
+      author = typeof a === 'string' ? a : (typeof a === 'object' && 'name' in a ? a.name || 'Unknown Author' : 'Unknown Author');
+    } else if (typeof metadata.author === 'string') author = metadata.author;
+    else if (typeof metadata.author === 'object' && 'name' in metadata.author) author = metadata.author.name || 'Unknown Author';
+  }
+  const title = (metadata.title && String(metadata.title).trim()) || 'Untitled';
+  const summary = metadata.description || metadata.subtitle || null;
+  let publisher: string | undefined = undefined;
+  if (metadata.publisher) {
+    if (typeof metadata.publisher === 'string') publisher = metadata.publisher;
+    else if (typeof metadata.publisher === 'object' && 'name' in metadata.publisher) publisher = metadata.publisher.name;
+  }
+  const publicationDate = metadata.published || metadata.issued || undefined;
+  let providerId: string | undefined = undefined;
+  if (typeof metadata.identifier === 'string') providerId = metadata.identifier;
+  else if (Array.isArray(metadata.identifier) && metadata.identifier.length > 0) {
+    const found = metadata.identifier.find((id: string) => typeof id === 'string');
+    if (found) providerId = found;
+  }
+  let subjects: string[] | undefined = undefined;
+  if (Array.isArray(metadata.subject)) {
+    subjects = metadata.subject.map((s: any) => typeof s === 'string' ? s : (s?.name || '')).filter((s: string) => !!s);
+  }
+  const cover = (pub.images && pub.images[0]) || (metadata.image && metadata.image[0]);
+  const coverImage = cover?.href ? new URL(cover.href, baseUrl).href : (cover?.url ? new URL(cover.url, baseUrl).href : null);
+  let links: Opds2Link[] = [];
+  if (Array.isArray(pub.links)) {
+    links = pub.links as Opds2Link[];
+  } else if (typeof pub.links === 'object' && pub.links) {
+    links = [pub.links as Opds2Link];
+  }
+  const acquisitions: { href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }[] = [];
+  const collections: { title: string; href: string }[] = [];
+  links.forEach((l: Record<string, any>) => {
+    if (!l || !l.href) return;
+    const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
+    const isAcq = rels.some((r: string) =>
+      r.includes('acquisition') ||
+      r === 'http://opds-spec.org/acquisition/borrow' ||
+      r === 'http://opds-spec.org/acquisition/loan' ||
+      r === 'http://opds-spec.org/acquisition/open-access' ||
+      r.includes('/open-access'),
+    );
+    if (isAcq) {
+      const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
+      acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
+    }
+    if (l.title && rels.includes('collection')) {
+      collections.push({ title: l.title, href: new URL(l.href, baseUrl).href });
+    }
+  });
+  const alternativeFormats = acquisitions.map(a => {
+    const format = normalizeFormat(a.type, a.indirectType) || 'UNKNOWN';
+    const isOpenAccess = a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access');
+    return {
+      format,
+      downloadUrl: a.href,
+      mediaType: a.type,
+      isOpenAccess
+    };
+  });
+  let chosen: typeof acquisitions[0] | undefined;
+  let isOpenAccess = false;
+  if (acquisitions.length > 0) {
+    const isType = (a: { type?: string }, want: string) => {
+      if (!a.type) return false;
+      const t = String(a.type).toLowerCase().trim();
+      if (want === 'epub') return t === 'application/epub+zip' || t.includes('epub');
+      if (want === 'pdf') return t === 'application/pdf' || t.includes('pdf');
+      if (want === 'html') return t === 'text/html' || t.includes('html');
+      return false;
+    };
+    const isOpen = (a: { rels: string[] }) => a.rels.some((r: string) => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access');
+    chosen = acquisitions.find(a => isOpen(a) && isType(a, 'epub'));
+    if (!chosen) chosen = acquisitions.find(a => isOpen(a) && isType(a, 'pdf'));
+    if (!chosen) chosen = acquisitions.find(a => isType(a, 'epub'));
+    if (!chosen) chosen = acquisitions.find(a => isType(a, 'pdf'));
+    if (!chosen) chosen = acquisitions.find(a => !isType(a, 'html'));
+    if (!chosen) chosen = acquisitions[0];
+    if (chosen && isOpen(chosen)) isOpenAccess = true;
+  }
+  let downloadUrl: string | undefined = undefined;
+  let format: string | undefined = undefined;
+  if (chosen) {
+    downloadUrl = chosen.href;
+    format = normalizeFormat(chosen.type, chosen.indirectType);
+  }
+  if (!downloadUrl && pub.content && Array.isArray(pub.content) && pub.content.length > 0) {
+    const c = pub.content[0];
+    if (c.href) downloadUrl = new URL(c.href, baseUrl).href;
+    if (!format && c.type) {
+      format = normalizeFormat(c.type);
+    }
+  }
+  const schemaType = metadata['@type'] || metadata.type;
+  const { schemaOrgType, publicationTypeLabel } = getSchemaOrgTypeAndLabel(schemaType);
+  let mediumFormatCode: string | undefined = undefined;
+  if (chosen && chosen.type) {
+    mediumFormatCode = normalizeMediumFormatCode(schemaType, chosen.type);
+  }
+  if (title && (downloadUrl || coverImage)) {
+    return {
+      title,
+      author,
+      coverImage: coverImage || null,
+      downloadUrl: downloadUrl || '',
+      summary: summary || null,
+      publisher: publisher || undefined,
+      publicationDate: publicationDate || undefined,
+      providerId: providerId || undefined,
+      subjects: subjects || undefined,
+      collections: collections.length > 0 ? collections : undefined,
+      format: format || undefined,
+      mediaType: chosen && chosen.type ? String(chosen.type).toLowerCase().trim() : undefined,
+      isOpenAccess: isOpenAccess ? true : undefined,
+      alternativeFormats: alternativeFormats.length > 0 ? alternativeFormats : undefined,
+      schemaOrgType,
+      publicationTypeLabel,
+      mediumFormatCode,
+    };
+  }
+  return undefined;
+}
+function normalizeMediumFormatCode(schemaType: string | undefined, type?: string): string | undefined {
+  if (!type) return undefined;
+  const t = String(type).toLowerCase().trim();
+  if (schemaType && schemaType !== 'https://schema.org/Book') {
+    return t === 'text/html' ? 'Web' : t;
+  }
+  return t === 'text/html' ? 'Web' : t;
+}
+
   function findIndirectType(indirect: any): string | undefined {
     if (!indirect) return undefined;
     // indirect may be array
@@ -265,216 +522,52 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
 
   if (jsonData.publications && Array.isArray(jsonData.publications)) {
     console.log('[OPDS2] Parsing', jsonData.publications.length, 'publications from feed');
-    jsonData.publications.forEach((pub: any) => {
-      const metadata = pub.metadata || {};
-      console.log('[OPDS2] Processing publication:', metadata.title || 'Untitled');
-      // Normalize links: some providers (e.g., Palace) embed XML serialized
-      // <link> elements inside JSON string fields. Detect string-serialized
-      // XML and convert to a links array so downstream logic can find
-      // acquisition links as usual.
-      if (typeof pub.links === 'string' && pub.links.trim().startsWith('<')) {
-        try {
-          const parser = new DOMParser();
-          const xml = parser.parseFromString(pub.links, 'application/xml');
-          const parsedLinks: any[] = [];
-          Array.from(xml.querySelectorAll('link')).forEach((ln: Element) => {
-            const href = ln.getAttribute('href');
-            const rel = ln.getAttribute('rel');
-            const type = ln.getAttribute('type');
-            const obj: any = {};
-            if (href) obj.href = href;
-            if (rel) obj.rel = rel;
-            if (type) obj.type = type;
-            parsedLinks.push(obj);
-          });
-          if (parsedLinks.length > 0) pub.links = parsedLinks;
-        } catch (e) {
-          // ignore and let existing logic handle other shapes
-        }
-      }
-
-      // Some feeds may put link XML inside properties or other fields
-      if (!pub.links && pub.properties && typeof pub.properties === 'object') {
-        const maybeLinks = pub.properties.links || pub.properties.link || pub.properties.acquisitions;
-        if (typeof maybeLinks === 'string' && maybeLinks.trim().startsWith('<')) {
+    if (jsonData.publications && Array.isArray(jsonData.publications)) {
+      for (const pub of jsonData.publications) {
+        // Normalize links: some providers (e.g., Palace) embed XML serialized <link> elements inside JSON string fields.
+        if (typeof pub.links === 'string' && pub.links.trim().startsWith('<')) {
           try {
             const parser = new DOMParser();
-            const xml = parser.parseFromString(maybeLinks, 'application/xml');
-            const parsedLinks: any[] = [];
+            const xml = parser.parseFromString(pub.links, 'application/xml');
+            const parsedLinks: Record<string, any>[] = [];
             Array.from(xml.querySelectorAll('link')).forEach((ln: Element) => {
               const href = ln.getAttribute('href');
               const rel = ln.getAttribute('rel');
               const type = ln.getAttribute('type');
-              const obj: any = {};
+              const obj: Record<string, any> = {};
               if (href) obj.href = href;
               if (rel) obj.rel = rel;
               if (type) obj.type = type;
               parsedLinks.push(obj);
             });
             if (parsedLinks.length > 0) pub.links = parsedLinks;
-          } catch (e) {
-            // ignore
+          } catch (_) { }
+        }
+        if (!pub.links && pub.properties && typeof pub.properties === 'object') {
+          const maybeLinks = pub.properties.links || pub.properties.link || pub.properties.acquisitions;
+          if (typeof maybeLinks === 'string' && maybeLinks.trim().startsWith('<')) {
+            try {
+              const parser = new DOMParser();
+              const xml = parser.parseFromString(maybeLinks, 'application/xml');
+              const parsedLinks: Record<string, any>[] = [];
+              Array.from(xml.querySelectorAll('link')).forEach((ln: Element) => {
+                const href = ln.getAttribute('href');
+                const rel = ln.getAttribute('rel');
+                const type = ln.getAttribute('type');
+                const obj: Record<string, any> = {};
+                if (href) obj.href = href;
+                if (rel) obj.rel = rel;
+                if (type) obj.type = type;
+                parsedLinks.push(obj);
+              });
+              if (parsedLinks.length > 0) pub.links = parsedLinks;
+            } catch (_) { }
           }
         }
+        const book = processOpds2Publication(pub, baseUrl);
+        if (book) books.push(book);
       }
-      const title = (metadata.title && String(metadata.title).trim()) || 'Untitled';
-      // author may be string, object, or array
-      let author = 'Unknown Author';
-      if (metadata.author) {
-        if (Array.isArray(metadata.author) && metadata.author.length > 0) {
-          const a = metadata.author[0];
-          author = typeof a === 'string' ? a : (a?.name || 'Unknown Author');
-        } else if (typeof metadata.author === 'string') author = metadata.author;
-        else if (metadata.author?.name) author = metadata.author.name;
-      }
-
-      const summary = metadata.description || metadata.subtitle || null;
-      const publisher = metadata.publisher?.name || metadata.publisher || undefined;
-      const publicationDate = metadata.published || metadata.issued || undefined;
-
-      // providerId from identifier field (string or array)
-      let providerId: string | undefined = undefined;
-      if (typeof metadata.identifier === 'string') providerId = metadata.identifier;
-      else if (Array.isArray(metadata.identifier) && metadata.identifier.length > 0) {
-        const found = metadata.identifier.find((id: any) => typeof id === 'string');
-        if (found) providerId = found;
-      }
-
-      // subjects
-      let subjects: string[] | undefined = undefined;
-      if (Array.isArray(metadata.subject)) {
-        subjects = metadata.subject.map((s: any) => typeof s === 'string' ? s : (s?.name || '')).filter((s: string) => !!s);
-      }
-
-      // cover image
-      const cover = (pub.images && pub.images[0]) || (metadata.image && metadata.image[0]);
-      const coverImage = cover?.href ? new URL(cover.href, baseUrl).href : (cover?.url ? new URL(cover.url, baseUrl).href : null);
-
-      // links can be an array; each link may have rel as string or array
-      const links = Array.isArray(pub.links) ? pub.links : (pub.links ? [pub.links] : []);
-
-
-      // Find acquisition links and collect all possible formats
-      const acquisitions: { href: string; rels: string[]; type?: string; indirectType?: string; acquisitionType?: string }[] = [];
-      const collections: { title: string; href: string }[] = [];
-      links.forEach((l: any) => {
-        if (!l || !l.href) return;
-        const rels = Array.isArray(l.rel) ? l.rel.map((r: any) => String(r)) : (l.rel ? [String(l.rel)] : []);
-        // If rel contains 'acquisition' or opds acquisition URIs (including open-access), treat as acquisition link
-        const isAcq = rels.some((r: string) =>
-          r.includes('acquisition') ||
-          r === 'http://opds-spec.org/acquisition/borrow' ||
-          r === 'http://opds-spec.org/acquisition/loan' ||
-          r === 'http://opds-spec.org/acquisition/open-access' ||
-          r.includes('/open-access'),
-        );
-        if (isAcq) {
-          const indirectType = findIndirectType(l.indirectAcquisition || l.properties?.indirectAcquisition);
-          acquisitions.push({ href: new URL(l.href, baseUrl).href, rels, type: l.type, indirectType });
-        }
-        // Extract collection links from individual books
-        if (l.title && rels.includes('collection')) {
-          collections.push({ title: l.title, href: new URL(l.href, baseUrl).href });
-        }
-      });
-
-
-      // Expose all acquisition links as alternativeFormats, with debug output
-      const alternativeFormats = acquisitions.map(a => {
-        const format = getFormatFromMimeType(a.type) || getFormatFromMimeType(a.indirectType) || 'UNKNOWN';
-        const isOpenAccess = a.rels.some(r => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access');
-        console.log('[OPDS2] Candidate acquisition link:', {
-          href: a.href,
-          rels: a.rels,
-          type: a.type,
-          indirectType: a.indirectType,
-          format,
-          isOpenAccess
-        });
-        return {
-          format,
-          downloadUrl: a.href,
-          mediaType: a.type,
-          isOpenAccess
-        };
-      });
-
-      // Prefer EPUB, then PDF, then anything else, and avoid text/html for primary, with debug output
-      let chosen: typeof acquisitions[0] | undefined;
-      let isOpenAccess = false;
-      if (acquisitions.length > 0) {
-        // Helper: robust type check (case-insensitive, trims, handles missing)
-        const isType = (a: any, want: string) => {
-          if (!a.type) return false;
-          const t = String(a.type).toLowerCase().trim();
-          if (want === 'epub') return t === 'application/epub+zip' || t.includes('epub');
-          if (want === 'pdf') return t === 'application/pdf' || t.includes('pdf');
-          if (want === 'html') return t === 'text/html' || t.includes('html');
-          return false;
-        };
-        const isOpen = (a: any) => a.rels.some((r: string) => r.includes('/open-access') || r === 'http://opds-spec.org/acquisition/open-access');
-        // Selection order with debug
-        chosen = acquisitions.find(a => isOpen(a) && isType(a, 'epub'));
-        if (chosen) console.log('[OPDS2] Chose open-access EPUB:', chosen);
-        if (!chosen) {
-          chosen = acquisitions.find(a => isOpen(a) && isType(a, 'pdf'));
-          if (chosen) console.log('[OPDS2] Chose open-access PDF:', chosen);
-        }
-        if (!chosen) {
-          chosen = acquisitions.find(a => isType(a, 'epub'));
-          if (chosen) console.log('[OPDS2] Chose any EPUB:', chosen);
-        }
-        if (!chosen) {
-          chosen = acquisitions.find(a => isType(a, 'pdf'));
-          if (chosen) console.log('[OPDS2] Chose any PDF:', chosen);
-        }
-        if (!chosen) {
-          chosen = acquisitions.find(a => !isType(a, 'html'));
-          if (chosen) console.log('[OPDS2] Chose any non-html:', chosen);
-        }
-        if (!chosen) {
-          chosen = acquisitions[0];
-          if (chosen) console.log('[OPDS2] Fallback to first acquisition link:', chosen);
-        }
-        if (chosen && isOpen(chosen)) {
-          isOpenAccess = true;
-        }
-      }
-
-      let downloadUrl: string | undefined = undefined;
-      let format: string | undefined = undefined;
-      if (chosen) {
-        downloadUrl = chosen.href;
-        format = getFormatFromMimeType(chosen.type) || getFormatFromMimeType(chosen.indirectType) || undefined;
-      }
-
-      // If no acquisition link found, sometimes publications include content (resources)
-      if (!downloadUrl && pub.content && Array.isArray(pub.content) && pub.content.length > 0) {
-        const c = pub.content[0];
-        if (c.href) downloadUrl = new URL(c.href, baseUrl).href;
-        if (!format && c.type) format = getFormatFromMimeType(c.type);
-      }
-
-      // Push if we have at least a download URL or cover/title
-      if (title && (downloadUrl || coverImage)) {
-        const book: CatalogBook = {
-          title,
-          author,
-          coverImage: coverImage || null,
-          downloadUrl: downloadUrl || '',
-          summary: summary || null,
-          publisher: publisher || undefined,
-          publicationDate: publicationDate || undefined,
-          providerId: providerId || undefined,
-          subjects: subjects || undefined,
-          collections: collections.length > 0 ? collections : undefined,
-          format: format || undefined,
-          isOpenAccess: isOpenAccess ? true : undefined,
-          alternativeFormats: alternativeFormats.length > 0 ? alternativeFormats : undefined,
-        };
-        books.push(book);
-      }
-    });
+    }
   }
 
   // After attempting to parse publications/navigation, validate that the

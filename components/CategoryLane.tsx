@@ -132,7 +132,7 @@ export const CategoryLaneComponent: React.FC<CategoryLaneProps> = ({
                               ? 'bg-purple-600'
                               : 'bg-sky-500'
                           }`}
-                        title={`Format: ${fmt.format}, MediaType: ${fmt.mediaType}`}
+                        title={`Format: ${fmt.format}`}
                       >
                         {fmt.format}
                       </span>
