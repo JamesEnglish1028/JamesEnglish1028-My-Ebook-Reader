@@ -24,8 +24,8 @@ This README summarizes the current state (features implemented), developer setup
 The Book Details page provides a visually clear, accessible, and feature-rich view for each book:
 
 - **Layout**: Two-column design with top-aligned book cover and title/details. Book title is large and accessible, with spacing and alignment for clarity.
-- **Format Badges**: Book format (EPUB, PDF, Audiobook), media type, and publication type are shown as colored badges using a shared badge component (`BookBadges.tsx`). This ensures consistent badge logic and UI in both the catalog/grid view (`BookCard.tsx`) and the Book Detail view (`BookDetailView.tsx`).
-  - Badges are only shown if the relevant metadata (e.g., format, mediaType, publicationTypeLabel) is present in the book object. Imported books may not display badges if metadata is missing.
+- **Format Badges**: Book format (EPUB, PDF, Audiobook) and publication type are shown as colored badges using a shared badge component (`BookBadges.tsx`). This ensures consistent badge logic and UI in both the catalog/grid view (`BookCard.tsx`) and the Book Detail view (`BookDetailView.tsx`).
+  - Badges are only shown if the relevant metadata (e.g., format, publicationTypeLabel) is present in the book object. Imported books may not display badges if metadata is missing.
 - **Accessibility**: Font sizes, spacing, and color contrast are chosen for readability. Title font is large but balanced, and all interactive elements have clear focus states.
 - **Citation Format Support**: Citations can be created and exported in APA or MLA style, with the format tracked per citation.
 - **Backup**: The original BookDetailView.tsx is backed up for reference and rollback.

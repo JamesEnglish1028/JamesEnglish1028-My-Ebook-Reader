@@ -62,18 +62,6 @@ const BookBadges: React.FC<BookBadgesProps> = ({ book }) => {
           {badge.format}
         </span>
       ))}
-      {/* MediaType badge if present */}
-      {book.mediaType && (
-        <span className="inline-block text-xs font-mono bg-slate-700 text-sky-200 px-2 py-0.5 rounded" title={`Media Type: ${book.mediaType}`}> 
-          {book.mediaType}
-        </span>
-      )}
-      {/* AcquisitionMediaType badge if present and mediaType is missing */}
-      {book.acquisitionMediaType && !book.mediaType && (
-        <span className="inline-block text-xs font-mono bg-slate-700 text-sky-200 px-2 py-0.5 rounded" title={`Acquisition Media Type: ${book.acquisitionMediaType}`}> 
-          {book.acquisitionMediaType}
-        </span>
-      )}
     </div>
   );
 };
