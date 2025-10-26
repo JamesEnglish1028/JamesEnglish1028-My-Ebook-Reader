@@ -38,8 +38,8 @@ describe('BookDetailView accessibility rendering', () => {
       setImportStatus: () => {},
     };
     const { getByText } = render(<BookDetailView {...props} />);
-    expect(getByText('Accessibility Features')).toBeInTheDocument();
-    expect(getByText('altText, displayTransformability')).toBeInTheDocument();
+  expect(getByText('Accessibility: Summary')).toBeInTheDocument();
+  expect(getByText('Features: altText, displayTransformability')).toBeInTheDocument();
     expect(getByText('Access Modes')).toBeInTheDocument();
     expect(getByText('textual')).toBeInTheDocument();
     expect(getByText('Accessibility Hazards')).toBeInTheDocument();

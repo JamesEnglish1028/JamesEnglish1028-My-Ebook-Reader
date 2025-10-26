@@ -4,7 +4,9 @@ const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
 // Main BookDetailView component
 import React, { useRef } from 'react';
 
-import type { BookMetadata, Bookmark, Citation, CatalogBook, BookRecord, ImportStatus } from '../types';
+import { bookmarkService } from '../domain/reader';
+import { citationService } from '../domain/reader/citation-service';
+import type { BookMetadata, BookRecord, Bookmark, CatalogBook, Citation, ImportStatus } from '../types';
 
 // Helper type to allow CatalogBook fields (mediaType, acquisitionMediaType, publicationTypeLabel, schemaOrgType) for detail view
 type BookDetailMetadata = BookMetadata & Partial<Pick<CatalogBook, 'mediaType' | 'acquisitionMediaType' | 'publicationTypeLabel' | 'schemaOrgType'>>;
@@ -114,9 +116,6 @@ interface AnimationData {
   rect: { x: number; y: number; width: number; height: number; top: number; right: number; bottom: number; left: number };
   coverImage?: string;
 }
-import { bookmarkService } from '../domain/reader';
-import { citationService } from '../domain/reader/citation-service';
-
 
 
 const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, catalogName, userCitationFormat, onReadBook, onImportFromCatalog, importStatus, setImportStatus }) => {
@@ -145,6 +144,16 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
   // Import button state and modal
   const [showImportSuccess, setShowImportSuccess] = React.useState(false);
   const [isImporting, setIsImporting] = React.useState(false);
+
+  // Only allow import if format or mediaType is PDF or EPUB
+  const isImportable = (() => {
+    const format = book.format?.toUpperCase();
+    const mediaType = book.mediaType?.toLowerCase();
+    return (
+      format === 'PDF' || format === 'EPUB' ||
+      mediaType === 'application/pdf' || mediaType === 'application/epub+zip'
+    );
+  })();
 
   const handleImportClick = async () => {
     if (isImporting) return;
@@ -184,9 +193,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
             <button
               className="mt-2 px-4 py-2 rounded bg-sky-700 text-white font-bold hover:bg-sky-600 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleImportClick}
-              disabled={isImporting}
+              disabled={isImporting || !isImportable}
             >
-              {isImporting ? 'Importing...' : 'Import to My Library'}
+              {isImporting ? 'Importing...' : isImportable ? 'Import to My Library' : 'Cannot Import: Not EPUB or PDF'}
             </button>
           )}
           {showImportSuccess && (

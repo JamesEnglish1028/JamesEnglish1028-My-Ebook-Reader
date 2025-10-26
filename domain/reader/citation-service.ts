@@ -9,7 +9,7 @@ import { getStorageKey } from '../../constants';
 import { logger } from '../../services/logger';
 import type { BookMetadata } from '../book/types';
 
-import type { Citation, CitationFormat, FormattedCitation } from './types';
+import type { Citation, CitationFormat } from './types';
 
 /**
  * Result type for citation operations

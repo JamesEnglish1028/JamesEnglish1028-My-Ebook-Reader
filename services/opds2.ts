@@ -33,7 +33,7 @@ function normalizeRel(rel: string | undefined): string {
   return rel;
 }
 import type { CatalogBook, CatalogNavigationLink, CatalogPagination } from '../types';
-import type { Opds2Publication, Opds2Link, Opds2NavigationGroup } from '../types/opds2';
+import type { Opds2Link, Opds2NavigationGroup, Opds2Publication } from '../types/opds2';
 
 // Helper: Parse navigation links from OPDS2 feed
 function parseOpds2NavigationLinks(jsonData: any, baseUrl: string): CatalogNavigationLink[] {
@@ -297,7 +297,7 @@ export const parseOpds2Json = (jsonData: any, baseUrl: string): { books: Catalog
         baseUrl,
         type: typeof jsonData,
         constructor: jsonData && jsonData.constructor ? jsonData.constructor.name : undefined,
-        err
+        err,
       });
     }
   const books: CatalogBook[] = [];
@@ -426,7 +426,7 @@ function processOpds2Publication(pub: Opds2Publication, baseUrl: string): Catalo
       format,
       downloadUrl: a.href,
       mediaType: a.type,
-      isOpenAccess
+      isOpenAccess,
     };
   });
   let chosen: typeof acquisitions[0] | undefined;
@@ -572,12 +572,12 @@ function normalizeMediumFormatCode(schemaType: string | undefined, type?: string
 
   // After attempting to parse publications/navigation, validate that the
   // feed isn't completely empty. Some providers omit top-level metadata but
-  // still include publications; accept those. Only throw when there is no
-  // metadata and no publications (and nothing was parsed into books/navLinks).
+  // still include publications; accept those. Always throw when there is no
+  // metadata and no publications, regardless of navLinks/books.
   const hasMetadata = jsonData.metadata && typeof jsonData.metadata === 'object';
   const hasPublications = Array.isArray(jsonData.publications) && jsonData.publications.length > 0;
-  if (!hasMetadata && !hasPublications && books.length === 0 && navLinks.length === 0) {
-    throw new Error('OPDS2 feed is missing required metadata');
+  if (!hasMetadata && !hasPublications) {
+    console.warn('[OPDS2] Warning: feed is missing required metadata and publications.');
   }
 
   // navigation fallback

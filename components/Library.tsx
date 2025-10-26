@@ -500,7 +500,7 @@ const Library: React.FC = () => {
             </aside>
           )}
           {/* Main Content */}
-          <main className={`flex-1 min-w-0 order-1 lg:order-2 ${availableCollections.length === 0 ? '' : ''}`}> 
+          <main className={`flex-1 min-w-0 order-1 lg:order-2 ${availableCollections.length === 0 ? '' : ''}`}>
             {renderCurrentView()}
           </main>
         </div>

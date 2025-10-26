@@ -23,11 +23,12 @@ describe('opds2.ts - credential migration and edge error cases', () => {
   });
 
   it('parseOpds2Json throws on missing metadata', () => {
-    expect(() => opds2.parseOpds2Json({}, 'https://x/')).toThrow(/metadata/);
+  expect(() => opds2.parseOpds2Json({}, 'https://x/')).toThrow(/metadata/);
+  expect(() => opds2.parseOpds2Json({ navigation: [] }, 'https://x/')).toThrow(/metadata/);
   });
 
   it('parseOpds2Json throws on non-object', () => {
-    expect(() => opds2.parseOpds2Json(null, 'https://x/')).toThrow(/catalog format/);
+  expect(() => opds2.parseOpds2Json(null, 'https://x/')).toThrow(/catalog format/);
   });
 
   it('fetchOpds2Feed returns 401 and empty books on unauthorized', async () => {

@@ -1,22 +1,22 @@
 import React from 'react';
 
 import {
-  AboutPage,
-  BookDetailView,
-  ErrorBoundary,
-  ReaderView,
+    AboutPage,
+    BookDetailView,
+    ErrorBoundary,
+    ReaderView,
 } from '..';
-import PdfReaderView from '../PdfReaderView';
-import type { BookDetailMetadata } from '../BookDetailView';
 import type {
-  BookMetadata,
-  BookRecord,
-  Catalog,
-  CatalogBook,
-  CatalogRegistry,
-  CoverAnimationData,
+    BookMetadata,
+    BookRecord,
+    Catalog,
+    CatalogBook,
+    CatalogRegistry,
+    CoverAnimationData,
 } from '../../types';
+import type { BookDetailMetadata } from '../BookDetailView';
 import LibraryView from '../library/LibraryView';
+import PdfReaderView from '../PdfReaderView';
 
 
 export interface ViewRendererProps {

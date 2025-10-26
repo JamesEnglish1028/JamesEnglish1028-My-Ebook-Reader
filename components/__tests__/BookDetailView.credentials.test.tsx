@@ -37,7 +37,7 @@ describe('BookDetailView credential retry using stored creds', () => {
 
     // Test harness similar to real app import flow
     const TestHarness: React.FC = () => {
-      const [importStatus, setImportStatus] = useState({ isLoading: false, message: '', error: null as string | null });
+  const [importStatus, setImportStatus] = useState({ isLoading: false, message: '', error: null as string | null, state: 'awaiting-auth' as 'awaiting-auth', host: 'test-host' });
 
       const handleImportFromCatalog = async () => {
         // BookDetailView will call resolveAcquisitionChainOpds1 internally when palace-type
@@ -45,11 +45,11 @@ describe('BookDetailView credential retry using stored creds', () => {
         return { success: false };
       };
 
-      const sample: CatalogBook = { title: 'Auth Book', author: 'A', coverImage: null, downloadUrl: 'https://opds.example/borrow/1', summary: null, providerId: 'p1', format: 'EPUB', acquisitionMediaType: 'application/adobe+epub' };
+  const sample = { id: 301, title: 'Auth Book', author: 'A', coverImage: null, downloadUrl: 'https://opds.example/borrow/1', summary: null, providerId: 'p1', format: 'EPUB', acquisitionMediaType: 'application/adobe+epub' } as any;
 
       return (
         <div>
-          <BookDetailView book={sample} source="catalog" onBack={() => {}} onReadBook={() => {}} onImportFromCatalog={handleImportFromCatalog} importStatus={importStatus} setImportStatus={setImportStatus} />
+          <BookDetailView book={sample} source="catalog" onBack={() => {}} onReadBook={() => {}} onImportFromCatalog={handleImportFromCatalog} importStatus={importStatus} setImportStatus={() => {}} userCitationFormat={'apa' as 'apa'} />
           <OpdsCredentialsModal isOpen={false} host={null} onClose={() => {}} onSubmit={() => {}} />
         </div>
       );
@@ -57,7 +57,7 @@ describe('BookDetailView credential retry using stored creds', () => {
 
     render(<TestHarness />);
 
-    const addButton = screen.getByRole('button', { name: /Read in Palace App|Add to Bookshelf/i });
+  const addButton = screen.getByRole('button', { name: /Import to My Library/i });
     await user.click(addButton);
 
     // Wait for resolve to be called

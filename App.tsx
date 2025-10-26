@@ -10,16 +10,15 @@ import { HashRouter, Route, Routes, useLocation, useNavigate } from 'react-route
 
 // Component imports - using barrel exports for cleaner code
 import {
-  ErrorBoundary,
-  ScreenReaderAnnouncer,
-  SplashScreen,
-  useConfirm,
-  useToast,
+    ErrorBoundary,
+    ScreenReaderAnnouncer,
+    SplashScreen,
+    useConfirm,
+    useToast,
 } from './components';
 // Import new LibraryView from refactored structure
 // Import app-level components
 import { GlobalModals, ViewRenderer } from './components/app';
-import BookDetailView from './components/BookDetailView';
 
 // Hooks imports
 import { useAuth } from './contexts/AuthContext';
@@ -28,15 +27,15 @@ import { useGlobalShortcuts } from './hooks';
 
 // Service imports - using barrel exports
 import {
-  db,
-  downloadLibraryFromDrive,
-  findCredentialForUrl,
-  generatePdfCover,
-  imageUrlToBase64,
-  logger,
-  maybeProxyForCors,
-  saveOpdsCredential,
-  uploadLibraryToDrive,
+    db,
+    downloadLibraryFromDrive,
+    findCredentialForUrl,
+    generatePdfCover,
+    imageUrlToBase64,
+    logger,
+    maybeProxyForCors,
+    saveOpdsCredential,
+    uploadLibraryToDrive,
 } from './services';
 import { extractBookMetadataFromOpf } from './services/epubParser';
 import { extractOpfXmlFromEpub } from './services/epubZipUtils';
@@ -45,17 +44,17 @@ import { extractOpfXmlFromEpub } from './services/epubZipUtils';
 
 // Type imports - kept separate as they're from a single file
 import type {
-  Bookmark,
-  BookMetadata,
-  BookRecord,
-  Catalog,
-  CatalogBook,
-  CatalogRegistry,
-  Citation,
-  CoverAnimationData,
-  CredentialPrompt,
-  ReaderSettings,
-  SyncPayload,
+    Bookmark,
+    BookMetadata,
+    BookRecord,
+    Catalog,
+    CatalogBook,
+    CatalogRegistry,
+    Citation,
+    CoverAnimationData,
+    CredentialPrompt,
+    ReaderSettings,
+    SyncPayload,
 } from './types';
 
 // Context imports
@@ -580,7 +579,7 @@ const AppInner: React.FC = () => {
         book.providerId,
         book.format,
         book.coverImage,
-        catalogBookMeta
+        catalogBookMeta,
       );
       // If import was successful, switch to library view so the user sees the new book immediately
       if (result.success) {
@@ -827,7 +826,7 @@ const AppInner: React.FC = () => {
             currentView,
             libraryRefreshFlag,
             activeOpdsSource,
-            catalogNavPath
+            catalogNavPath,
           })}
         </main>
       )}

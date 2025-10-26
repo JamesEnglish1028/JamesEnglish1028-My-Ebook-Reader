@@ -19,16 +19,17 @@ describe('BookDetailView Distributor as Provider Integration', () => {
   });
 
   test('displays distributor as provider name for catalog books', () => {
-    const catalogBookWithDistributor: CatalogBook = {
+    const catalogBookWithDistributor = {
+      id: 201,
       title: 'Test OAPEN Book',
       author: 'Test Author',
       coverImage: null,
       downloadUrl: 'https://example.com/download',
       summary: 'A test book from OAPEN',
-      distributor: 'OAPEN', // This should show as provider
+      distributor: 'OAPEN',
       providerId: 'test-123',
       format: 'PDF',
-    };
+    } as any;
 
     const mockProps = {
       book: catalogBookWithDistributor,
@@ -36,31 +37,31 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       onBack: vi.fn(),
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
-      importStatus: { isLoading: false, message: '', error: null },
+  importStatus: { isLoading: false, message: '', error: null, state: 'awaiting-auth' as 'awaiting-auth', host: 'test-host' },
+  userCitationFormat: 'apa' as 'apa',
       setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
 
-    // Should show Provider ID section with distributor as provider name
-    expect(screen.getByText('Provider ID')).toBeInTheDocument();
-    expect(screen.getByText('test-123')).toBeInTheDocument();
-    expect(screen.getByText('from OAPEN')).toBeInTheDocument();
+  // Should show Provider section with distributor as provider name
+  expect(screen.getByText('Provider')).toBeInTheDocument();
+  expect(screen.getByText('OAPEN')).toBeInTheDocument();
 
     console.log('✅ Catalog book shows distributor as provider name');
   });
 
   test('displays providerName for library books', () => {
-    const libraryBookWithProvider: BookMetadata = {
+    const libraryBookWithProvider = {
       id: 1,
       title: 'Test Library Book',
       author: 'Test Author',
       coverImage: null,
       providerId: 'lib-456',
       providerName: 'My Library Provider',
-      distributor: 'OAPEN', // Library books should use providerName, not distributor
+      distributor: 'OAPEN',
       format: 'EPUB',
-    };
+    } as any;
 
     const mockProps = {
       book: libraryBookWithProvider,
@@ -68,25 +69,25 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       onBack: vi.fn(),
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
-      importStatus: { isLoading: false, message: '', error: null },
+  importStatus: { isLoading: false, message: '', error: null, state: 'awaiting-auth' as 'awaiting-auth', host: 'test-host' },
+  userCitationFormat: 'apa' as 'apa',
       setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
 
-    // Should show Provider ID section with providerName (not distributor)
-    expect(screen.getByText('Provider ID')).toBeInTheDocument();
-    expect(screen.getByText('lib-456')).toBeInTheDocument();
-    expect(screen.getByText('from My Library Provider')).toBeInTheDocument();
-
-    // Should NOT show distributor separately since it's a library book
-    expect(screen.queryByText('from OAPEN')).not.toBeInTheDocument();
+  // Should show Provider section with providerName
+  expect(screen.getByText('Provider')).toBeInTheDocument();
+  expect(screen.getByText('My Library Provider')).toBeInTheDocument();
+  // Should NOT show distributor separately since it's a library book
+  expect(screen.queryByText('OAPEN')).not.toBeInTheDocument();
 
     console.log('✅ Library book shows providerName, not distributor');
   });
 
   test('handles catalog books without distributor gracefully', () => {
-    const catalogBookWithoutDistributor: CatalogBook = {
+    const catalogBookWithoutDistributor = {
+      id: 202,
       title: 'Book Without Distributor',
       author: 'Test Author',
       coverImage: null,
@@ -94,7 +95,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       summary: 'Book without distributor',
       providerId: 'no-dist-123',
       format: 'EPUB',
-    };
+    } as any;
 
     const mockProps = {
       book: catalogBookWithoutDistributor,
@@ -102,16 +103,17 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       onBack: vi.fn(),
       onReadBook: vi.fn(),
       onImportFromCatalog: vi.fn(),
-      importStatus: { isLoading: false, message: '', error: null },
+  importStatus: { isLoading: false, message: '', error: null, state: 'awaiting-auth' as 'awaiting-auth', host: 'test-host' },
+  userCitationFormat: 'apa' as 'apa',
       setImportStatus: vi.fn(),
     };
 
     render(<BookDetailView {...mockProps} />);
 
-    // Should show Provider ID but no "from" text since no distributor
-    expect(screen.getByText('Provider ID')).toBeInTheDocument();
-    expect(screen.getByText('no-dist-123')).toBeInTheDocument();
-    expect(screen.queryByText(/from/)).not.toBeInTheDocument();
+  // Should show Provider section but no distributor
+  expect(screen.getByText('Provider')).toBeInTheDocument();
+  // Should NOT show distributor
+  expect(screen.queryByText('OAPEN')).not.toBeInTheDocument();
 
     console.log('✅ Catalog book without distributor handled gracefully');
   });

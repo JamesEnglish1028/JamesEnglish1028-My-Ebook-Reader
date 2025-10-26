@@ -1,7 +1,7 @@
-import type { AudienceMode, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogWithCategories, CatalogWithCollections, CategorizationMode, Category, Collection, CollectionGroup, CollectionMode, FictionMode, MediaMode, Series } from '../types';
-import { parseOpds2Json } from './opds2';
+import type { AudienceMode, CatalogBook, CatalogNavigationLink, CatalogPagination, CatalogWithCategories, CatalogWithCollections, CategorizationMode, Category, Collection, CollectionGroup, CollectionMode, FictionMode, MediaMode } from '../types';
 
 import { logger } from './logger';
+import { parseOpds2Json } from './opds2';
 import { maybeProxyForCors, proxiedUrl } from './utils';
 // NOTE: prefer a static import for `maybeProxyForCors` instead of a dynamic import
 // because static imports keep bundling deterministic and avoid creating a
@@ -484,7 +484,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                                 console.log('[mebooks] parseOpds2Json result:', {
                                     navLinks: parsed.navLinks,
                                     books: parsed.books,
-                                    pagination: parsed.pagination
+                                    pagination: parsed.pagination,
                                 });
                                 return parsed;
                     } catch (e) {

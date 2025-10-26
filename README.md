@@ -196,3 +196,7 @@ This repository does not currently include a license file. Consider adding an ap
 ## Release
 
 This README was updated as part of the v1.0.0 release tagging in this repository. See the Git tags for release history.
+
+## OPDS2 Feed Parsing
+
+If an OPDS2 feed is missing required metadata or publications, the parser will log a warning but will not throw an error. The UI will remain optional and will not crash or break. This allows the app to gracefully handle incomplete or minimal feeds.

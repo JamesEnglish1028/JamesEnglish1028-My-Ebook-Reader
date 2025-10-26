@@ -2,6 +2,7 @@ import React from 'react';
 
 import { proxiedUrl } from '../../../services/utils';
 import type { BookMetadata, CatalogBook } from '../../../types';
+
 import BookBadges from './BookBadges';
 
 interface BookCardProps {

@@ -30,8 +30,8 @@ describe('BookDetailView format badge and import button', () => {
     // Format badge should display PDF
     expect(screen.getByText('PDF')).toBeInTheDocument();
 
-    // Import button should allow PDF imports (app supports PDF reader)
-    expect(screen.getByRole('button', { name: /Add to Bookshelf/i })).toBeInTheDocument();
+  // Import button should allow PDF imports (app supports PDF reader)
+  expect(screen.getByRole('button', { name: /Import to My Library/i })).toBeInTheDocument();
   });
 
   it('shows Add to Bookshelf for EPUB catalog book', () => {
@@ -50,7 +50,7 @@ describe('BookDetailView format badge and import button', () => {
     // Format badge should display EPUB
     expect(screen.getByText('EPUB')).toBeInTheDocument();
 
-    // Import button should show 'Add to Bookshelf'
-    expect(screen.getByRole('button', { name: /Add to Bookshelf/i })).toBeInTheDocument();
+  // Import button should show 'Import to My Library'
+  expect(screen.getByRole('button', { name: /Import to My Library/i })).toBeInTheDocument();
   });
 });

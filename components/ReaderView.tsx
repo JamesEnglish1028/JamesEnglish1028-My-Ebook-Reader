@@ -2,16 +2,16 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { db } from '../services/db';
 import { bookmarkService, citationService, positionTracker } from '../domain/reader';
+import { db } from '../services/db';
 import {
-  buildTocFromSpine,
-  findFirstChapter,
-  getEpubViewStateForBook,
-  getReaderSettings,
-  performBookSearch,
-  saveEpubViewStateForBook,
-  saveReaderSettings,
+    buildTocFromSpine,
+    findFirstChapter,
+    getEpubViewStateForBook,
+    getReaderSettings,
+    performBookSearch,
+    saveEpubViewStateForBook,
+    saveReaderSettings,
 } from '../services/readerUtils';
 import { isDebug, trackEvent } from '../services/utils';
 import type { Bookmark, BookRecord, Citation, CoverAnimationData, ReaderSettings, SearchResult, TocItem } from '../types';

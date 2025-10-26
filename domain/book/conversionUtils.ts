@@ -1,6 +1,6 @@
 import type { CatalogBook } from '../catalog/types';
 
-import type { BookRecord, BookMetadata } from './types';
+import type { BookMetadata, BookRecord } from './types';
 
 // Convert CatalogBook to BookRecord for saving to DB
 export function catalogBookToBookRecord(catalogBook: CatalogBook, epubData: ArrayBuffer): BookRecord {

@@ -19,8 +19,11 @@ describe('ErrorBoundary', () => {
         <ProblemChild />
       </ErrorBoundary>,
     );
+    // Update to match actual fallback UI text and error message
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
     expect(screen.getByText(/test error/i)).toBeInTheDocument();
+    // Button text may be 'Try Again' or similar
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 
   it('renders children when no error', () => {
@@ -41,7 +44,8 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     );
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    const tryAgainButton = screen.getByRole('button', { name: /try again/i });
+    fireEvent.click(tryAgainButton);
     expect(onReset).toHaveBeenCalled();
   });
 });

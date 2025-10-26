@@ -1,4 +1,5 @@
 import React from 'react';
+
 import type { BookMetadata, CatalogBook } from '../../../types';
 
 interface BookBadgesProps {
