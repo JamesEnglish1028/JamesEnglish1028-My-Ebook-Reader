@@ -479,7 +479,9 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                 // Enhanced logic to handle ambiguous Content-Type headers
                 if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
                     try {
+                        console.warn('[mebooks] Attempting to parse OPDS2 JSON (proxied), response length:', responseText.length);
                         const jsonData = JSON.parse(responseText);
+                        console.warn('[mebooks] Successfully parsed OPDS2 JSON (proxied), keys:', Object.keys(jsonData).slice(0, 5));
                         return parseOpds2Json(jsonData, baseUrl);
                     } catch (e) {
                         // If parsing fails, check if the body looks like XML
@@ -492,7 +494,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                                 throw new Error('Failed to parse catalog content as both JSON and XML.');
                             }
                         } else {
-                            console.error('[mebooks] Failed to parse as JSON and does not appear to be XML:', e);
+                            console.error('[mebooks] Failed to parse as JSON (proxied) and does not appear to be XML:', e);
                             throw new Error('Failed to parse catalog content as JSON.');
                         }
                     }
@@ -556,7 +558,9 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
         // Enhanced logic to handle ambiguous Content-Type headers
         if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
             try {
+                console.warn('[mebooks] Attempting to parse OPDS2 JSON (direct), response length:', responseText.length);
                 const jsonData = JSON.parse(responseText);
+                console.warn('[mebooks] Successfully parsed OPDS2 JSON (direct), keys:', Object.keys(jsonData).slice(0, 5));
                 return parseOpds2Json(jsonData, baseUrl);
             } catch (e) {
                 // Some Palace endpoints return Atom XML but incorrectly set Content-Type
@@ -570,13 +574,14 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                         throw new Error('Failed to parse catalog content as both JSON and XML.');
                     }
                 }
-                console.warn('[mebooks] Failed to JSON.parse response');
+                console.warn('[mebooks] Failed to JSON.parse response (direct)');
                 throw new Error(`Failed to parse JSON response for ${url}.`);
             }
         } else if (contentType.includes('application/atom+xml') || contentType.includes('application/xml') || contentType.includes('text/xml')) {
             return parseOpds1Xml(responseText, baseUrl);
         } else {
             // Attempt to auto-detect format if Content-Type is vague (e.g., text/plain)
+            console.warn('[mebooks] Fell through to else block - forcedVersion:', forcedVersion, 'contentType:', contentType, 'response starts with {:', responseText.trim().startsWith('{'), 'response starts with <:', responseText.trim().startsWith('<'));
             if (forcedVersion !== '1' && responseText.trim().startsWith('{')) {
                 try {
                     const jsonData = JSON.parse(responseText);
