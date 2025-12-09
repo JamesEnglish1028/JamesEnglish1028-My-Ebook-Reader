@@ -2,12 +2,19 @@
 
 ## Overview
 
-This implementation adds support for launching MeBooks from a catalog registry viewer application with automatic OPDS catalog import functionality.
+This implementation provides comprehensive support for registry viewer applications to integrate with MeBooks. It solves the challenge of single-page app integration by using cross-tab communication via localStorage events, ensuring catalogs are added to existing MeBooks instances rather than isolated new tabs.
 
-## Integration Points
+## Integration Methods
 
-### URL Parameters
-MeBooks now supports the following URL parameters for automatic catalog import:
+### 1. Cross-Tab Communication (Primary Method)
+Uses localStorage events to communicate with existing MeBooks instances:
+- Registry sends catalog import request via localStorage
+- Existing MeBooks instance receives and processes the request
+- MeBooks responds with success/failure status
+- No new tabs needed - works with existing user data
+
+### 2. URL Parameters (Fallback Method)
+Falls back to URL parameters when no existing instance is detected:
 - `import`: The URL of the OPDS catalog to import
 - `name`: The display name for the catalog
 
@@ -69,18 +76,94 @@ window.open(mebooksUrl, '_blank');
 
 A test file `test-registry-integration.html` has been created with sample links to test the integration functionality. The test includes links with various OPDS catalogs to verify the automatic import behavior.
 
+## MeBooks Integration Library
+
+A JavaScript library (`mebooks-integration.js`) provides a clean API for registry applications:
+
+```javascript
+// Initialize
+const mebooksIntegration = new MeBooksIntegration('https://your-mebooks-domain.com/');
+
+// Import a catalog
+const result = await mebooksIntegration.importCatalog(
+    'https://standardebooks.org/opds/all', 
+    'Standard Ebooks'
+);
+
+// Check if MeBooks is running
+const isRunning = await mebooksIntegration.checkMeBooksRunning();
+```
+
+### Library Features
+- **Smart Detection**: Automatically detects existing MeBooks instances
+- **Fallback Handling**: Opens new instance if none exists
+- **Promise-based API**: Clean async/await interface
+- **Status Checking**: Can detect if MeBooks is currently running
+- **Configurable Timeouts**: Adjustable response timeouts
+
+## Cross-Tab Communication Protocol
+
+### Import Request
+```javascript
+localStorage.setItem('mebooks-import-catalog', JSON.stringify({
+    importUrl: 'https://example.com/opds',
+    catalogName: 'Example Catalog', 
+    timestamp: Date.now()
+}));
+```
+
+### Import Response
+```javascript
+localStorage.setItem('mebooks-import-response', JSON.stringify({
+    success: true,
+    catalogName: 'Example Catalog',
+    timestamp: Date.now()
+}));
+```
+
+### Ping/Pong Detection
+```javascript
+// Ping
+localStorage.setItem('mebooks-ping', JSON.stringify({
+    timestamp: Date.now()
+}));
+
+// Pong
+localStorage.setItem('mebooks-pong', JSON.stringify({
+    timestamp: Date.now(),
+    version: '1.0.0'
+}));
+```
+
 ## Technical Notes
 
-- Uses existing `useCatalogs` hook for catalog management
-- Leverages existing toast system for user feedback
-- OPDS version defaults to '2' (OPDS 2.0)
-- Compatible with existing URL parameter handling (autoOpen)
-- Maintains clean separation of concerns
+- **Cross-Tab Communication**: Uses localStorage events for same-origin tab communication
+- **Timeout Handling**: 1.5-second timeout before falling back to URL parameters
+- **Message Validation**: Timestamps prevent processing stale messages
+- **Automatic Cleanup**: Messages are automatically removed after processing
+- **Window Focus**: Successfully imported catalogs bring MeBooks to the front
+- **Error Handling**: Comprehensive error handling with user feedback
+- **Version Detection**: Ping/pong includes version information for compatibility
+
+## Testing
+
+### Comprehensive Test Page
+The `test-registry-integration.html` includes:
+- Sample catalog import buttons
+- Status detection functionality  
+- Real-time feedback display
+- Integration library demonstration
+
+### Test Scenarios
+1. **Existing Instance**: MeBooks already open - catalog added via cross-tab communication
+2. **No Instance**: MeBooks not open - new instance launched with catalog
+3. **Status Detection**: Check if MeBooks is currently running
 
 ## Future Enhancements
 
 Potential improvements could include:
-- Support for additional URL parameters (e.g., auto-navigate to specific collection)
-- Validation of OPDS catalog URLs before adding
-- Support for different OPDS versions via URL parameter
-- Batch catalog import from multiple URLs
+- **Batch Import**: Multiple catalogs in single request
+- **Version Compatibility**: Check MeBooks version before import
+- **User Preferences**: Respect user settings for import behavior
+- **Validation**: Pre-validate OPDS URLs before sending
+- **Analytics**: Track import success rates and methods used

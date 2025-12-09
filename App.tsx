@@ -229,32 +229,95 @@ const AppInner: React.FC = () => {
 
   // Handle OPDS catalog import from registry viewer
   // URL parameters: ?import=<catalogUrl>&name=<catalogName>
+  const importCatalog = useCallback((importUrl: string, catalogName: string) => {
+    try {
+      addCatalog(catalogName, importUrl, '2'); // Default to OPDS 2
+      toast.pushToast(`Successfully added catalog: ${catalogName}`, 4000);
+      logger.info('[App] Auto-imported OPDS catalog from registry', { importUrl, catalogName });
+      
+      // Navigate to library view to show the new catalog
+      setCurrentView('library');
+      
+      // Focus the window to bring MeBooks to the front
+      window.focus();
+      
+      return true;
+    } catch (error) {
+      toast.pushToast(`Failed to add catalog: ${catalogName}`, 6000);
+      logger.error('[App] Failed to import OPDS catalog from registry', { importUrl, catalogName, error });
+      return false;
+    }
+  }, [addCatalog, toast, setCurrentView]);
+
+  // Handle URL parameter import
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const importUrl = params.get('import');
     const catalogName = params.get('name');
     
     if (importUrl && catalogName) {
-      // Add the catalog to the user's collection
-      try {
-        addCatalog(catalogName, importUrl, '2'); // Default to OPDS 2
-        toast.pushToast(`Successfully added catalog: ${catalogName}`, 4000);
-        logger.info('[App] Auto-imported OPDS catalog from registry', { importUrl, catalogName });
-        
-        // Navigate to library view to show the new catalog
-        setCurrentView('library');
-        
-        // Clear URL parameters after processing
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('import');
-        newUrl.searchParams.delete('name');
-        window.history.replaceState({}, document.title, newUrl.toString());
-      } catch (error) {
-        toast.pushToast(`Failed to add catalog: ${catalogName}`, 6000);
-        logger.error('[App] Failed to import OPDS catalog from registry', { importUrl, catalogName, error });
-      }
+      importCatalog(importUrl, catalogName);
+      
+      // Clear URL parameters after processing
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('import');
+      newUrl.searchParams.delete('name');
+      window.history.replaceState({}, document.title, newUrl.toString());
     }
-  }, [location.search, addCatalog, toast]);
+  }, [location.search, importCatalog]);
+
+  // Listen for cross-tab catalog import messages and ping requests
+  useEffect(() => {
+    const handleStorageMessage = (event: StorageEvent) => {
+      if (event.key === 'mebooks-import-catalog' && event.newValue) {
+        try {
+          const { importUrl, catalogName, timestamp } = JSON.parse(event.newValue);
+          
+          // Only process recent messages (within last 5 seconds)
+          if (Date.now() - timestamp < 5000) {
+            logger.info('[App] Received cross-tab catalog import request', { importUrl, catalogName });
+            
+            const success = importCatalog(importUrl, catalogName);
+            
+            // Send response back
+            localStorage.setItem('mebooks-import-response', JSON.stringify({
+              success,
+              catalogName,
+              timestamp: Date.now(),
+            }));
+            
+            // Clear the message
+            localStorage.removeItem('mebooks-import-catalog');
+          }
+        } catch (error) {
+          logger.error('[App] Failed to process cross-tab import message', { error });
+        }
+      }
+      
+      // Handle ping requests to detect if MeBooks is running
+      if (event.key === 'mebooks-ping' && event.newValue) {
+        try {
+          const { timestamp } = JSON.parse(event.newValue);
+          
+          // Only respond to recent pings (within last 2 seconds)
+          if (Date.now() - timestamp < 2000) {
+            localStorage.setItem('mebooks-pong', JSON.stringify({
+              timestamp: Date.now(),
+              version: '1.0.0', // Could be useful for version checking
+            }));
+            
+            // Clear the ping message
+            localStorage.removeItem('mebooks-ping');
+          }
+        } catch (error) {
+          logger.error('[App] Failed to process ping message', { error });
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageMessage);
+    return () => window.removeEventListener('storage', handleStorageMessage);
+  }, [importCatalog]);
 
   const handleOpenBook = useCallback((id: number, animationData: CoverAnimationData, format: string = 'EPUB') => {
     setSelectedBookId(id);
