@@ -235,10 +235,20 @@ const Library: React.FC<LibraryProps> = ({
     // Check if we're browsing a registry
     const isRegistry = activeOpdsSource && !('opdsVersion' in activeOpdsSource);
     
+    console.warn('[mebooks-library] fetchAndParseSource called:', {
+      url,
+      activeOpdsSource,
+      isRegistry,
+      hasOpdsVersion: activeOpdsSource ? ('opdsVersion' in activeOpdsSource) : 'no source',
+    });
+    
     if (isRegistry) {
       // Use dedicated registry handler
+      console.warn('[mebooks-library] Routing to fetchRegistryCatalogs');
       return fetchRegistryCatalogs(url);
     }
+    
+    console.warn('[mebooks-library] Routing to regular catalog handler');
 
     // Regular catalog handling
     setIsLoading(false);
