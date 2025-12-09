@@ -21,6 +21,7 @@ This README summarizes the current state (features implemented), developer setup
 - Accessibility: focus management and aria attributes on modals and the help overlay; keyboard-trappable help dialog.
 - Persistence: per-book last-read positions, per-book view state (PDF zoom / EPUB font-size), bookmarks, and citations saved in LocalStorage and IndexedDB.
 - **Book Details Page**: Restored and enhanced layout with two-column design, top-aligned cover and title, accessible font sizes and spacing, format badges (EPUB, PDF, Audiobook) matching catalog views, and citation format support (APA, MLA, Chicago). Includes backup and type updates for reliability.
+- **Palace Registry Integration**: Automatic OPDS catalog import when launched from registry applications. Supports URL parameters `?import=<catalogUrl>&name=<catalogName>` for seamless catalog discovery and addition with user feedback and error handling.
 # Book Details Page
 
 The Book Details page provides a visually clear, accessible, and feature-rich view for each book:
@@ -149,6 +150,14 @@ See the migration guide for usage examples and best practices.
 
 ## Short changelog (this release)
 
+### Palace Registry Integration (December 2025)
+- ✅ Added automatic OPDS catalog import via URL parameters
+- ✅ Support for `?import=<catalogUrl>&name=<catalogName>` launch parameters
+- ✅ Toast notifications for import success/failure feedback
+- ✅ Automatic navigation to library view after import
+- ✅ URL parameter cleanup after processing
+- ✅ Comprehensive test page and documentation
+
 ### Phase 2 - Service Layer (October 2025)
 - ✅ Created 5 domain services (2,274 lines of code)
 - ✅ Implemented Result pattern for type-safe error handling
@@ -186,6 +195,42 @@ Planned follow-ups:
 - Add caching/ETag support and robust error handling for OPDS2 fetches.
 - Improve UI for managing stored OPDS credentials.
 
+## Palace Registry Integration
+
+MeBooks now supports automatic OPDS catalog import when launched from registry viewer applications like the Palace Library Registry UI. This enables seamless catalog discovery and addition to your library.
+
+### How It Works
+
+When MeBooks is launched with specific URL parameters, it automatically imports the OPDS catalog:
+
+```
+https://your-mebooks-domain.com/#/?import=<catalogUrl>&name=<catalogName>
+```
+
+### Features
+
+- **Automatic Import**: Catalogs are automatically added to your library collection
+- **User Feedback**: Toast notifications confirm successful imports or report errors
+- **Clean Navigation**: After processing, the app navigates to the library view
+- **URL Cleanup**: Parameters are removed from the URL after processing
+- **Error Handling**: Robust error handling with user-friendly messages
+
+### Integration Examples
+
+Registry applications can launch MeBooks using:
+
+```javascript
+const catalogUrl = "https://standardebooks.org/opds/all";
+const catalogName = "Standard Ebooks";
+const mebooksUrl = `https://your-domain.com/#/?import=${encodeURIComponent(catalogUrl)}&name=${encodeURIComponent(catalogName)}`;
+window.open(mebooksUrl, '_blank');
+```
+
+### Testing
+
+A test page is included at `/test-registry-integration.html` with sample OPDS catalogs for testing the integration functionality.
+
+For detailed implementation information, see `REGISTRY_INTEGRATION_IMPLEMENTATION.md`.
 
 ## Contributing
 
