@@ -154,6 +154,7 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
                                     className="w-full bg-slate-700 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                                 />
                             </div>
+                            {activeTab === 'catalogs' && (
                             <div>
                                 <label htmlFor="opds-version" className="block text-sm font-medium text-slate-400 mb-1">OPDS Version</label>
                                 <select id="opds-version" value={opdsVersion} onChange={(e) => setOpdsVersion(e.target.value as any)} className="w-full bg-slate-700 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -162,6 +163,10 @@ const ManageCatalogsModal: React.FC<ManageCatalogsModalProps> = ({
                                     <option value="2">OPDS 2 (JSON)</option>
                                 </select>
                             </div>
+                            )}
+                            {activeTab === 'registries' && (
+                            <p className="text-sm text-slate-400">Registries are always OPDS 2.0 (JSON) format.</p>
+                            )}
                             {error && <p className="text-sm text-red-400">{error}</p>}
                             <button type="submit" className="w-full py-2 px-4 rounded-md bg-sky-500 hover:bg-sky-600 transition-colors font-bold text-sm">
                                 Add {activeTab === 'catalogs' ? 'Catalog' : 'Registry'}
