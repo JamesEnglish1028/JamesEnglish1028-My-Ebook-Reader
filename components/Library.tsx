@@ -203,6 +203,10 @@ const Library: React.FC<LibraryProps> = ({
     const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
     const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
     const isRegistry = activeOpdsSource && !('opdsVersion' in activeOpdsSource);
+    
+    console.warn('[mebooks-library] DEBUG: activeOpdsSource =', activeOpdsSource);
+    console.warn('[mebooks-library] DEBUG: isPalaceHost =', isPalaceHost, 'isRegistry =', isRegistry);
+    console.warn('[mebooks-library] DEBUG: activeOpdsSource.opdsVersion =', (activeOpdsSource as any)?.opdsVersion);
 
     const forcedVersion = (isPalaceHost && !isRegistry) ? '1' : ((activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto');
     const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
@@ -817,9 +821,8 @@ const Library: React.FC<LibraryProps> = ({
                         books={collectionGroup.books}
                         onBookClick={handleCatalogBookClick}
                         onCollectionClick={handleCollectionClick}
-                     
                       />
-                    )}
+                    ))}
                   </div>
                 ) : showCollectionView && catalogCollections.length > 0 ? (
                   <div className="space-y-6 animate-fadeIn">
