@@ -23,7 +23,7 @@ import { GlobalModals, ViewRenderer } from './components/app';
 // Hooks imports
 import { useAuth } from './contexts/AuthContext';
 import { opdsAcquisitionService } from './domain/catalog';
-import { useGlobalShortcuts } from './hooks';
+import { useGlobalShortcuts, useCatalogs } from './hooks';
 
 // Service imports - using barrel exports
 import {
@@ -92,6 +92,9 @@ const queryClient = new QueryClient({
 
 
 const AppInner: React.FC = () => {
+  // Catalog management
+  const { addCatalog } = useCatalogs();
+
   // Track user's citation format setting
   const [userCitationFormat, setUserCitationFormat] = useState<'apa' | 'mla'>(() => {
     try {
@@ -223,6 +226,35 @@ const AppInner: React.FC = () => {
     }
     // only run on first mount or when search changes
   }, [location.search, navigate]);
+
+  // Handle OPDS catalog import from registry viewer
+  // URL parameters: ?import=<catalogUrl>&name=<catalogName>
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const importUrl = params.get('import');
+    const catalogName = params.get('name');
+    
+    if (importUrl && catalogName) {
+      // Add the catalog to the user's collection
+      try {
+        addCatalog(catalogName, importUrl, '2'); // Default to OPDS 2
+        toast.pushToast(`Successfully added catalog: ${catalogName}`, 4000);
+        logger.info('[App] Auto-imported OPDS catalog from registry', { importUrl, catalogName });
+        
+        // Navigate to library view to show the new catalog
+        setCurrentView('library');
+        
+        // Clear URL parameters after processing
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('import');
+        newUrl.searchParams.delete('name');
+        window.history.replaceState({}, document.title, newUrl.toString());
+      } catch (error) {
+        toast.pushToast(`Failed to add catalog: ${catalogName}`, 6000);
+        logger.error('[App] Failed to import OPDS catalog from registry', { importUrl, catalogName, error });
+      }
+    }
+  }, [location.search, addCatalog, toast]);
 
   const handleOpenBook = useCallback((id: number, animationData: CoverAnimationData, format: string = 'EPUB') => {
     setSelectedBookId(id);

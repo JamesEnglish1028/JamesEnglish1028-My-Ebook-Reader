@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeBooks Registry Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-link {
+            display: block;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border: 2px solid #007acc;
+            border-radius: 8px;
+            color: #007acc;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        .test-link:hover {
+            background-color: #e6f3ff;
+        }
+        .description {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-left: 4px solid #007acc;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>MeBooks Registry Integration Test</h1>
+    
+    <div class="description">
+        <p>This page tests the integration between a catalog registry viewer and MeBooks. Click the test links below to launch MeBooks with different OPDS catalogs.</p>
+        <p><strong>Expected behavior:</strong> MeBooks should automatically add the catalog and show a success toast message.</p>
+    </div>
+
+    <h2>Test Links</h2>
+    
+    <a href="http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/#/?import=https://standardebooks.org/opds/all&name=Standard%20Ebooks" class="test-link" target="_blank">
+        <strong>Test 1: Standard Ebooks</strong><br>
+        URL: https://standardebooks.org/opds/all<br>
+        Name: Standard Ebooks
+    </a>
+    
+    <a href="http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/#/?import=https://www.feedbooks.com/publicdomain/catalog.atom&name=Feedbooks%20Public%20Domain" class="test-link" target="_blank">
+        <strong>Test 2: Feedbooks Public Domain</strong><br>
+        URL: https://www.feedbooks.com/publicdomain/catalog.atom<br>
+        Name: Feedbooks Public Domain
+    </a>
+    
+    <a href="http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/#/?import=https://catalog.biblioboard.com/&name=BiblioBoard%20Catalog" class="test-link" target="_blank">
+        <strong>Test 3: BiblioBoard Catalog</strong><br>
+        URL: https://catalog.biblioboard.com/<br>
+        Name: BiblioBoard Catalog
+    </a>
+    
+    <div class="description">
+        <h3>How to Test:</h3>
+        <ol>
+            <li>Click one of the test links above</li>
+            <li>MeBooks should open in a new tab/window</li>
+            <li>You should see a toast message saying "Successfully added catalog: [Name]"</li>
+            <li>The catalog should appear in your library's catalog list</li>
+            <li>The URL parameters should be cleaned from the address bar</li>
+        </ol>
+    </div>
+</body>
+</html>
