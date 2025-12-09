@@ -247,7 +247,7 @@ const isRunning = await mebooksIntegration.checkMeBooksRunning();
    async function addToMeBooks(catalogUrl, catalogName) {
        try {
            const result = await mebooksIntegration.importCatalog(catalogUrl, catalogName);
-           
+
            if (result.success) {
                console.log(`✅ ${result.message}`);
                // Show success UI
@@ -289,12 +289,12 @@ const isRunning = await mebooksIntegration.checkMeBooksRunning();
 
 ### 🧪 Testing & Development
 
-**Live Test Page**: Visit `/test-registry-integration.html` on your MeBooks instance  
+**Live Test Page**: Visit `/test-registry-integration.html` on your MeBooks instance
 **Example Registry App**: See `/example-registry-app.html` for a complete registry implementation
 
 **Test Scenarios**:
 1. **Existing Instance**: MeBooks already open - catalog added via cross-tab communication
-2. **No Instance**: MeBooks not open - new instance launched with catalog  
+2. **No Instance**: MeBooks not open - new instance launched with catalog
 3. **Status Detection**: Check if MeBooks is currently running
 
 ### 🔍 Integration Examples
@@ -306,12 +306,12 @@ import React, { useState } from 'react';
 const CatalogCard = ({ catalog }) => {
     const [status, setStatus] = useState('');
     const mebooksIntegration = new MeBooksIntegration('https://your-mebooks-domain.com/');
-    
+
     const handleAddToMeBooks = async () => {
         setStatus('Adding catalog...');
         try {
             const result = await mebooksIntegration.importCatalog(
-                catalog.opdsUrl, 
+                catalog.opdsUrl,
                 catalog.name
             );
             setStatus(result.success ? '✅ Added successfully!' : '❌ Failed to add');
@@ -319,7 +319,7 @@ const CatalogCard = ({ catalog }) => {
             setStatus('❌ Error occurred');
         }
     };
-    
+
     return (
         <div className="catalog-card">
             <h3>{catalog.name}</h3>
@@ -336,17 +336,17 @@ class RegistryApp {
     constructor() {
         this.mebooks = new MeBooksIntegration('https://your-mebooks-domain.com/');
     }
-    
+
     async addCatalogToMeBooks(catalogElement) {
         const url = catalogElement.dataset.opdsUrl;
         const name = catalogElement.dataset.name;
         const statusEl = catalogElement.querySelector('.status');
-        
+
         statusEl.textContent = 'Adding to MeBooks...';
-        
+
         const result = await this.mebooks.importCatalog(url, name);
-        statusEl.textContent = result.success ? 
-            '✅ Added to MeBooks!' : 
+        statusEl.textContent = result.success ?
+            '✅ Added to MeBooks!' :
             '❌ Failed to add';
     }
 }
@@ -378,7 +378,7 @@ window.addEventListener('storage', (event) => {
 ### 📁 Repository Files
 
 - `mebooks-integration.js` - Integration library
-- `test-registry-integration.html` - Live test page  
+- `test-registry-integration.html` - Live test page
 - `example-registry-app.html` - Complete example registry application
 - `REGISTRY_INTEGRATION_IMPLEMENTATION.md` - Technical implementation details
 

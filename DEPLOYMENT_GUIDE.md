@@ -7,7 +7,7 @@ This guide explains how to deploy and use the MeBooks integration files for regi
 ### Required Files
 - `mebooks-integration.js` - Core integration library (required)
 
-### Optional Files  
+### Optional Files
 - `test-registry-integration.html` - Test page for integration validation
 - `example-registry-app.html` - Complete example registry implementation
 
@@ -56,7 +56,7 @@ const mebooks = new MeBooksIntegration('https://your-mebooks-domain.com/');
 ```javascript
 async function addToMeBooks(catalogUrl, catalogName) {
     const result = await mebooks.importCatalog(catalogUrl, catalogName);
-    
+
     if (result.success) {
         // Show success message
         console.log(`✅ ${result.message}`);
@@ -116,7 +116,7 @@ mebooks.setResponseTimeout(2000); // 2 second timeout
 async function addCatalogSafely(catalogUrl, catalogName) {
     try {
         const result = await mebooks.importCatalog(catalogUrl, catalogName);
-        
+
         switch (result.method) {
             case 'cross-tab-communication':
                 showSuccess(`Added to existing MeBooks: ${catalogName}`);
@@ -128,10 +128,10 @@ async function addCatalogSafely(catalogUrl, catalogName) {
                 // Current page will navigate to MeBooks
                 break;
         }
-        
+
     } catch (error) {
         showError(`Failed to add catalog: ${error.message}`);
-        
+
         // Fallback: direct URL navigation
         const fallbackUrl = `https://your-mebooks-domain.com/#/?import=${encodeURIComponent(catalogUrl)}&name=${encodeURIComponent(catalogName)}`;
         window.open(fallbackUrl, '_blank');
@@ -187,7 +187,7 @@ https://your-mebooks-domain.com/test-registry-integration.html
 
 ### Common Issues
 1. **Library Not Loading**: Check path and CORS settings
-2. **No Response**: Verify MeBooks URL and network connectivity  
+2. **No Response**: Verify MeBooks URL and network connectivity
 3. **Popup Blocked**: Implement fallback to same-tab navigation
 4. **Cross-Tab Not Working**: Check localStorage availability and browser privacy settings
 

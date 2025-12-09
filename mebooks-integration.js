@@ -1,10 +1,10 @@
 /**
  * MeBooks Registry Integration Library
- * 
+ *
  * This library provides utilities for registry applications to integrate with MeBooks,
  * allowing them to send OPDS catalog information to existing MeBooks instances or
  * open new ones with the catalog pre-loaded.
- * 
+ *
  * Usage:
  *   const mebooksIntegration = new MeBooksIntegration('http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/');
  *   mebooksIntegration.importCatalog('https://example.com/opds', 'Example Catalog');
@@ -48,11 +48,11 @@ class MeBooksIntegration {
                             responseReceived = true;
                             localStorage.removeItem('mebooks-import-response');
                             window.removeEventListener('storage', responseListener);
-                            
+
                             resolve({
                                 success: response.success,
                                 method: 'cross-tab-communication',
-                                message: response.success 
+                                message: response.success
                                     ? `Successfully added "${catalogName}" to existing MeBooks instance`
                                     : `Failed to add "${catalogName}" to existing MeBooks instance`
                             });
@@ -69,9 +69,9 @@ class MeBooksIntegration {
             setTimeout(() => {
                 if (!responseReceived) {
                     window.removeEventListener('storage', responseListener);
-                    
+
                     const mebooksUrl = `${this.mebooksBaseUrl}#/?import=${encodeURIComponent(catalogUrl)}&name=${encodeURIComponent(catalogName)}`;
-                    
+
                     if (sameTab) {
                         window.location.href = mebooksUrl;
                         resolve({
@@ -84,7 +84,7 @@ class MeBooksIntegration {
                         resolve({
                             success: !!newWindow,
                             method: 'new-tab',
-                            message: newWindow 
+                            message: newWindow
                                 ? `Opening MeBooks in new tab with catalog: ${catalogName}`
                                 : 'Failed to open MeBooks (popup blocked?)'
                         });

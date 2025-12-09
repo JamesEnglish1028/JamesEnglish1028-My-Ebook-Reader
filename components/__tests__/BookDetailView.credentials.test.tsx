@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 
+import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import '@testing-library/jest-dom';
-import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as opds from '../../services/opds';
 import * as opds2 from '../../services/opds2';
-import type { CatalogBook } from '../../types';
 import BookDetailView from '../BookDetailView';
 import OpdsCredentialsModal from '../OpdsCredentialsModal';
 

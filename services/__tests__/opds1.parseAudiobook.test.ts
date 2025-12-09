@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { parseOpds1Xml } from '../opds';
-import { xmlAudiobookFeed, xmlAudiobookEdgeFeed } from './fixtures/opds1AudiobookFixtures';
+import { xmlAudiobookEdgeFeed, xmlAudiobookFeed } from './fixtures/opds1AudiobookFixtures';
 
 describe('OPDS1 Audiobook XML Parsing', () => {
   it('correctly detects audiobooks from schema:additionalType attribute', () => {

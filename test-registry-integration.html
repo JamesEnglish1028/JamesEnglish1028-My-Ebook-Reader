@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +13,7 @@
             padding: 20px;
             line-height: 1.6;
         }
+
         .test-link {
             display: block;
             width: 100%;
@@ -28,9 +30,11 @@
             font-size: 16px;
             text-align: left;
         }
+
         .test-link:hover {
             background-color: #e6f3ff;
         }
+
         .description {
             background-color: #f9f9f9;
             padding: 15px;
@@ -39,28 +43,32 @@
         }
     </style>
 </head>
+
 <body>
     <h1>MeBooks Registry Integration Test</h1>
-    
+
     <div class="description">
-        <p>This page tests the integration between a catalog registry viewer and MeBooks. Click the test buttons below to add OPDS catalogs to an existing MeBooks instance or open a new one.</p>
-        <p><strong>Expected behavior:</strong> If MeBooks is already open, it should automatically add the catalog. Otherwise, it will open MeBooks and add the catalog.</p>
+        <p>This page tests the integration between a catalog registry viewer and MeBooks. Click the test buttons below
+            to add OPDS catalogs to an existing MeBooks instance or open a new one.</p>
+        <p><strong>Expected behavior:</strong> If MeBooks is already open, it should automatically add the catalog.
+            Otherwise, it will open MeBooks and add the catalog.</p>
     </div>
 
     <h2>Test Buttons</h2>
-    
+
     <button onclick="importCatalog('https://standardebooks.org/opds/all', 'Standard Ebooks')" class="test-link">
         <strong>Test 1: Standard Ebooks</strong><br>
         URL: https://standardebooks.org/opds/all<br>
         Name: Standard Ebooks
     </button>
-    
-    <button onclick="importCatalog('https://www.feedbooks.com/publicdomain/catalog.atom', 'Feedbooks Public Domain')" class="test-link">
+
+    <button onclick="importCatalog('https://www.feedbooks.com/publicdomain/catalog.atom', 'Feedbooks Public Domain')"
+        class="test-link">
         <strong>Test 2: Feedbooks Public Domain</strong><br>
         URL: https://www.feedbooks.com/publicdomain/catalog.atom<br>
         Name: Feedbooks Public Domain
     </button>
-    
+
     <button onclick="importCatalog('https://catalog.biblioboard.com/', 'BiblioBoard Catalog')" class="test-link">
         <strong>Test 3: BiblioBoard Catalog</strong><br>
         URL: https://catalog.biblioboard.com/<br>
@@ -68,57 +76,60 @@
     </button>
 
     <h2>Status Check</h2>
-    
-    <button onclick="checkMeBooksStatus()" class="test-link" style="background-color: #f0fff0; border-color: #32cd32; color: #228b22;">
+
+    <button onclick="checkMeBooksStatus()" class="test-link"
+        style="background-color: #f0fff0; border-color: #32cd32; color: #228b22;">
         <strong>Check if MeBooks is Running</strong><br>
         This will detect if MeBooks is open in another tab
     </button>
-    
+
     <div class="description">
         <h3>How to Test:</h3>
         <ol>
-            <li>First, open MeBooks in another tab: <a href="http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/" target="_blank">Open MeBooks</a></li>
+            <li>First, open MeBooks in another tab: <a href="http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/"
+                    target="_blank">Open MeBooks</a></li>
             <li>Click one of the test buttons above</li>
             <li>If MeBooks is already open, it should receive the catalog and show a toast message</li>
             <li>If MeBooks isn't open, it will open automatically with the catalog</li>
             <li>The catalog should appear in your library's catalog list</li>
         </ol>
-        <div id="status" style="margin-top: 20px; padding: 10px; background: #f0f8ff; border-radius: 5px; display: none;"></div>
+        <div id="status"
+            style="margin-top: 20px; padding: 10px; background: #f0f8ff; border-radius: 5px; display: none;"></div>
     </div>
 
     <script src="mebooks-integration.js"></script>
     <script>
         // Initialize the integration library
         const mebooksIntegration = new MeBooksIntegration('http://localhost:3000/JamesEnglish1028-My-Ebook-Reader/');
-        
+
         async function importCatalog(catalogUrl, catalogName) {
             const status = document.getElementById('status');
             status.style.display = 'block';
             status.textContent = `Attempting to add catalog: ${catalogName}...`;
-            
+
             try {
                 const result = await mebooksIntegration.importCatalog(catalogUrl, catalogName);
-                
-                status.textContent = result.success ? 
+
+                status.textContent = result.success ?
                     `✅ ${result.message}` :
                     `❌ ${result.message}`;
-                    
+
                 console.log('Import result:', result);
             } catch (error) {
                 status.textContent = `❌ Error: ${error.message}`;
                 console.error('Import failed:', error);
             }
         }
-        
+
         // Add a button to check if MeBooks is running
         async function checkMeBooksStatus() {
             const status = document.getElementById('status');
             status.style.display = 'block';
             status.textContent = 'Checking if MeBooks is running...';
-            
+
             try {
                 const isRunning = await mebooksIntegration.checkMeBooksRunning();
-                status.textContent = isRunning ? 
+                status.textContent = isRunning ?
                     '✅ MeBooks is running in another tab!' :
                     '❌ MeBooks is not currently running.';
             } catch (error) {
@@ -127,4 +138,5 @@
         }
     </script>
 </body>
+
 </html>

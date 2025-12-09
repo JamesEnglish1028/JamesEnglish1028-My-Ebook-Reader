@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import BookDetailView from '../BookDetailView';
-import { pdfCatalogBook, defaultImportStatus } from './fixtures/bookDetailViewFixtures';
+import { defaultImportStatus, pdfCatalogBook } from './fixtures/bookDetailViewFixtures';
 
 const mockUseToast = vi.fn(() => ({
   showToast: vi.fn(),

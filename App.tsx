@@ -23,7 +23,7 @@ import { GlobalModals, ViewRenderer } from './components/app';
 // Hooks imports
 import { useAuth } from './contexts/AuthContext';
 import { opdsAcquisitionService } from './domain/catalog';
-import { useGlobalShortcuts, useCatalogs } from './hooks';
+import { useCatalogs, useGlobalShortcuts } from './hooks';
 
 // Service imports - using barrel exports
 import {
@@ -234,13 +234,13 @@ const AppInner: React.FC = () => {
       addCatalog(catalogName, importUrl, '2'); // Default to OPDS 2
       toast.pushToast(`Successfully added catalog: ${catalogName}`, 4000);
       logger.info('[App] Auto-imported OPDS catalog from registry', { importUrl, catalogName });
-      
+
       // Navigate to library view to show the new catalog
       setCurrentView('library');
-      
+
       // Focus the window to bring MeBooks to the front
       window.focus();
-      
+
       return true;
     } catch (error) {
       toast.pushToast(`Failed to add catalog: ${catalogName}`, 6000);
@@ -254,10 +254,10 @@ const AppInner: React.FC = () => {
     const params = new URLSearchParams(location.search);
     const importUrl = params.get('import');
     const catalogName = params.get('name');
-    
+
     if (importUrl && catalogName) {
       importCatalog(importUrl, catalogName);
-      
+
       // Clear URL parameters after processing
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('import');
@@ -272,20 +272,20 @@ const AppInner: React.FC = () => {
       if (event.key === 'mebooks-import-catalog' && event.newValue) {
         try {
           const { importUrl, catalogName, timestamp } = JSON.parse(event.newValue);
-          
+
           // Only process recent messages (within last 5 seconds)
           if (Date.now() - timestamp < 5000) {
             logger.info('[App] Received cross-tab catalog import request', { importUrl, catalogName });
-            
+
             const success = importCatalog(importUrl, catalogName);
-            
+
             // Send response back
             localStorage.setItem('mebooks-import-response', JSON.stringify({
               success,
               catalogName,
               timestamp: Date.now(),
             }));
-            
+
             // Clear the message
             localStorage.removeItem('mebooks-import-catalog');
           }
@@ -293,19 +293,19 @@ const AppInner: React.FC = () => {
           logger.error('[App] Failed to process cross-tab import message', { error });
         }
       }
-      
+
       // Handle ping requests to detect if MeBooks is running
       if (event.key === 'mebooks-ping' && event.newValue) {
         try {
           const { timestamp } = JSON.parse(event.newValue);
-          
+
           // Only respond to recent pings (within last 2 seconds)
           if (Date.now() - timestamp < 2000) {
             localStorage.setItem('mebooks-pong', JSON.stringify({
               timestamp: Date.now(),
               version: '1.0.0', // Could be useful for version checking
             }));
-            
+
             // Clear the ping message
             localStorage.removeItem('mebooks-ping');
           }

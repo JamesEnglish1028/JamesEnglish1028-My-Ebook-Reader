@@ -32,12 +32,12 @@ addCatalog('https://standardebooks.org/opds/all', 'Standard Ebooks');
 
 ## Features
 
-✅ **Smart Integration**: Automatically detects existing MeBooks instances  
-✅ **Cross-Tab Communication**: Preserves user data and settings  
-✅ **Fallback Support**: Opens new instance if none exists  
-✅ **Error Handling**: Comprehensive error reporting  
-✅ **Promise-based API**: Modern async/await support  
-✅ **No Dependencies**: Standalone library  
+✅ **Smart Integration**: Automatically detects existing MeBooks instances
+✅ **Cross-Tab Communication**: Preserves user data and settings
+✅ **Fallback Support**: Opens new instance if none exists
+✅ **Error Handling**: Comprehensive error reporting
+✅ **Promise-based API**: Modern async/await support
+✅ **No Dependencies**: Standalone library
 
 ## Integration Methods
 

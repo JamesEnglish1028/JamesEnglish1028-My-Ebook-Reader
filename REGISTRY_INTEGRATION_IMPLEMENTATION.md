@@ -86,7 +86,7 @@ const mebooksIntegration = new MeBooksIntegration('https://your-mebooks-domain.c
 
 // Import a catalog
 const result = await mebooksIntegration.importCatalog(
-    'https://standardebooks.org/opds/all', 
+    'https://standardebooks.org/opds/all',
     'Standard Ebooks'
 );
 
@@ -107,7 +107,7 @@ const isRunning = await mebooksIntegration.checkMeBooksRunning();
 ```javascript
 localStorage.setItem('mebooks-import-catalog', JSON.stringify({
     importUrl: 'https://example.com/opds',
-    catalogName: 'Example Catalog', 
+    catalogName: 'Example Catalog',
     timestamp: Date.now()
 }));
 ```
@@ -150,7 +150,7 @@ localStorage.setItem('mebooks-pong', JSON.stringify({
 ### Comprehensive Test Page
 The `test-registry-integration.html` includes:
 - Sample catalog import buttons
-- Status detection functionality  
+- Status detection functionality
 - Real-time feedback display
 - Integration library demonstration
 
