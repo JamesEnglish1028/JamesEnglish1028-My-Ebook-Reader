@@ -197,34 +197,190 @@ Planned follow-ups:
 
 ## Palace Registry Integration
 
-MeBooks now supports automatic OPDS catalog import when launched from registry viewer applications like the Palace Library Registry UI. This enables seamless catalog discovery and addition to your library.
+MeBooks provides comprehensive integration support for registry viewer applications through cross-tab communication and a dedicated JavaScript library. This enables seamless catalog discovery and addition to existing user libraries without losing data or creating isolated instances.
 
-### How It Works
+### 🚀 MeBooks Integration Library
 
-When MeBooks is launched with specific URL parameters, it automatically imports the OPDS catalog:
+**Download**: [`mebooks-integration.js`](mebooks-integration.js)
 
-```
-https://your-mebooks-domain.com/#/?import=<catalogUrl>&name=<catalogName>
-```
-
-### Features
-
-- **Automatic Import**: Catalogs are automatically added to your library collection
-- **User Feedback**: Toast notifications confirm successful imports or report errors
-- **Clean Navigation**: After processing, the app navigates to the library view
-- **URL Cleanup**: Parameters are removed from the URL after processing
-- **Error Handling**: Robust error handling with user-friendly messages
-
-### Integration Examples
-
-Registry applications can launch MeBooks using:
+A standalone JavaScript library that handles the complexity of integrating with MeBooks:
 
 ```javascript
-const catalogUrl = "https://standardebooks.org/opds/all";
-const catalogName = "Standard Ebooks";
-const mebooksUrl = `https://your-domain.com/#/?import=${encodeURIComponent(catalogUrl)}&name=${encodeURIComponent(catalogName)}`;
-window.open(mebooksUrl, '_blank');
+// Initialize the integration library
+const mebooksIntegration = new MeBooksIntegration('https://your-mebooks-domain.com/');
+
+// Import a catalog - automatically detects existing instances
+const result = await mebooksIntegration.importCatalog(catalogUrl, catalogName);
+
+// Check if MeBooks is currently running
+const isRunning = await mebooksIntegration.checkMeBooksRunning();
 ```
+
+### 🔧 Integration Methods
+
+**1. Cross-Tab Communication (Recommended)**
+- Communicates with existing MeBooks instances via localStorage events
+- Preserves user's existing library data and settings
+- Provides instant feedback and error handling
+- No popup blockers or new tab issues
+
+**2. URL Parameters (Fallback)**
+- Opens new MeBooks instance when no existing one is detected
+- URL format: `https://your-domain.com/#/?import=<catalogUrl>&name=<catalogName>`
+
+### 📋 Quick Integration Guide
+
+#### For Registry Applications:
+
+1. **Include the Library**:
+   ```html
+   <script src="https://your-mebooks-domain.com/mebooks-integration.js"></script>
+   ```
+
+2. **Initialize**:
+   ```javascript
+   const mebooksIntegration = new MeBooksIntegration('https://your-mebooks-domain.com/');
+   ```
+
+3. **Add Catalog Integration**:
+   ```javascript
+   async function addToMeBooks(catalogUrl, catalogName) {
+       try {
+           const result = await mebooksIntegration.importCatalog(catalogUrl, catalogName);
+           
+           if (result.success) {
+               console.log(`✅ ${result.message}`);
+               // Show success UI
+           } else {
+               console.error(`❌ ${result.message}`);
+               // Show error UI
+           }
+       } catch (error) {
+           console.error('Integration failed:', error);
+       }
+   }
+   ```
+
+4. **Add to Your UI**:
+   ```html
+   <button onclick="addToMeBooks('https://example.com/opds', 'Example Catalog')">
+       Add to MeBooks
+   </button>
+   ```
+
+### 🎯 Library API Reference
+
+#### `new MeBooksIntegration(mebooksBaseUrl)`
+- **mebooksBaseUrl**: Base URL of your MeBooks instance
+
+#### `importCatalog(catalogUrl, catalogName, options)`
+- **catalogUrl**: OPDS catalog URL to import
+- **catalogName**: Display name for the catalog
+- **options**: Configuration object
+  - `sameTab`: Open in same tab instead of new tab (default: false)
+  - `focusExisting`: Focus existing MeBooks tab if found (default: true)
+- **Returns**: Promise resolving to `{success: boolean, method: string, message: string}`
+
+#### `checkMeBooksRunning()`
+- **Returns**: Promise resolving to boolean indicating if MeBooks is running
+
+#### `setResponseTimeout(timeout)`
+- **timeout**: Milliseconds to wait for existing instance response (500-5000ms)
+
+### 🧪 Testing & Development
+
+**Live Test Page**: Visit `/test-registry-integration.html` on your MeBooks instance  
+**Example Registry App**: See `/example-registry-app.html` for a complete registry implementation
+
+**Test Scenarios**:
+1. **Existing Instance**: MeBooks already open - catalog added via cross-tab communication
+2. **No Instance**: MeBooks not open - new instance launched with catalog  
+3. **Status Detection**: Check if MeBooks is currently running
+
+### 🔍 Integration Examples
+
+**React Component**:
+```jsx
+import React, { useState } from 'react';
+
+const CatalogCard = ({ catalog }) => {
+    const [status, setStatus] = useState('');
+    const mebooksIntegration = new MeBooksIntegration('https://your-mebooks-domain.com/');
+    
+    const handleAddToMeBooks = async () => {
+        setStatus('Adding catalog...');
+        try {
+            const result = await mebooksIntegration.importCatalog(
+                catalog.opdsUrl, 
+                catalog.name
+            );
+            setStatus(result.success ? '✅ Added successfully!' : '❌ Failed to add');
+        } catch (error) {
+            setStatus('❌ Error occurred');
+        }
+    };
+    
+    return (
+        <div className="catalog-card">
+            <h3>{catalog.name}</h3>
+            <button onClick={handleAddToMeBooks}>Add to MeBooks</button>
+            {status && <p>{status}</p>}
+        </div>
+    );
+};
+```
+
+**Vanilla JavaScript**:
+```javascript
+class RegistryApp {
+    constructor() {
+        this.mebooks = new MeBooksIntegration('https://your-mebooks-domain.com/');
+    }
+    
+    async addCatalogToMeBooks(catalogElement) {
+        const url = catalogElement.dataset.opdsUrl;
+        const name = catalogElement.dataset.name;
+        const statusEl = catalogElement.querySelector('.status');
+        
+        statusEl.textContent = 'Adding to MeBooks...';
+        
+        const result = await this.mebooks.importCatalog(url, name);
+        statusEl.textContent = result.success ? 
+            '✅ Added to MeBooks!' : 
+            '❌ Failed to add';
+    }
+}
+```
+
+### 🔗 Cross-Tab Communication Protocol
+
+For advanced integrations, you can implement the protocol directly:
+
+**Import Request**:
+```javascript
+localStorage.setItem('mebooks-import-catalog', JSON.stringify({
+    importUrl: catalogUrl,
+    catalogName: catalogName,
+    timestamp: Date.now()
+}));
+```
+
+**Response Listening**:
+```javascript
+window.addEventListener('storage', (event) => {
+    if (event.key === 'mebooks-import-response' && event.newValue) {
+        const response = JSON.parse(event.newValue);
+        console.log('Import result:', response.success);
+    }
+});
+```
+
+### 📁 Repository Files
+
+- `mebooks-integration.js` - Integration library
+- `test-registry-integration.html` - Live test page  
+- `example-registry-app.html` - Complete example registry application
+- `REGISTRY_INTEGRATION_IMPLEMENTATION.md` - Technical implementation details
 
 ### Testing
 
