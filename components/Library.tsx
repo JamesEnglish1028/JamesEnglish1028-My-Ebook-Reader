@@ -188,7 +188,8 @@ const Library: React.FC<LibraryProps> = ({
     }
   }, [handleUpdateRegistryHook, activeOpdsSource, setActiveOpdsSource]);
 
-  const fetchAndParseSource = useCallback(async (url: string, baseUrl?: string) => {
+  // Fetch and parse registry catalogs (registries are always OPDS 2.0 JSON)
+  const fetchRegistryCatalogs = useCallback(async (url: string) => {
     setIsLoading(false);
     setIsCatalogLoading(true);
     setCatalogError(null);
@@ -197,18 +198,62 @@ const Library: React.FC<LibraryProps> = ({
     setCatalogNavLinks([]);
     setCatalogPagination(null);
 
-    // If the activeOpdsSource includes an opdsVersion preference, pass it through
-    // Force Palace hosts to use OPDS 1 to get collection navigation links, but NOT for registries
-    // (registries are always OPDS 2.0 JSON)
-    const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
-    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+    try {
+      console.warn('[mebooks-library] Fetching registry from:', url);
+      // Registries are always OPDS 2.0 JSON - force version '2'
+      const { books, navLinks, pagination, error } = await fetchCatalogContent(url, url, '2');
+      
+      if (error) {
+        setCatalogError(error);
+      } else {
+        console.warn('[mebooks-library] Registry response:', { 
+          booksCount: books.length, 
+          navLinksCount: navLinks.length,
+          navLinks: navLinks.map(l => ({ title: l.title, url: l.url, rel: l.rel }))
+        });
+        
+        // For registries, we only care about navigation links (the catalog entries)
+        // Filter out pagination links to avoid UI loops
+        const paginationUrls = Object.values(pagination).filter((val): val is string => !!val);
+        const catalogEntries = navLinks.filter(nav => !paginationUrls.includes(nav.url));
+        
+        setCatalogNavLinks(catalogEntries);
+        setCatalogPagination(pagination);
+        // Registries don't have books at the root level
+        setOriginalCatalogBooks([]);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch registry';
+      console.error('[mebooks-library] Registry fetch error:', err);
+      setCatalogError(errorMsg);
+    }
+    
+    setIsCatalogLoading(false);
+  }, [fetchCatalogContent]);
+
+  const fetchAndParseSource = useCallback(async (url: string, baseUrl?: string) => {
+    // Check if we're browsing a registry
     const isRegistry = activeOpdsSource && !('opdsVersion' in activeOpdsSource);
     
-    console.warn('[mebooks-library] DEBUG: activeOpdsSource =', activeOpdsSource);
-    console.warn('[mebooks-library] DEBUG: isPalaceHost =', isPalaceHost, 'isRegistry =', isRegistry);
-    console.warn('[mebooks-library] DEBUG: activeOpdsSource.opdsVersion =', (activeOpdsSource as any)?.opdsVersion);
+    if (isRegistry) {
+      // Use dedicated registry handler
+      return fetchRegistryCatalogs(url);
+    }
 
-    const forcedVersion = (isPalaceHost && !isRegistry) ? '1' : ((activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto');
+    // Regular catalog handling
+    setIsLoading(false);
+    setIsCatalogLoading(true);
+    setCatalogError(null);
+    setCatalogBooks([]);
+    setOriginalCatalogBooks([]);
+    setCatalogNavLinks([]);
+    setCatalogPagination(null);
+
+    // For catalogs: If opdsVersion is set, use it; otherwise check if Palace host needs forcing
+    const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
+    const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
+    
+    const forcedVersion = isPalaceHost ? '1' : ((activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto');
     const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
 
     if (error) {
@@ -258,7 +303,7 @@ const Library: React.FC<LibraryProps> = ({
       }
     }
     setIsCatalogLoading(false);
-  }, [fetchCatalogContent, catalogNavPath]);
+  }, [activeOpdsSource, fetchRegistryCatalogs, catalogNavPath]);
 
   // Separate useEffect for re-processing existing data when filters change
   useEffect(() => {
