@@ -795,6 +795,48 @@ const Library: React.FC<LibraryProps> = ({
 
     // OPDS VIEW (CATALOG OR REGISTRY)
     if (activeOpdsSource) {
+      const isRegistry = !('opdsVersion' in activeOpdsSource);
+      
+      // REGISTRY VIEW: Show catalog entries as a list
+      if (isRegistry && catalogBooks.length === 0 && catalogNavLinks.length > 0) {
+        return (
+          <div>
+            <div className="bg-slate-700/60 rounded-lg p-4 mb-6">
+              <h2 className="text-2xl font-semibold text-sky-300 mb-4 px-2">Available Catalogs</h2>
+              <p className="text-slate-300 mb-4 px-2">Select a catalog to browse:</p>
+              <ul className="space-y-2">
+                {catalogNavLinks.map(link => (
+                  <li key={link.url}>
+                    <button
+                      onClick={() => handleNavLinkClick(link)}
+                      className="w-full text-left p-4 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors border-2 border-transparent hover:border-sky-600"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-sky-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-white truncate">{link.title}</h3>
+                          {link.isCatalog && (
+                            <p className="text-sm text-sky-400">OPDS Catalog</p>
+                          )}
+                        </div>
+                        <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      }
+      
+      // CATALOG VIEW: Show books and category navigation
       return (
         <div>
           {/* Only show category navigation links in main content, not collection links */}
