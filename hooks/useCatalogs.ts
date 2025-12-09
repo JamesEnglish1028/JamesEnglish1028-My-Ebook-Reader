@@ -53,12 +53,19 @@ export function useCatalogs() {
 
     // Registry management functions
     const addRegistry = useCallback((name: string, url: string) => {
+        console.warn('[useCatalogs] addRegistry called:', { name, url });
         const newRegistry: CatalogRegistry = {
             id: new Date().toISOString(),
             name,
             url,
         };
-        setRegistries(prev => [...prev, newRegistry]);
+        console.warn('[useCatalogs] Created registry object:', newRegistry);
+        console.warn('[useCatalogs] Has opdsVersion?', 'opdsVersion' in newRegistry);
+        setRegistries(prev => {
+            const updated = [...prev, newRegistry];
+            console.warn('[useCatalogs] Updated registries:', updated);
+            return updated;
+        });
         return newRegistry;
     }, [setRegistries]);
 

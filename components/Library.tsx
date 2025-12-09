@@ -171,7 +171,9 @@ const Library: React.FC<LibraryProps> = ({
   }, [handleUpdateCatalogHook, activeOpdsSource, setActiveOpdsSource, setCatalogNavPath]);
 
   const handleAddRegistry = useCallback((name: string, url: string) => {
-    handleAddRegistryHook(name, url);
+    console.warn('[Library] handleAddRegistry called:', { name, url });
+    const result = handleAddRegistryHook(name, url);
+    console.warn('[Library] handleAddRegistry result:', result);
   }, [handleAddRegistryHook]);
 
   const handleDeleteRegistry = useCallback((id: string) => {
