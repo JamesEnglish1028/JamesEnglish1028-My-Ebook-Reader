@@ -477,7 +477,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
                 }
 
                 // Enhanced logic to handle ambiguous Content-Type headers
-                if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+                if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
                     try {
                         console.warn('[mebooks] Attempting to parse OPDS2 JSON (proxied), response length:', responseText.length);
                         const jsonData = JSON.parse(responseText);
@@ -556,7 +556,7 @@ export const fetchCatalogContent = async (url: string, baseUrl: string, forcedVe
 
         console.warn('[mebooks] About to check JSON condition - forcedVersion:', forcedVersion, 'contentType includes opds+json:', contentType.includes('application/opds+json'));
         // Enhanced logic to handle ambiguous Content-Type headers
-        if (forcedVersion !== '1' && (contentType.includes('application/opds+json') || contentType.includes('application/json'))) {
+        if (contentType.includes('application/opds+json') || contentType.includes('application/json')) {
             try {
                 console.warn('[mebooks] Attempting to parse OPDS2 JSON (direct), response length:', responseText.length);
                 const jsonData = JSON.parse(responseText);

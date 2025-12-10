@@ -1,17 +1,17 @@
-
+/// <reference path="../global.d.ts" />
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { bookmarkService, citationService, positionTracker } from '../domain/reader';
 import { db } from '../services/db';
 import {
-    buildTocFromSpine,
-    findFirstChapter,
-    getEpubViewStateForBook,
-    getReaderSettings,
-    performBookSearch,
-    saveEpubViewStateForBook,
-    saveReaderSettings,
+  buildTocFromSpine,
+  findFirstChapter,
+  getEpubViewStateForBook,
+  getReaderSettings,
+  performBookSearch,
+  saveEpubViewStateForBook,
+  saveReaderSettings,
 } from '../services/readerUtils';
 import { isDebug, trackEvent } from '../services/utils';
 import type { Bookmark, BookRecord, Citation, CoverAnimationData, ReaderSettings, SearchResult, TocItem } from '../types';
@@ -26,6 +26,11 @@ import Spinner from './Spinner';
 import TocPanel from './TocPanel';
 import ZoomHud from './ZoomHud';
 
+// Use global types from window interface
+type Book = ReturnType<Window['ePub']>;
+type Rendition = ReturnType<Book['renderTo']>;
+type Navigation = Awaited<ReturnType<Book['loaded']['navigation']['then']>>;
+
 
 interface ReaderViewProps {
   bookId: number;
@@ -35,7 +40,7 @@ interface ReaderViewProps {
 
 const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData }) => {
   const [bookData, setBookData] = useState<BookRecord | null>(null);
-  const [rendition, setRendition] = useState<object | null>(null);
+  const [rendition, setRendition] = useState<Rendition | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [showNavPanel, setShowNavPanel] = useState(false);
@@ -85,13 +90,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const coverRef = useRef<HTMLImageElement | null>(null);
-  const bookRef = useRef<object | null>(null);
-  const renditionRef = useRef<object | null>(null);
+  const bookRef = useRef<Book | null>(null);
+  const renditionRef = useRef<Rendition | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const speechStateRef = useRef(speechState);
   speechStateRef.current = speechState;
-  const navigationRef = useRef<object | null>(null);
+  const navigationRef = useRef<Navigation | null>(null);
   const sliderTimeoutRef = useRef<number | null>(null);
   const latestCfiRef = useRef<string | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
@@ -705,7 +710,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
   // Effect to get the current chapter label once navigation is ready and location changes
   useEffect(() => {
     if (currentCfi && isNavReady && navigationRef.current) {
-      const nav = navigationRef.current;
+      const nav = navigationRef.current as any;
       const tocItemPromise = nav.get(currentCfi);
       if (tocItemPromise && typeof tocItemPromise.then === 'function') {
         tocItemPromise.then((tocItem: any) => {
@@ -968,7 +973,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ bookId, onClose, animationData 
       note: note,
       pageNumber: locationInfo.currentPage > 0 ? locationInfo.currentPage : undefined,
       chapter: chapter,
-      citationFormat: settings.citationFormat,
+      citationFormat: 'apa',
     });
 
     if (addResult.success) {

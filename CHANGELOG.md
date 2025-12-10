@@ -49,6 +49,16 @@ All notable changes to this project will be documented in this file.
 - Users now see newly imported books in My Library immediately after import, without needing to refresh the browser.
 - Improved reliability of cover image import from remote catalogs.
 
+## December 10, 2025
+
+### Changed
+- Registry browsing now maps Palace registry `catalogs` entries into navigation links, so registry results display and can be selected as catalogs.
+- OPDS JSON parsing no longer blocks on forced OPDS1, allowing Palace catalogs/registries to resolve correctly.
+- Registry storage sanitizes stray `opdsVersion` fields to keep registries clean.
+
+### Fixed
+- EPUB reader typings updated to use `Book` and `Rendition` from the global `window.ePub`, eliminating loose `object` types and citation format mismatch.
+
 ---
 
 ## How to Deploy

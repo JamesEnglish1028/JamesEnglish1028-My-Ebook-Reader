@@ -38,6 +38,34 @@ import type { Opds2Link, Opds2NavigationGroup, Opds2Publication } from '../types
 // Helper: Parse navigation links from OPDS2 feed
 function parseOpds2NavigationLinks(jsonData: any, baseUrl: string): CatalogNavigationLink[] {
   const navLinks: CatalogNavigationLink[] = [];
+  // Palace registry feeds expose a top-level `catalogs` array; map each entry
+  // to a navigable catalog link so the UI can render the registry results.
+  if (jsonData.catalogs && Array.isArray(jsonData.catalogs)) {
+    (jsonData.catalogs as any[]).forEach((catalogEntry) => {
+      if (!catalogEntry) return;
+      const meta = catalogEntry.metadata || {};
+      const title = meta.title || meta.name || catalogEntry.title || 'Catalog';
+      const links = Array.isArray(catalogEntry.links) ? catalogEntry.links as Opds2Link[] : [];
+      const pickCatalogLink = () => {
+        const relContainsCatalog = (rel: string) => rel.toLowerCase().includes('catalog');
+        // Prefer explicit catalog rel, then any OPDS link
+        const byRel = links.find((l) => typeof l.rel === 'string' && relContainsCatalog(l.rel));
+        if (byRel) return byRel;
+        const byRelArray = links.find((l) => Array.isArray(l.rel) && l.rel.some((r) => typeof r === 'string' && relContainsCatalog(r)));
+        if (byRelArray) return byRelArray;
+        return links.find((l) => typeof l.type === 'string' && l.type.includes('opds'));
+      };
+      const link = pickCatalogLink();
+      if (link && link.href) {
+        navLinks.push({
+          title,
+          url: new URL(link.href, baseUrl).href,
+          rel: 'subsection',
+          isCatalog: true,
+        });
+      }
+    });
+  }
   // Top-level 'groups' array (OPDS2 registry feeds)
   if (jsonData.groups && Array.isArray(jsonData.groups)) {
     (jsonData.groups as Opds2NavigationGroup[]).forEach((group) => {

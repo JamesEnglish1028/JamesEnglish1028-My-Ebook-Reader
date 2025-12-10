@@ -18,6 +18,14 @@ import ManageCatalogsModal from './ManageCatalogsModal';
 import Spinner from './Spinner';
 import { UncategorizedLane } from './UncategorizedLane';
 
+const isCatalogSource = (source: Catalog | CatalogRegistry | null | undefined): source is Catalog => {
+  return !!source && typeof (source as Catalog).opdsVersion !== 'undefined';
+};
+
+const isRegistrySource = (source: Catalog | CatalogRegistry | null | undefined): source is CatalogRegistry => {
+  return !!source && !isCatalogSource(source);
+};
+
 interface LibraryProps {
   onOpenBook: (id: number, animationData: CoverAnimationData, format?: string) => void;
   onShowBookDetail: (book: BookMetadata | CatalogBook, source: 'library' | 'catalog', catalogName?: string) => void;
@@ -235,16 +243,17 @@ const Library: React.FC<LibraryProps> = ({
 
   const fetchAndParseSource = useCallback(async (url: string, baseUrl?: string) => {
     // Check if we're browsing a registry
-    const isRegistry = activeOpdsSource && !('opdsVersion' in activeOpdsSource);
-    
+    const catalogSource = isCatalogSource(activeOpdsSource) ? activeOpdsSource : null;
+    const registrySelected = isRegistrySource(activeOpdsSource);
+
     console.warn('[mebooks-library] fetchAndParseSource called:', {
       url,
       activeOpdsSource,
-      isRegistry,
-      hasOpdsVersion: activeOpdsSource ? ('opdsVersion' in activeOpdsSource) : 'no source',
+      registrySelected,
+      catalogSelected: !!catalogSource,
     });
     
-    if (isRegistry) {
+    if (registrySelected) {
       // Use dedicated registry handler
       console.warn('[mebooks-library] Routing to fetchRegistryCatalogs');
       return fetchRegistryCatalogs(url);
@@ -265,7 +274,12 @@ const Library: React.FC<LibraryProps> = ({
     const hostname = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
     const isPalaceHost = hostname.endsWith('palace.io') || hostname.endsWith('palaceproject.io') || hostname === 'palace.io' || hostname.endsWith('.palace.io');
     
-    const forcedVersion = isPalaceHost ? '1' : ((activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto');
+    // Only force OPDS1 for Palace hosts when we are sure this is a catalog and the catalog did not explicitly request v2.
+    const forcedVersion = catalogSource
+      ? (isPalaceHost && (!catalogSource.opdsVersion || catalogSource.opdsVersion === 'auto')
+        ? '1'
+        : catalogSource.opdsVersion || 'auto')
+      : 'auto';
     const { books, navLinks, pagination, error } = await fetchCatalogContent(url, baseUrl || url, forcedVersion as any);
 
     if (error) {
@@ -611,6 +625,7 @@ const Library: React.FC<LibraryProps> = ({
   }, [activeOpdsSource, catalogNavPath, setCatalogNavPath, fetchAndParseSource]);
 
   const handleToggleNode = useCallback(async (nodeUrl: string) => {
+    const catalogSource = isCatalogSource(activeOpdsSource) ? activeOpdsSource : null;
     const findAndUpdateNode = async (nodes: CatalogNavigationLink[]): Promise<CatalogNavigationLink[]> => {
       const newNodes = [...nodes];
       for (let i = 0; i < newNodes.length; i++) {
@@ -644,7 +659,7 @@ const Library: React.FC<LibraryProps> = ({
           });
 
           const baseUrl = activeOpdsSource?.url;
-          const forcedVersion2 = (activeOpdsSource && 'opdsVersion' in activeOpdsSource) ? (activeOpdsSource as any).opdsVersion || 'auto' : 'auto';
+          const forcedVersion2 = catalogSource ? catalogSource.opdsVersion || 'auto' : 'auto';
           // Diagnostic: log forcedVersion when expanding navigation nodes
           logger.debug('[mebooks] fetchCatalogContent (nav children) - forcedVersion:', forcedVersion2, 'node:', node.url);
           const { navLinks: newChildren, error } = await fetchCatalogContent(node.url, baseUrl || node.url, forcedVersion2 as any);
@@ -807,7 +822,7 @@ const Library: React.FC<LibraryProps> = ({
 
     // OPDS VIEW (CATALOG OR REGISTRY)
     if (activeOpdsSource) {
-      const isRegistry = !('opdsVersion' in activeOpdsSource);
+      const isRegistry = isRegistrySource(activeOpdsSource);
       
       // REGISTRY VIEW: Show catalog entries as a list
       if (isRegistry && catalogBooks.length === 0 && catalogNavLinks.length > 0) {
@@ -1337,17 +1352,6 @@ const Library: React.FC<LibraryProps> = ({
                 aria-orientation="vertical"
               >
                 <ul className="p-1 text-white" role="none">
-                  <li role="none" className="flex items-center justify-between px-3 py-2">
-                    <span className="text-sm">Theme</span>
-                    <button
-                      onClick={() => setUiTheme(uiTheme === 'dark' ? 'light' : 'dark')}
-                      className={`ml-2 px-3 py-1 rounded-md border-2 transition-colors text-sm font-medium ${uiTheme === 'dark' ? 'border-sky-500 bg-sky-500/20 text-sky-300' : 'border-slate-600 bg-white text-slate-800'}`}
-                      role="menuitem"
-                      aria-label="Toggle theme"
-                    >
-                      {uiTheme === 'dark' ? 'Dark' : 'Light'}
-                    </button>
-                  </li>
                   <li role="none">
                     <button
                       onClick={() => {

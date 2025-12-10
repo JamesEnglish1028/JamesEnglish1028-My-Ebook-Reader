@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { LIBRARY_KEYS } from '../constants';
 import type { Catalog, CatalogRegistry } from '../types';
@@ -18,6 +18,11 @@ export function useCatalogs() {
     const [catalogs, setCatalogs] = useLocalStorage<Catalog[]>(LIBRARY_KEYS.CATALOGS, []);
     const [registries, setRegistries] = useLocalStorage<CatalogRegistry[]>(LIBRARY_KEYS.REGISTRIES, []);
 
+    const sanitizedRegistries = useMemo<CatalogRegistry[]>(
+        () => registries.map(({ id, name, url }) => ({ id, name, url })),
+        [registries],
+    );
+
     // Migrate old catalogs without opdsVersion to include 'auto' as default
     useEffect(() => {
         const needsMigration = catalogs.some((c: any) => !c.opdsVersion);
@@ -28,6 +33,14 @@ export function useCatalogs() {
             setCatalogs(migrated);
         }
     }, [catalogs, setCatalogs]);
+
+    // Migrate registries that were mistakenly saved with an opdsVersion property
+    useEffect(() => {
+        const hasBadRegistry = registries.some((r: any) => 'opdsVersion' in r);
+        if (hasBadRegistry) {
+            setRegistries(sanitizedRegistries);
+        }
+    }, [registries, sanitizedRegistries, setRegistries]);
 
     // Catalog management functions
     const addCatalog = useCallback((name: string, url: string, opdsVersion: 'auto' | '1' | '2' = 'auto') => {
@@ -81,7 +94,7 @@ export function useCatalogs() {
 
     return {
         catalogs,
-        registries,
+        registries: sanitizedRegistries,
         addCatalog,
         deleteCatalog,
         updateCatalog,
