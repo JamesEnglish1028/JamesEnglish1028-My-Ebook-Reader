@@ -74,4 +74,69 @@ describe('parseOpds2Json', () => {
     expect(b.format).toBe('EPUB');
     expect(b.coverImage).toContain('/covers/1.jpg');
   });
+
+  it('extracts series metadata when present', () => {
+    const feed = {
+      metadata: { title: 'Series Catalog' },
+      publications: [
+        {
+          metadata: {
+            title: 'Episode 2',
+            author: 'J. Writer',
+            identifier: 'ep-2',
+            series: { name: 'Great Saga', position: 2 },
+          },
+          links: [ { href: '/works/2', rel: 'http://opds-spec.org/acquisition/open-access', type: 'application/epub+zip' } ],
+        },
+      ],
+    };
+
+    const { books } = parseOpds2Json(feed, 'https://example.org/');
+    expect(books[0].series?.name).toBe('Great Saga');
+    expect(books[0].series?.position).toBe(2);
+  });
+
+  it('maps subject objects into subjects and categories', () => {
+    const feed = {
+      metadata: { title: 'Subj Catalog' },
+      publications: [
+        {
+          metadata: {
+            title: 'Taxonomy',
+            author: 'Analyst',
+            subject: [
+              { name: 'Science Fiction', term: 'sci-fi', scheme: 'http://example.org/genres' },
+              'Space Opera',
+            ],
+          },
+          links: [ { href: '/works/3', rel: 'http://opds-spec.org/acquisition/open-access', type: 'application/epub+zip' } ],
+        },
+      ],
+    };
+
+    const { books } = parseOpds2Json(feed, 'https://example.org/');
+    expect(books[0].subjects).toEqual(['Science Fiction', 'Space Opera']);
+    expect(books[0].categories?.[0].scheme).toBe('http://example.org/genres');
+    expect(books[0].categories?.[0].term).toBe('sci-fi');
+  });
+
+  it('captures contributors alongside primary author', () => {
+    const feed = {
+      metadata: { title: 'Contrib Catalog' },
+      publications: [
+        {
+          metadata: {
+            title: 'With Editors',
+            author: 'Lead Author',
+            contributor: [ { name: 'Editor One' }, 'Editor Two' ],
+          },
+          links: [ { href: '/works/4', rel: 'http://opds-spec.org/acquisition/open-access', type: 'application/epub+zip' } ],
+        },
+      ],
+    };
+
+    const { books } = parseOpds2Json(feed, 'https://example.org/');
+    expect(books[0].author).toBe('Lead Author');
+    expect(books[0].contributors).toEqual(['Editor One', 'Editor Two']);
+  });
 });

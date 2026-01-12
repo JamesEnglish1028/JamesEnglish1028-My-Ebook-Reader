@@ -8,8 +8,8 @@ import { bookmarkService } from '../domain/reader';
 import { citationService } from '../domain/reader/citation-service';
 import type { BookMetadata, BookRecord, Bookmark, CatalogBook, Citation, ImportStatus } from '../types';
 
-// Helper type to allow CatalogBook fields (mediaType, acquisitionMediaType, publicationTypeLabel, schemaOrgType) for detail view
-type BookDetailMetadata = BookMetadata & Partial<Pick<CatalogBook, 'mediaType' | 'acquisitionMediaType' | 'publicationTypeLabel' | 'schemaOrgType'>>;
+// Helper type to allow CatalogBook fields (mediaType, acquisitionMediaType, publicationTypeLabel, schemaOrgType, contributors, categories) for detail view
+type BookDetailMetadata = BookMetadata & Partial<Pick<CatalogBook, 'mediaType' | 'acquisitionMediaType' | 'publicationTypeLabel' | 'schemaOrgType' | 'contributors' | 'categories'>>;
 
 // Unified props interface (fixes type errors)
 export interface BookDetailViewProps {
@@ -220,6 +220,9 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
         <div className="mb-6 mt-10 flex flex-col justify-start">
           <h2 className="text-4xl md:text-5xl font-extrabold text-slate-100 mb-6 leading-tight mt-0">{book.title}</h2>
           {book.author && <div className="mb-2 text-lg text-slate-400">By {book.author}</div>}
+          {book.contributors && book.contributors.length > 0 && (
+            <div className="mb-2 text-slate-400">Contributors: {book.contributors.join(', ')}</div>
+          )}
           {book.publisher && <div className="mb-2 text-slate-400">Publisher: {book.publisher}</div>}
           {book.publicationDate && <div className="mb-2 text-slate-400">Published: {book.publicationDate}</div>}
           {book.isbn && (
@@ -264,6 +267,18 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({ book, onBack, source, c
             {book.accessibilitySummary && <li><span className="font-semibold text-slate-200">Accessibility:</span> <span className="text-slate-400">{book.accessibilitySummary}</span></li>}
             {book.accessibilityFeatures && book.accessibilityFeatures.length > 0 && (
               <li><span className="font-semibold text-slate-200">Features:</span> <span className="text-slate-400">{book.accessibilityFeatures.join(', ')}</span></li>
+            )}
+            {book.categories && book.categories.length > 0 && (
+              <li>
+                <span className="font-semibold text-slate-200">Categories:</span>{' '}
+                <span className="text-slate-400">{book.categories.map(cat => cat.label || cat.term).join(', ')}</span>
+              </li>
+            )}
+            {(!book.categories || book.categories.length === 0) && book.subjects && book.subjects.length > 0 && (
+              <li>
+                <span className="font-semibold text-slate-200">Subjects:</span>{' '}
+                <span className="text-slate-400">{book.subjects.join(', ')}</span>
+              </li>
             )}
           </ul>
         </div>

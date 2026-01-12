@@ -22,9 +22,10 @@ describe('opds2.ts - credential migration and edge error cases', () => {
     expect(Array.isArray(creds)).toBe(true);
   });
 
-  it('parseOpds2Json throws on missing metadata', () => {
-  expect(() => opds2.parseOpds2Json({}, 'https://x/')).toThrow(/metadata/);
-  expect(() => opds2.parseOpds2Json({ navigation: [] }, 'https://x/')).toThrow(/metadata/);
+  it('parseOpds2Json tolerates missing metadata', () => {
+    const parsed = opds2.parseOpds2Json({}, 'https://x/');
+    expect(parsed.books).toEqual([]);
+    expect(parsed.navLinks).toEqual([]);
   });
 
   it('parseOpds2Json throws on non-object', () => {

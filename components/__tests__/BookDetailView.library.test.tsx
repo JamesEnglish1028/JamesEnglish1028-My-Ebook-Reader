@@ -30,7 +30,7 @@ describe('BookDetailView Library Book UI', () => {
     render(<BookDetailView {...mockProps} />);
     expect(screen.getByText('Return to My Library')).toBeInTheDocument();
     expect(screen.getByText('Read Book')).toBeInTheDocument();
-    expect(screen.getByText('Provider')).toBeInTheDocument();
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
     expect(screen.getByText('My Local Library')).toBeInTheDocument();
     expect(screen.queryByText('OAPEN')).not.toBeInTheDocument();
   });

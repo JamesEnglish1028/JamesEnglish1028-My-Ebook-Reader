@@ -49,6 +49,7 @@ export interface CatalogBook {
   providerId?: string; // Unique ID from the catalog
   distributor?: string; // Distribution provider name
   subjects?: string[];
+  contributors?: string[];
   format?: 'EPUB' | 'PDF' | string;
 
   // OPDS-specific metadata

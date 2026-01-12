@@ -49,8 +49,8 @@ describe('BookDetailView Distributor Display Integration', () => {
   // Check that the book title is displayed
   expect(screen.getAllByText('Geschichte der Komparatistik in Programmtexten').length).toBeGreaterThan(0);
   // Check that the Provider field is displayed
-  expect(screen.getByText('Provider')).toBeInTheDocument();
-  expect(screen.getByText('OAPEN')).toBeInTheDocument();
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
+    expect(screen.getByText('OAPEN')).toBeInTheDocument();
 
     console.log('✅ BookDetailView correctly displays distributor information for catalog books');
   });
@@ -81,8 +81,8 @@ describe('BookDetailView Distributor Display Integration', () => {
     render(<BookDetailView {...mockProps} />);
 
   // Verify provider is shown
-  expect(screen.getByText('Provider')).toBeInTheDocument();
-  expect(screen.getByText('BiblioBoard')).toBeInTheDocument();
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
+    expect(screen.getByText('BiblioBoard')).toBeInTheDocument();
 
     console.log('✅ BookDetailView correctly displays BiblioBoard distributor');
   });
@@ -112,7 +112,7 @@ describe('BookDetailView Distributor Display Integration', () => {
     render(<BookDetailView {...mockProps} />);
 
   // Verify provider label is shown
-  expect(screen.getByText('Provider')).toBeInTheDocument();
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
 
     console.log('✅ BookDetailView correctly hides distributor when not present');
   });

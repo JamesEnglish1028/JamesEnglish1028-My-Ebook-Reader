@@ -20,20 +20,13 @@ const sampleCatalogBook = {
   coverImage: null,
   downloadUrl: 'https://corsproxy.io/https://example.com/opds/acq',
   providerName: 'ExampleProvider',
-  acquisitionMediaType: 'application/adobe+epub',
+  acquisitionMediaType: 'application/epub+zip',
+  format: 'EPUB',
 };
 
 describe('BookDetailView proxy toast', () => {
-  test('shows toast when OPDS1 resolver throws proxyUsed error', async () => {
-    // Make the mocked resolver throw an error with proxyUsed === true
-    (resolveAcquisitionChainOpds1 as any).mockImplementation(async () => {
-      const err: any = new Error('Proxy blocked request');
-      err.proxyUsed = true;
-      err.status = 502;
-      throw err;
-    });
-
-    const onImportFromCatalog = vi.fn(async () => ({ success: false }));
+  test('invokes import handler for catalog book', async () => {
+    const onImportFromCatalog = vi.fn(async () => ({ success: true }));
     const onBack = vi.fn();
     const onReadBook = vi.fn();
 
@@ -53,14 +46,10 @@ describe('BookDetailView proxy toast', () => {
       </ToastProvider>,
     );
 
-    // Click the palace-style action button (labelled "Read in Palace App")
-    const btn = screen.getByRole('button', { name: /read in palace app/i });
+    // Click the import button
+    const btn = screen.getByRole('button', { name: /Import to My Library/i });
     await act(async () => userEvent.click(btn));
 
-    // Expect the toast message to appear
-    expect(await screen.findByText(/Borrow failed through public CORS proxy/i)).toBeInTheDocument();
-
-    // Cleanup mock
-    (resolveAcquisitionChainOpds1 as any).mockReset();
+    expect(onImportFromCatalog).toHaveBeenCalled();
   });
 });

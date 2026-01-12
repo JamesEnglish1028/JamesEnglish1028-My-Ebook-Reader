@@ -99,8 +99,8 @@ describe('Import flow with authDocument', () => {
 
     render(<TestHarness />);
 
-    // Click the Add to Bookshelf button
-    const addButton = screen.getByRole('button', { name: /Add to Bookshelf/i });
+    // Click the Import button
+    const addButton = screen.getByRole('button', { name: /Import to My Library/i });
     await user.click(addButton);
 
     // Modal should appear with authDocument info

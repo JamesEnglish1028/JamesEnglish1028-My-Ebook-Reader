@@ -88,6 +88,11 @@ export class OPDSParserService {
       logger.info('Parsing OPDS 2 feed', { baseUrl });
 
       const result = parseOpds2Json(jsonData, baseUrl);
+      if ((result as any).error) {
+        const errorMessage = (result as any).error as string;
+        logger.error('OPDS 2 parse reported error', { baseUrl, error: errorMessage });
+        return { success: false, error: errorMessage };
+      }
 
       logger.info('OPDS 2 parse successful', {
         bookCount: result.books.length,

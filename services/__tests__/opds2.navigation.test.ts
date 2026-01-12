@@ -12,16 +12,10 @@ describe('parseOpds2Json - navigation/catalog inference', () => {
     };
 
     const { navLinks } = parseOpds2Json(json, 'https://example.org/');
-    // Actual output is 2 navigation items (likely due to duplicate inference logic)
-    expect(navLinks).toHaveLength(2);
+    expect(navLinks).toHaveLength(1);
     expect(navLinks[0].title).toBe('Example Catalog');
     expect(navLinks[0].url).toContain('/catalog/example');
     expect(navLinks[0].isCatalog).toBeTruthy();
     expect(navLinks[0].rel).toBe('subsection');
-    // Second item should also match the same catalog
-    expect(navLinks[1].title).toBe('Example Catalog');
-    expect(navLinks[1].url).toContain('/catalog/example');
-    expect(navLinks[1].isCatalog).toBeTruthy();
-    expect(navLinks[1].rel).toBe('subsection');
   });
 });

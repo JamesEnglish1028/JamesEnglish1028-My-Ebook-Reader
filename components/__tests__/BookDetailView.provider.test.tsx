@@ -27,6 +27,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       summary: 'A test book from OAPEN',
       distributor: 'OAPEN',
       providerId: 'test-123',
+      providerName: 'OAPEN',
       format: 'PDF',
     } as any;
 
@@ -43,9 +44,9 @@ describe('BookDetailView Distributor as Provider Integration', () => {
 
     render(<BookDetailView {...mockProps} />);
 
-  // Should show Provider section with distributor as provider name
-  expect(screen.getByText('Provider')).toBeInTheDocument();
-  expect(screen.getByText('OAPEN')).toBeInTheDocument();
+    // Should show Provider section with distributor as provider name
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
+    expect(screen.getByText('OAPEN')).toBeInTheDocument();
 
     console.log('✅ Catalog book shows distributor as provider name');
   });
@@ -76,8 +77,8 @@ describe('BookDetailView Distributor as Provider Integration', () => {
     render(<BookDetailView {...mockProps} />);
 
   // Should show Provider section with providerName
-  expect(screen.getByText('Provider')).toBeInTheDocument();
-  expect(screen.getByText('My Library Provider')).toBeInTheDocument();
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
+    expect(screen.getByText('My Library Provider')).toBeInTheDocument();
   // Should NOT show distributor separately since it's a library book
   expect(screen.queryByText('OAPEN')).not.toBeInTheDocument();
 
@@ -93,6 +94,7 @@ describe('BookDetailView Distributor as Provider Integration', () => {
       downloadUrl: 'https://example.com/download',
       summary: 'Book without distributor',
       providerId: 'no-dist-123',
+      providerName: 'Imported locally',
       format: 'EPUB',
     } as any;
 
@@ -109,10 +111,10 @@ describe('BookDetailView Distributor as Provider Integration', () => {
 
     render(<BookDetailView {...mockProps} />);
 
-  // Should show Provider section but no distributor
-  expect(screen.getByText('Provider')).toBeInTheDocument();
-  // Should NOT show distributor
-  expect(screen.queryByText('OAPEN')).not.toBeInTheDocument();
+    // Should show Provider section but no distributor
+    expect(screen.getByText(/Provider:/)).toBeInTheDocument();
+    // Should NOT show distributor
+    expect(screen.queryByText('OAPEN')).not.toBeInTheDocument();
 
     console.log('✅ Catalog book without distributor handled gracefully');
   });

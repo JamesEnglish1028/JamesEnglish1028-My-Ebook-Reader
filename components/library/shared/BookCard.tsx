@@ -60,6 +60,11 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
 
   const coverImage = getCoverImage();
 
+  const contributors = isCatalogBook(book) ? book.contributors ?? [] : [];
+  const categories = isCatalogBook(book)
+    ? (book.categories ?? []).map((cat) => cat.label || cat.term).filter(Boolean)
+    : [];
+
   return (
     <div
       ref={ref}
@@ -102,6 +107,16 @@ const BookCard = React.forwardRef<HTMLDivElement, BookCardProps>(({
         <p className="text-xs text-slate-400 truncate">
           {book.author}
         </p>
+        {contributors.length > 0 && (
+          <p className="text-[11px] text-slate-400 truncate" title={contributors.join(', ')}>
+            Contributors: {contributors.slice(0, 2).join(', ')}
+          </p>
+        )}
+        {categories.length > 0 && (
+          <p className="text-[11px] text-slate-500 truncate" title={categories.join(', ')}>
+            Categories: {categories.slice(0, 2).join(', ')}
+          </p>
+        )}
         <BookBadges book={book} />
       </div>
     </div>

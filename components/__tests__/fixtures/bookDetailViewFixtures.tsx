@@ -8,6 +8,7 @@ export const catalogBook = {
   summary: 'A book from the OAPEN catalog',
   distributor: 'OAPEN',
   providerId: 'oapen-123',
+  providerName: 'OAPEN Library',
   format: 'EPUB',
   acquisitionMediaType: 'application/epub+zip',
 };
@@ -21,6 +22,7 @@ export const pdfCatalogBook = {
   summary: 'A PDF book',
   distributor: 'BiblioBoard',
   providerId: 'biblio-789',
+  providerName: 'BiblioBoard',
   format: 'PDF',
   acquisitionMediaType: 'application/pdf',
 };
