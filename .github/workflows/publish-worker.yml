@@ -20,9 +20,11 @@ jobs:
         run: |
           echo "--- proxy directory listing ---"
           ls -la proxy || true
-          echo "\n--- proxy/wrangler.toml contents ---"
+          echo ""
+          echo "--- proxy/wrangler.toml contents ---"
           sed -n '1,200p' proxy/wrangler.toml || true
-          echo "\n--- secret presence checks (no values) ---"
+          echo ""
+          echo "--- secret presence checks (no values) ---"
           if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then echo "CLOUDFLARE_API_TOKEN is set"; else echo "CLOUDFLARE_API_TOKEN is NOT set"; fi
           if [ -n "${{ secrets.CF_API_TOKEN }}" ]; then echo "CF_API_TOKEN is set"; else echo "CF_API_TOKEN is NOT set"; fi
       - name: Verify Worker secrets
